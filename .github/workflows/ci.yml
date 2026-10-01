@@ -41,29 +41,34 @@ jobs:
         run: pip install "argon2-cffi>=23.1" "cryptography>=42"
       - name: 校验黄金向量
         run: python scripts/verify-vectors.py
-      - name: 配置 MSVC 环境
+      - name: 定位 MSVC 环境
         shell: pwsh
         run: |
-          # windows-2022 runner 自带 VS2022，直接调用 VsDevCmd 载入环境
-          $vsdev = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
-          if (-not (Test-Path $vsdev)) {
-            $vsdev = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat"
-          }
-          if (-not (Test-Path $vsdev)) {
+          # windows-2022 runner 自带 VS2022（Enterprise 或 Community）。
+          # 定位 VsDevCmd.bat 并写入 GITHUB_ENV，供后续 cmd 步骤使用。
+          $candidates = @(
+            "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat",
+            "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat"
+          )
+          $vsdev = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $vsdev) {
             Write-Host "::error::未找到 VsDevCmd.bat，MSVC 环境不可用"; exit 1
           }
-          $env:VSDEVCMD = $vsdev
-          # 后续步骤通过 CMake Preset 复用此环境
-      - name: 构建并测试
-        shell: pwsh
+          "VSDEVCMD=$vsdev" >> $env:GITHUB_ENV
+          Write-Host "MSVC: $vsdev"
+      - name: 构建并测试密码学层
+        shell: cmd
         run: |
-          if (Test-Path windows/CMakeLists.txt) {
-            cmake -S windows -B windows/build -A x64
-            cmake --build windows/build --config Release
-            ctest --test-dir windows/build -C Release --output-on-failure
-          } else {
-            Write-Host "::notice::windows 工程尚未创建，跳过构建"
-          }
+          call "%VSDEVCMD%"
+          chcp 65001 >nul
+          pwsh -NoProfile -File windows/scripts/build.ps1 -Test
+      - name: 上传测试日志
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-crypto-test
+          path: windows/build/
+          if-no-files-found: ignore
 
   # ---------- Linux ----------
   linux:

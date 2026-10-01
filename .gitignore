@@ -24,6 +24,12 @@
 # ---- 依赖 ----
 node_modules/
 vendor/
+# 例外：Argon2 参考实现必须入库。五端编译同一份源码是跨端一致性的基础，
+# 且 Windows 11 的 CNG 不提供 Argon2id，没有系统 API 可用。
+# 引入方式与修改纪律见 vendor/argon2/README.md。
+!vendor/
+vendor/*
+!vendor/argon2/
 Pods/
 .build/
 DerivedData/
@@ -70,3 +76,13 @@ desktop.ini
 *.tmp
 *.bak
 *~
+
+# ---- Argon2 内置源码（由 scripts/vendor-argon2.py 同步，不直接改动）----
+# 注意：vendor/argon2 需要入库，五端共用同一份实现以保证跨端一致，
+# 因此这里不忽略。仅忽略编译中间产物。
+*.obj
+*.pdb
+*.ilk
+*.idb
+*.exp
+*.lib

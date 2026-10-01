@@ -1,0 +1,13 @@
+name: CNG 能力探测（一次性）
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+jobs:
+  probe:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: 探测 CNG 非对称算法可用性
+        shell: pwsh
+        run: python scripts/probe-cng.py

@@ -40,9 +40,20 @@ class SecureBytes {
   SecureBytes() = default;
   explicit SecureBytes(std::size_t n) : data_(n, 0) {}
   SecureBytes(const std::uint8_t* p, std::size_t n) : data_(p, p + n) {}
+  // 密钥材料禁止拷贝：拷贝会产生无法追踪的副本，违背清零约定。
   SecureBytes(const SecureBytes&) = delete;
   SecureBytes& operator=(const SecureBytes&) = delete;
-  SecureBytes(SecureBytes&& o) noexcept : data_(std::move(o.data_)) { o.data_.clear(); }
+  SecureBytes(SecureBytes&& o) noexcept : data_(std::move(o.data_)) {
+    o.data_.clear();
+  }
+  SecureBytes& operator=(SecureBytes&& o) noexcept {
+    if (this != &o) {
+      clear();
+      data_ = std::move(o.data_);
+      o.data_.clear();
+    }
+    return *this;
+  }
 
   std::uint8_t* data() noexcept { return data_.data(); }
   const std::uint8_t* data() const noexcept { return data_.data(); }
@@ -66,6 +77,12 @@ enum class CryptoError {
 };
 
 const char* to_string(CryptoError e);
+
+// ---- 环境能力探测 ----
+// 精简版 / 容器化 Windows 镜像可能只提供 CNG 对称算法（AES、SHA、ChaCha20），
+// 而不提供 RSA / ECC / DH。此时 RSA 相关调用会返回 STATUS_INVALID_HANDLE 或
+// STATUS_NOT_SUPPORTED。启动时探测一次，避免把环境缺陷误报为实现缺陷。
+bool cng_has_asymmetric_support();
 
 // ---- 随机数（CNG BCryptGenRandom，不得使用非密码学随机源）----
 void random_bytes(std::span<std::uint8_t> out);
