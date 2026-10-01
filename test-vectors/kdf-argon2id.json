@@ -1,0 +1,96 @@
+{
+  "description": "Argon2id 密钥派生黄金向量。KEK = Argon2id(password, salt)",
+  "params": {
+    "memoryKiB": 10240,
+    "iterations": 3,
+    "parallelism": 1,
+    "outputLen": 32,
+    "version": 19
+  },
+  "vectors": [
+    {
+      "name": "argon2id-basic-1",
+      "kdf": {
+        "alg": "argon2id",
+        "version": 19,
+        "passwordHex": "746573742d70617373776f72642d31",
+        "saltHex": "000102030405060708090a0b0c0d0e0f",
+        "memoryKiB": 10240,
+        "iterations": 3,
+        "parallelism": 1,
+        "outputLen": 32
+      },
+      "expectedHex": "886e0e877304df99328dd88e6ddf809ca106ed37d961b16fea7d3868f550fe8f"
+    },
+    {
+      "name": "argon2id-basic-2",
+      "kdf": {
+        "alg": "argon2id",
+        "version": 19,
+        "passwordHex": "",
+        "saltHex": "000102030405060708090a0b0c0d0e0f",
+        "memoryKiB": 10240,
+        "iterations": 3,
+        "parallelism": 1,
+        "outputLen": 32
+      },
+      "expectedHex": "7357f7eb83a4aa7269586aee71eaae3614d8bcfa3d49b08b2771ba32d9e51675"
+    },
+    {
+      "name": "argon2id-basic-3",
+      "kdf": {
+        "alg": "argon2id",
+        "version": 19,
+        "passwordHex": "61",
+        "saltHex": "ffffffffffffffffffffffffffffffff",
+        "memoryKiB": 10240,
+        "iterations": 3,
+        "parallelism": 1,
+        "outputLen": 32
+      },
+      "expectedHex": "014ce211c19738b307915076a4e50184b59d8e71fdb8b6749050abaa831f0034"
+    },
+    {
+      "name": "argon2id-utf8-password",
+      "kdf": {
+        "alg": "argon2id",
+        "version": 19,
+        "passwordHex": "e5af86e7a081e5af86e7a081",
+        "saltHex": "000102030405060708090a0b0c0d0e0f",
+        "memoryKiB": 10240,
+        "iterations": 3,
+        "parallelism": 1,
+        "outputLen": 32
+      },
+      "expectedHex": "e6f4b2e3aabaab7bc03dc2fce3fc5504025f1295ab857554953e42ecf14a5a3f"
+    },
+    {
+      "name": "argon2id-long-password",
+      "kdf": {
+        "alg": "argon2id",
+        "version": 19,
+        "passwordHex": "5050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050",
+        "saltHex": "000102030405060708090a0b0c0d0e0f",
+        "memoryKiB": 10240,
+        "iterations": 3,
+        "parallelism": 1,
+        "outputLen": 32
+      },
+      "expectedHex": "98dcd05ea708e8525e8f5aa6970fce14c44cb45af40efcfd4257c5360d39d24c"
+    },
+    {
+      "name": "argon2id-salt-differs",
+      "kdf": {
+        "alg": "argon2id",
+        "version": 19,
+        "passwordHex": "746573742d70617373776f72642d31",
+        "saltHex": "10101010101010101010101010101010",
+        "memoryKiB": 10240,
+        "iterations": 3,
+        "parallelism": 1,
+        "outputLen": 32
+      },
+      "expectedHex": "94716955413ab5de894315dcd1b066958597777a9fca3f3c9942d29aecc14ec7"
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "description": "AES-256-GCM 黄金向量。nonce 12 字节，tag 16 字节",
+  "note": "pubKeyNonce 与 privKeyNonce 必须不同：同 KEK 复用 nonce 会使两密文",
+  "note2": "异或即可恢复两明文异或，加密完全失效。",
+  "vectors": [
+    {
+      "name": "aesgcm-basic",
+      "alg": "aes-256-gcm",
+      "keyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "nonceHex": "000102030405060708090a0b",
+      "aadHex": "6d61737465722d6b65792d69642d313662797465",
+      "plaintextHex": "e69cbae5af86e4bfa1e681afe58685e5aeb9",
+      "cipherHex": "a19e6cfe6a6326a42ca71624546ffd882d6f",
+      "tagHex": "cccb8d51303c24818f8adcf0e0f0955c"
+    },
+    {
+      "name": "aesgcm-empty-plaintext",
+      "alg": "aes-256-gcm",
+      "keyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "nonceHex": "000102030405060708090a0b",
+      "aadHex": "7365637265742d69642d31366279746573",
+      "plaintextHex": "",
+      "cipherHex": "",
+      "tagHex": "fb460d6237a1ac5a0c9529d7f8c63cf8"
+    },
+    {
+      "name": "aesgcm-aad-differs",
+      "alg": "aes-256-gcm",
+      "keyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "nonceHex": "000102030405060708090a0b",
+      "aadHex": "6f746865722d6161642d76616c756521",
+      "plaintextHex": "e69cbae5af86e4bfa1e681afe58685e5aeb9",
+      "cipherHex": "a19e6cfe6a6326a42ca71624546ffd882d6f",
+      "tagHex": "e7ddad3db17b09edca336b38f8f8a598"
+    },
+    {
+      "name": "aesgcm-pubkey-nonce",
+      "alg": "aes-256-gcm",
+      "keyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "nonceHex": "a0a0a0a0a0a0a0a0a0a0a0a0",
+      "aadHex": "6d61737465722d6b65792d69642d313662797465",
+      "plaintextHex": "5253412d5055424c49432d4b45592d4445522d4259544553",
+      "cipherHex": "77e223ceee910c91f012a3c9a866ddea80eab4a7ebb96c48",
+      "tagHex": "1e3afc6515c5d399f16b882f8510572e"
+    },
+    {
+      "name": "aesgcm-privkey-nonce",
+      "alg": "aes-256-gcm",
+      "keyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "nonceHex": "b0b0b0b0b0b0b0b0b0b0b0b0",
+      "aadHex": "6d61737465722d6b65792d69642d313662797465",
+      "plaintextHex": "5253412d505249564154452d4b45592d4445522d4259544553",
+      "cipherHex": "a8e1bd67ce98d7fc44ce8a8696f233a224c7161ce3dd94c000",
+      "tagHex": "25ba9c0c56477c5769c95f7b1b0bfb85"
+    }
+  ]
+}

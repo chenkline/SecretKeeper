@@ -1,0 +1,157 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # 每日定时全量构建，用于发现上游依赖的破坏性变更
+    - cron: "17 3 * * *"
+
+jobs:
+  # ---------- 黄金测试向量校验（关键路径）----------
+  vectors:
+    name: 向量校验
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 安装依赖
+        run: pip install "argon2-cffi>=23.1" "cryptography>=42"
+      - name: 校验向量自洽性
+        run: python scripts/verify-vectors.py
+      - name: 确认向量可复现（参数未被意外改动）
+        run: |
+          python scripts/gen-vectors.py
+          git diff --exit-code test-vectors/ \\
+            || (echo "::error::向量与生成脚本不一致，请检查是否手工改过向量或参数变更"; exit 1)
+
+
+  # ---------- Windows ----------
+  windows:
+    name: Windows (C++/WinUI3)
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 安装向量校验依赖
+        run: pip install "argon2-cffi>=23.1" "cryptography>=42"
+      - name: 校验黄金向量
+        run: python scripts/verify-vectors.py
+      - name: 配置 MSVC
+        uses: ilammy/msvc-dev@v1
+      - name: 构建并测试
+        shell: pwsh
+        run: |
+          if (Test-Path windows/CMakeLists.txt) {
+            cmake -S windows -B windows/build -A x64
+            cmake --build windows/build --config Release
+            ctest --test-dir windows/build -C Release --output-on-failure
+          } else {
+            Write-Host "::notice::windows 工程尚未创建，跳过构建"
+          }
+
+  # ---------- Linux ----------
+  linux:
+    name: Linux (C/Qt)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 安装向量校验依赖
+        run: pip install "argon2-cffi>=23.1" "cryptography>=42"
+      - name: 校验黄金向量
+        run: python scripts/verify-vectors.py
+      - name: 安装 Qt 与依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build qt6-base-dev libssl-dev libsodium-dev libsqlite3-dev
+      - name: 构建并测试
+        run: |
+          if [ -f linux/CMakeLists.txt ]; then
+            cmake -S linux -B linux/build -G Ninja -DCMAKE_BUILD_TYPE=Release
+            cmake --build linux/build
+            ctest --test-dir linux/build --output-on-failure
+          else
+            echo "::notice::linux 工程尚未创建，跳过构建"
+          fi
+
+
+  # ---------- macOS ----------
+  macos:
+    name: macOS (Swift/AppKit)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 安装向量校验依赖
+        run: pip install "argon2-cffi>=23.1" "cryptography>=42"
+      - name: 校验黄金向量
+        run: python scripts/verify-vectors.py
+      - name: 构建并测试
+        run: |
+          if [ -d macos ]; then
+            swift build --package-path macos -c release
+            swift test --package-path macos -c release
+          else
+            echo "::notice::macos 工程尚未创建，跳过构建"
+          fi
+
+  # ---------- Android ----------
+  android:
+    name: Android (Kotlin/Compose)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 安装向量校验依赖
+        run: pip install "argon2-cffi>=23.1" "cryptography>=42"
+      - name: 校验黄金向量
+        run: python scripts/verify-vectors.py
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - name: 构建并测试
+        run: |
+          if [ -f android/gradlew ]; then
+            chmod +x android/gradlew
+            cd android && ./gradlew assembleDebug test --no-daemon
+          else
+            echo "::notice::android 工程尚未创建，跳过构建"
+          fi
+
+  # ---------- iOS ----------
+  ios:
+    name: iOS (Swift/SwiftUI)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 安装向量校验依赖
+        run: pip install "argon2-cffi>=23.1" "cryptography>=42"
+      - name: 校验黄金向量
+        run: python scripts/verify-vectors.py
+      - name: 构建并测试（未签名）
+        run: |
+          if [ -d ios ]; then
+            xcodebuild build -project ios/ios.xcodeproj -scheme ios \\
+              -destination "generic/platform=iOS" -configuration Release \\
+              CODE_SIGNING_ALLOWED=NO
+          else
+            echo "::notice::ios 工程尚未创建，跳过构建"
+          fi
