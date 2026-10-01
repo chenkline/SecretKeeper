@@ -16,6 +16,12 @@ import json
 import os
 import sys
 
+# Windows runner 上 Python 的 stdout 默认是 cp1252，打印中文会抛
+# UnicodeEncodeError 让整个 job 变红。必须在任何输出之前完成重配。
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 from argon2.low_level import Type, hash_secret_raw
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa

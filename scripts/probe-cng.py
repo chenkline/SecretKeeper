@@ -7,7 +7,16 @@
 # 且 BCryptGetProperty(BCRYPT_OBJECT_LENGTH) 直接返回 NOT_SUPPORTED。
 # 本程序用于在 CI 上一次性确认，避免把环境问题误判为实现缺陷。
 
-import ctypes, sys
+import ctypes
+import sys
+
+# Windows 控制台默认代码页不是 UTF-8，打印中文会抛 UnicodeEncodeError
+# 让 job 变红。必须在任何输出之前完成重配。
+for _stream in (sys.stdout, sys.stderr):
+    _reconfigure = getattr(_stream, "reconfigure", None)
+    if _reconfigure is not None:
+        _reconfigure(encoding="utf-8", errors="replace")
+
 from ctypes import wintypes
 
 bc = ctypes.WinDLL("bcrypt.dll")

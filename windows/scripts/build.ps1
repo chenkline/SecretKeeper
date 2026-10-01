@@ -20,6 +20,12 @@ param(
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..\..")
 
+# CI 的 Windows 控制台默认代码页不是 UTF-8，Write-Host 打印中文会抛
+# NativeCommandFailed 让 job 变红。强制切到 UTF-8，与 runner 上的
+# chcp 65001 双保险。
+try { chcp 65001 > $null } catch { }
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+
 $buildDir = "windows\build"
 New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
 
