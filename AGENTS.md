@@ -141,6 +141,49 @@ Secret/
 - CI 必须覆盖：五端构建 + 五端黄金测试向量校验 + 格式往返测试。
 - 合并前要求所有 job 通过。
 
+### 9.1 Windows runner 的三个坑（已踩，勿重犯）
+
+| 坑 | 现象 | 处理 |
+|---|---|---|
+| 控制台非 UTF-8 | Python 打印中文抛 `UnicodeEncodeError`，C++ `Write-Host` 抛 `NativeCommandFailed`，job 直接变红 | 在脚本**内部**重配（`sys.stdout.reconfigure` / `chcp 65001`），不要依赖 CI 环境变量，这样本地与 CI 行为一致 |
+| VS 路径写死 | runner 镜像的 Visual Studio SKU 随镜像更新变化，写死 `Enterprise`/`Community` 路径迟早失效 | 用 `vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64` 查询，失败再递归兜底 |
+| SDK 装不上 | Android job 装 SDK 要下数 GB 且需交互式接受许可协议，许可步骤失败就让整个 job 变红，而此时并无东西需要构建 | 先探测工程是否存在，不存在则整段跳过 |
+
+测试输出必须**全 ASCII**。中文注释在源文件里没问题，但 `printf` 出去的中文在
+GBK 控制台上会炸。
+
+### 9.2 内置第三方源码
+
+| 目录 | 来源 | 为什么内置 |
+|---|---|---|
+| `vendor/argon2/` | Argon2 官方参考实现 20190702（CC0/Apache-2.0） | Windows CNG 不提供 Argon2id，且五端必须编译同一份实现才能保证跨端一致 |
+| `vendor/sqlite/` | SQLite amalgamation 3.45.0（public-domain dedication） | 五端编译同一份 `sqlite3.c`，避免各端 SQLite 版本差异造成行为分叉 |
+
+两者都**必须入库**（`.gitignore` 已加例外）。本机缺少对应开发工具，且项目约束
+不安装新工具。改前先读各自的 `README.md`。
+
+### 9.3 本机与 CI 的环境差异
+
+- VS BuildTools 在**非默认路径** `D:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools`（不是 `Program Files (x86)`）
+- 本机**无 CMake**，Windows 构建走 `windows/scripts/build.ps1`；Linux/macOS 走 CMake/SwiftPM
+- Python 位于 `D:\veighna_studio\`，已装 `argon2-cffi` 与 `cryptography`
+- 系统有本地代理 `127.0.0.1:7899`，git 与 GitHub API 需走它；直连 github.com:443 会间歇超时
+- 推送认证用 `.local/context.md` 里的 token，经 `http.https://github.com/.extraheader` 传入；该文件已被 gitignore，**严禁提交**
+
+### 9.4 CNG 缺少非对称算法（已知环境限制）
+
+Windows 11 build 22631 与 GitHub `windows-2022` runner 的 CNG **均不提供**
+RSA/ECDH/ECDSA/DH/DSA：
+
+- 一律返回 `STATUS_NOT_SUPPORTED (0xC00000BB)`
+- `BCryptGenerateKeyPair` 返回成功，但后续 `BCryptExportKey` / `BCryptEncrypt`
+  返回 `STATUS_INVALID_HANDLE (0xC0000008)`
+- AES / SHA256 / ChaCha20-Poly1305 正常
+
+因此**本机与 CI 都无法执行 RSA 测试**。`cng_has_asymmetric_support()` 会主动探测
+并让测试显式跳过。**完整 RSA 覆盖需要其他环境**，不要误以为测试全绿就代表
+RSA 路径正确。
+
 ---
 
 ## 10. 文档索引
