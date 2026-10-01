@@ -44,13 +44,29 @@ jobs:
       - name: 定位 MSVC 环境
         shell: pwsh
         run: |
-          # windows-2022 runner 自带 VS2022（Enterprise 或 Community）。
-          # 定位 VsDevCmd.bat 并写入 GITHUB_ENV，供后续 cmd 步骤使用。
-          $candidates = @(
-            "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat",
-            "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat"
-          )
-          $vsdev = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          # runner 镜像里的 VS 版本与 SKU 会随镜像更新变化（Enterprise /
+          # Community / Professional 都出现过），写死路径迟早会失效。
+          # 因此优先用官方的 vswhere 查询，失败再退回递归搜索。
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsdev = $null
+          if (Test-Path $vswhere) {
+            $install = & $vswhere -latest -products * `
+              -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+              -property installationPath
+            if ($install) {
+              $candidate = Join-Path $install "Common7\Tools\VsDevCmd.bat"
+              if (Test-Path $candidate) { $vsdev = $candidate }
+            }
+          }
+          if (-not $vsdev) {
+            $root = "${env:ProgramFiles(x86)}\Microsoft Visual Studio"
+            if (Test-Path $root) {
+              $vsdev = Get-ChildItem -Path $root -Filter VsDevCmd.bat `
+                -Recurse -ErrorAction SilentlyContinue |
+                Where-Object { $_.FullName -match "\\Common7\\Tools\\VsDevCmd\.bat$" } |
+                Select-Object -First 1 -ExpandProperty FullName
+            }
+          }
           if (-not $vsdev) {
             Write-Host "::error::未找到 VsDevCmd.bat，MSVC 环境不可用"; exit 1
           }
