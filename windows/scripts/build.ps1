@@ -108,6 +108,12 @@ if ($Test) {
         "windows\src\crypto\crypto.cpp",
         "windows\src\crypto\der.cpp",
         "windows\src\crypto\bignum.cpp",
+        "windows\src\core\text.cpp",
+        "windows\src\core\error.cpp",
+        "windows\src\core\backoff.cpp",
+        "windows\src\core\kek_cache.cpp",
+        "windows\src\core\master_key_service.cpp",
+        "windows\src\container\container.cpp",
         "windows\src\store\hex.cpp",
         "windows\src\store\index_db.cpp",
         "windows\src\store\file_store.cpp",
@@ -125,6 +131,30 @@ if ($Test) {
     & "$buildDir\store_test.exe" "."
     $storeRc = $LASTEXITCODE
     if ($storeRc -ne 0) { throw "存储层测试失败（退出码 $storeRc）" }
+
+    Write-Host "`n=== 构建核心层自检 ==="
+    $coreSrcs = $argonSrcs + @(
+        "windows\src\crypto\crypto.cpp",
+        "windows\src\crypto\der.cpp",
+        "windows\src\crypto\bignum.cpp",
+        "windows\src\core\text.cpp",
+        "windows\src\core\error.cpp",
+        "windows\src\core\backoff.cpp",
+        "windows\src\core\kek_cache.cpp",
+        "windows\tests\core_test.cpp"
+    )
+    $coreCmd = "cl.exe /nologo /std:c++20 /utf-8 /EHsc $cfgFlag /MD " +
+               "/D_CRT_SECURE_NO_WARNINGS " +
+               ($includeArgs -join " ") + " " +
+               "/Fo:$buildDir\ /Fd:$buildDir\store\ /Fe:$buildDir\core_test.exe " +
+               (($coreSrcs | ForEach-Object { "`"$_`"" }) -join " ") +
+               " $($argonFlags -join ' ') /link bcrypt.lib"
+    cmd /c $coreCmd
+    if ($LASTEXITCODE -ne 0) { throw "核心层编译失败" }
+
+    & "$buildDir\core_test.exe"
+    $coreRc = $LASTEXITCODE
+    if ($coreRc -ne 0) { throw "核心层测试失败（退出码 $coreRc）" }
     Write-Host "`n全部通过。"
 } else {
     Write-Host "构建目标：库（尚未定义 UI 工程）"
