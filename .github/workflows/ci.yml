@@ -133,22 +133,33 @@ jobs:
         run: pip install "argon2-cffi>=23.1" "cryptography>=42"
       - name: 校验黄金向量
         run: python scripts/verify-vectors.py
+      # 尚未创建 android 工程时不装 SDK —— 装 SDK 要下载数 GB 且需要接受
+      # 许可协议，既慢又容易因许可步骤失败而让整个 job 变红，
+      # 而此时根本没有东西需要构建。
+      - name: 检查 android 工程是否存在
+        id: has_android
+        run: |
+          if [ -f android/gradlew ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "::notice::android 工程尚未创建，跳过 SDK 安装与构建"
+          fi
       - uses: actions/setup-java@v4
+        if: steps.has_android.outputs.exists == 'true'
         with:
           distribution: temurin
           java-version: "17"
       - name: 安装 Android SDK 并接受许可协议
+        if: steps.has_android.outputs.exists == 'true'
         run: |
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
           sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" > /dev/null
       - name: 构建并测试
+        if: steps.has_android.outputs.exists == 'true'
         run: |
-          if [ -f android/gradlew ]; then
-            chmod +x android/gradlew
-            cd android && ./gradlew assembleDebug test --no-daemon
-          else
-            echo "::notice::android 工程尚未创建，跳过构建"
-          fi
+          chmod +x android/gradlew
+          cd android && ./gradlew assembleDebug test --no-daemon
 
   # ---------- iOS ----------
   ios:
