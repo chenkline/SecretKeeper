@@ -68,6 +68,7 @@ if ($Test) {
         "windows\src\crypto\crypto.cpp",
         "windows\src\crypto\der.cpp",
         "windows\src\crypto\bignum.cpp",
+        "windows\src\container\container.cpp",
         "windows\tests\crypto_test.cpp"
     )
     $cmd = "cl.exe /nologo /std:c++20 /utf-8 /EHsc /W4 $cfgFlag /MD " +

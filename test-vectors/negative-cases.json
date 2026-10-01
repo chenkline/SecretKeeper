@@ -6,7 +6,8 @@
     "unsupported_version": "版本号高于支持范围",
     "truncated": "数据截断",
     "length_mismatch": "长度字段与实际不符",
-    "unknown_algorithm": "未知算法标识（如 v0.0.1 遇到 SM2）"
+    "unknown_algorithm": "未知算法标识（如 v0.0.1 遇到 SM2）",
+    "invalid_utf8": "name / title 不是合法 UTF-8"
   },
   "vectors": [
     {
@@ -65,9 +66,15 @@
     },
     {
       "name": "unknown-algorithm-sm2",
-      "inputHex": "53534331000100000000000802000000000f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f",
+      "inputHex": "534d4b31000100000000000102",
       "expectedError": "unknown_algorithm",
-      "desc": "SM2 算法标识在 v0.0.1 必须拒绝"
+      "desc": "主密钥文件使用 SM2 算法标识（mkAlg=2），v0.0.1 必须拒绝"
+    },
+    {
+      "name": "invalid-utf8-name",
+      "inputHex": "534d4b31000100000000008e0100000010000102030405060708090a0b0c0d0e0f00000001c300000010000102030405060708090a0b0c0d0e0f000028000000000300000001010000000ca0a0a0a0a0a0a0a0a0a0a0a000000010000000000000000000000000000000000000000178010000000cb0b0b0b0b0b0b0b0b0b0b0b000000010000000000000000000000000000000000000000179",
+      "expectedError": "invalid_utf8",
+      "desc": "name 含非法 UTF-8（0xC3 是双字节序列首字节，单独出现即非法）"
     },
     {
       "name": "tampered-ciphertext",

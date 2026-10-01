@@ -377,9 +377,35 @@ def gen_negative():
          "expectedError": "length_mismatch", "desc": "TLV 长度 0xFFFFFFFF，禁止越界分配"},
         {"name": "trailing-garbage", "inputHex": hx(g + b"\x00\x01\x02"),
          "expectedError": "length_mismatch", "desc": "文件尾部有多余字节"},
-        {"name": "unknown-algorithm-sm2", "inputHex": hx(hdr(1, 8) + b"\x02" + b"\x00\x00\x00\x00" + bytes([0x0F] * 16)),
-         "expectedError": "unknown_algorithm", "desc": "SM2 算法标识在 v0.0.1 必须拒绝"},
+        # SM2 是主密钥文件（SMK1）的 mkAlg 字段值，机密信息文件没有算法字段。
+        # 这里必须用 SMK1，否则测的就不是「未知算法标识」而是长度问题。
+        # 长度只覆盖到 mkAlg 一个字节，够解析器读出算法标识并拒绝即可。
+        {"name": "unknown-algorithm-sm2",
+         "inputHex": hx(hdr(1, 1, magic=b"SMK1") + b"\x02"),
+         "expectedError": "unknown_algorithm",
+         "desc": "主密钥文件使用 SM2 算法标识（mkAlg=2），v0.0.1 必须拒绝"},
     ]
+
+    # name 含非法 UTF-8。先构造一份完全合法的主密钥文件（name = "X"），
+    # 再把 name 的那一个字节换成 0xC3。0xC3 是双字节序列的首字节，
+    # 单独出现属于截断的 UTF-8 序列，必然校验失败。
+    # 长度前缀保持不变，因此测的确实是 UTF-8 校验而非长度校验。
+    _mk_valid = build_master_key_file(
+        1, bytes(range(16)), "X", bytes(range(16)),
+        KDF_MEM, KDF_ITER, KDF_PAR,
+        bytes([0xA0] * 12), bytes(16), b"x",
+        bytes([0xB0] * 12), bytes(16), b"y",
+    )
+    _bad_name_offset = _mk_valid.index(b"X")
+    _mk_bad = bytearray(_mk_valid)
+    _mk_bad[_bad_name_offset] = 0xC3
+    vectors.append({
+        "name": "invalid-utf8-name",
+        "inputHex": hx(bytes(_mk_bad)),
+        "expectedError": "invalid_utf8",
+        "desc": "name 含非法 UTF-8（0xC3 是双字节序列首字节，单独出现即非法）",
+    })
+
 
     # 密文篡改与错误密码：均走 GCM 认证失败
     kek = hash_secret_raw(b"container-password", bytes(range(16)),
@@ -413,6 +439,7 @@ def gen_negative():
             "truncated": "数据截断",
             "length_mismatch": "长度字段与实际不符",
             "unknown_algorithm": "未知算法标识（如 v0.0.1 遇到 SM2）",
+            "invalid_utf8": "name / title 不是合法 UTF-8",
         },
         "vectors": vectors,
     })
