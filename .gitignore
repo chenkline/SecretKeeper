@@ -1,0 +1,72 @@
+# ---- 机密：绝不入库 ----
+.local/
+*.secret
+*.key
+*.pem
+*.pfx
+*.p12
+*.keystore
+*.jks
+*.ppk
+.env
+.env.*
+!.env.example
+
+# ---- 导出的机密数据（含真实密文，切勿提交）----
+*.smk
+*.ssc
+*.smkexp
+*.sscexp
+*.db
+*.db-wal
+*.db-shm
+
+# ---- 依赖 ----
+node_modules/
+vendor/
+Pods/
+.build/
+DerivedData/
+build/
+cmake-build-*/
+obj/
+bin/
+packages/
+.gradle/
+
+# ---- IDE / 编辑器 ----
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userprefs
+*.xcuserdatad/
+xcuserdata/
+
+# ---- 构建产物 ----
+dist/
+out/
+*.apk
+*.aab
+*.ipa
+*.app/
+*.msix
+*.msixbundle
+*.exe
+*.dll
+*.so
+*.dylib
+*.msi
+*.AppImage
+
+# ---- 操作系统 ----
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- 临时文件 ----
+*.log
+*.tmp
+*.bak
+*~
