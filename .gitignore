@@ -30,6 +30,7 @@ vendor/
 !vendor/
 vendor/*
 !vendor/argon2/
+!vendor/sqlite/
 Pods/
 .build/
 DerivedData/

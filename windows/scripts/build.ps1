@@ -68,6 +68,18 @@ $argonSrcs = @(
     "vendor\argon2\src\$argonImpl"
 )
 
+$sqliteSrcs = @(
+    # SQLite 编译单元体积很大且默认警告很吵，关掉 W4 以免噪声淹没真实问题。
+    "vendor\sqlite\sqlite3.c"
+)
+
+$includeArgs = @(
+    "/I windows\src\crypto",
+    "/I windows\src\store",
+    "/I vendor\argon2\include",
+    "/I vendor\sqlite"
+)
+
 if ($Test) {
     Write-Host "`n=== 构建测试可执行文件 ==="
     $srcs = $argonSrcs + @(
@@ -79,7 +91,7 @@ if ($Test) {
     )
     $cmd = "cl.exe /nologo /std:c++20 /utf-8 /EHsc /W4 $cfgFlag /MD " +
            "/D_CRT_SECURE_NO_WARNINGS " +
-           "/I windows\src\crypto /I vendor\argon2\include " +
+           ($includeArgs -join " ") + " " +
            "/Fo:$buildDir\ /Fe:$buildDir\crypto_test.exe " +
            (($srcs | ForEach-Object { "`"$_`"" }) -join " ") +
            " $($argonFlags -join ' ') /link bcrypt.lib"
@@ -90,6 +102,29 @@ if ($Test) {
     & "$buildDir\crypto_test.exe" "."
     $rc = $LASTEXITCODE
     if ($rc -ne 0) { throw "测试失败（退出码 $rc）" }
+
+    Write-Host "`n=== 构建存储层自检 ==="
+    $storeSrcs = $argonSrcs + $sqliteSrcs + @(
+        "windows\src\crypto\crypto.cpp",
+        "windows\src\crypto\der.cpp",
+        "windows\src\crypto\bignum.cpp",
+        "windows\src\store\hex.cpp",
+        "windows\src\store\index_db.cpp",
+        "windows\src\store\file_store.cpp",
+        "windows\tests\store_test.cpp"
+    )
+    $storeCmd = "cl.exe /nologo /std:c++20 /utf-8 /EHsc $cfgFlag /MD " +
+                "/D_CRT_SECURE_NO_WARNINGS /DSQLITE_OMIT_LOAD_EXTENSION " +
+                ($includeArgs -join " ") + " " +
+                "/Fo:$buildDir\ /Fd:$buildDir\store\ /Fe:$buildDir\store_test.exe " +
+                (($storeSrcs | ForEach-Object { "`"$_`"" }) -join " ") +
+                " /link bcrypt.lib"
+    cmd /c $storeCmd
+    if ($LASTEXITCODE -ne 0) { throw "存储层编译失败" }
+
+    & "$buildDir\store_test.exe" "."
+    $storeRc = $LASTEXITCODE
+    if ($storeRc -ne 0) { throw "存储层测试失败（退出码 $storeRc）" }
     Write-Host "`n全部通过。"
 } else {
     Write-Host "构建目标：库（尚未定义 UI 工程）"
