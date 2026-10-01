@@ -66,14 +66,14 @@ winget install Python.Python.3.12
 
 | Job | Runner | 工具链 | 产物 |
 |---|---|---|---|
-| **windows** | `windows-2022» | VS 2022 + MSBuild + CMake | MSIX bundle / exe |
-| **linux** | `ubuntu-24.04» | Qt 6 + CMake + Ninja | AppImage / tar.gz |
-| **macos** | `macos-15» | Xcode 16 + SwiftPM | .app / .dmg |
-| **android** | `ubuntu-24.04» | JDK 17 + Android SDK 34 + Gradle | .apk |
-| **ios** | `macos-15» | Xcode 16 + SwiftPM | .xcarchive（未签名） |
-| **vectors** | `ubuntu-24.04» | Python 校验脚本 | 校验报告 |
+| **windows** | `windows-2022` | VS 2022 + MSBuild + CMake | MSIX bundle / exe |
+| **linux** | `ubuntu-24.04` | Qt 6 + CMake + Ninja | AppImage / tar.gz |
+| **macos** | `macos-15` | Xcode 16 + SwiftPM | .app / .dmg |
+| **android** | `ubuntu-24.04` | JDK 17 + Android SDK 34 + Gradle | .apk |
+| **ios** | `macos-15` | Xcode 16 + SwiftPM | .xcarchive（未签名） |
+| **vectors** | `ubuntu-24.04` | Python 校验脚本 | 校验报告 |
 
-**关于 iOS 签名**：CI 只产出**未签名**构建（`CODE_SIGNING_ALLOWED=NO»）。正式分发需在 macOS 本机用开发者证书签名，签名流程不放入公开 CI，避免证书泄露。
+**关于 iOS 签名**：CI 只产出**未签名**构建（`CODE_SIGNING_ALLOWED=NO`）。正式分发需在 macOS 本机用开发者证书签名，签名流程不放入公开 CI，避免证书泄露。
 
 ### 3.3 触发时机
 
@@ -86,11 +86,11 @@ winget install Python.Python.3.12
 
 | 缓存项 | 缓存键依据 |
 |---|---|
-| Gradle | `gradle/libs» |
-| SwiftPM | `spm/<Package.resolved 哈希>» |
-| Qt | `qt/<版本>» |
-| CMake 构建目录 | `cmake/<job>-<分支>» |
-| NuGet | `nuget» |
+| Gradle | `gradle/libs` |
+| SwiftPM | `spm/<Package.resolved 哈希>` |
+| Qt | `qt/<版本>` |
+| CMake 构建目录 | `cmake/<job>-<分支>` |
+| NuGet | `nuget` |
 
 缓存键必须包含 **lock 文件的哈希**，依赖变更时自动失效。
 
@@ -99,7 +99,7 @@ winget install Python.Python.3.12
 **这是跨平台一致性的最大风险来源。** 各端密码库大版本升级可能改变默认参数。
 
 要求：
-- 五个平台的依赖版本在仓库中显式锁定（`pubspec.lock»、`gradle/libs.versions.toml»、`Package.resolved»、CMake `FetchContent» 的 `GIT_TAG» 等）。
+- 五个平台的依赖版本在仓库中显式锁定（`pubspec.lock`、`gradle/libs.versions.toml`、`Package.resolved`、CMake `FetchContent` 的 `GIT_TAG` 等）。
 - **密码学相关依赖的升级必须单独提交**，并附五端黄金向量全绿证明。
 - 定时构建用于发现上游被动变更。
 
@@ -124,7 +124,7 @@ winget install Python.Python.3.12
 
 ### 4.2 本地快速回归
 
-建议提供轻量脚本 `scripts/test-vectors.ps1»，只跑 Windows 端向量，供本地秒级反馈；全量仍以 CI 为准。
+建议提供轻量脚本 `scripts/test-vectors.ps1`，只跑 Windows 端向量，供本地秒级反馈；全量仍以 CI 为准。
 
 ## 5. 仓库设置
 
