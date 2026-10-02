@@ -188,6 +188,26 @@ jobs:
         run: |
           & $env:MSBUILD "windows/src/ui/App.vcxproj" `
             /t:Build /p:Configuration=Release /p:Platform=x64 /m /v:minimal
+      - name: 诊断 App SDK 引导与链接项
+        if: always()
+        shell: pwsh
+        run: |
+          $pkg = "$env:USERPROFILE\.nuget\packages\microsoft.windowsappsdk"
+          if (Test-Path $pkg) {
+            Write-Host "=== App SDK 包目录 ==="
+            Get-ChildItem $pkg -Directory | ForEach-Object { Write-Host "  $($_.Name)" }
+            Write-Host "=== 含 Bootstrap 的文件 ==="
+            Get-ChildItem $pkg -Recurse -Include *.h,*.lib,*.dll -ErrorAction SilentlyContinue |
+              Where-Object { $_.Name -match 'Bootstrap' } |
+              ForEach-Object { Write-Host "  $($_.FullName)" }
+            Write-Host "=== SelfContained 相关 targets 属性 ==="
+            Get-ChildItem $pkg -Recurse -Filter *.targets -ErrorAction SilentlyContinue |
+              Select-String -Pattern 'SelfContained|Bootstrap' |
+              Select-Object -First 40 |
+              ForEach-Object { Write-Host "  $($_.Filename):$($_.LineNumber): $($_.Line.Trim())" }
+          } else {
+            Write-Host "::warning::App SDK 包未找到，还原可能失败"
+          }
       - name: 上传构建产物
         if: always()
         uses: actions/upload-artifact@v4
