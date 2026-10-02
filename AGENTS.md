@@ -143,8 +143,7 @@ Secret/
 ### 8.1 改动纪律（最小改动，铁律）
 
 - **不得变更存量文件的换行符格式。** 仓库内换行符并不统一：绝大多数文件是 LF，
-  但以下三个文件是 **CRLF**，改它们时必须逐字节保持 CRLF：
-  - `.github/workflows/probe-cng.yml`
+  但以下两个文件是 **CRLF**，改它们时必须逐字节保持 CRLF：
   - `windows/src/container/container.cpp`
   - `windows/src/container/container.h`
 
