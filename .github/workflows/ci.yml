@@ -218,6 +218,35 @@ jobs:
           }
           Write-Host "using PlatformToolset=$toolset"
           "TOOLSET=$toolset" >> $env:GITHUB_ENV
+
+          # MSB8020 在工具集目录存在时仍会发生，根因通常是该目录下的
+          # Toolset.props / Toolset.targets 缺失（即 C++ 工程支持组件
+          # Microsoft.VisualStudio.Component.VC.Tools.x86.x64 未装全）。
+          # 这里显式列出内容，把"缺什么"变成可见事实而不是猜测。
+          $tsDir = Join-Path $x64Sets $toolset
+          if (Test-Path $tsDir) {
+            $files = @(Get-ChildItem $tsDir -File | Select-Object -ExpandProperty Name)
+            Write-Host "toolset dir [$toolset]: $($files -join ', ')"
+            foreach ($req in @("Toolset.props", "Toolset.targets")) {
+              if (-not (Test-Path (Join-Path $tsDir $req))) {
+                Write-Host "::error::缺少 $req —— C++ 工程支持组件不完整"
+              }
+            }
+          } else {
+            Write-Host "::error::工具集目录不存在: $tsDir"
+          }
+          # 同时确认编译器本体存在
+          $cl = Join-Path $install "VC\Tools\MSVC"
+          if (Test-Path $cl) {
+            $vers = @(Get-ChildItem $cl -Directory | Select-Object -ExpandProperty Name)
+            Write-Host "MSVC compiler dirs: $($vers -join ', ')"
+            foreach ($v in $vers) {
+              $clExe = Join-Path $cl "$v\bin\Hostx64\x64\cl.exe"
+              Write-Host "  cl.exe present for $v : $(Test-Path $clExe)"
+            }
+          } else {
+            Write-Host "::error::VC\Tools\MSVC 不存在，MSVC 编译器未安装"
+          }
       - name: 还原 NuGet 包
         shell: pwsh
         run: |
