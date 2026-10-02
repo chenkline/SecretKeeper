@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\..\Directory.Packages.props" />
+  <!-- 必须导入 Microsoft.Cpp.Default.props，否则工程没有 Build 目标
+       （CI 上表现为 MSB4057: The target "Build" does not exist）。 -->
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Label="Globals">
     <CppWinRTOptimized>true</CppWinRTOptimized>
     <CppWinRTRootNamespaceAutoMerge>true</CppWinRTRootNamespaceAutoMerge>
@@ -75,4 +78,5 @@
   <ItemGroup>
     <Manifest Include="app.manifest" />
   </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
