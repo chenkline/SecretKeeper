@@ -52,7 +52,10 @@
   </ItemGroup>
   <PropertyGroup Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v143</PlatformToolset>
+    <!-- 不写死 PlatformToolset。runner 镜像的 VS 版本会变：写死 v143 在
+         某些镜像上报 MSB8020（工具集找不到），实测 windows-2022 上已装
+         14.29/14.44 两套工具。不设时由 Microsoft.Cpp.Default.props 继承
+         当前 VS 的默认工具集，跨镜像最稳。 -->
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)'=='Release' and '$(Platform)'=='x64'" Label="Configuration">
