@@ -135,13 +135,6 @@ $includeArgs = @(
     "/I vendor\mbedtls\include"
 )
 
-function Invoke-TestExe([string]$exe, [string[]]$exeArgs, [string]$label) {
-    if (-not (Test-Path $exe)) { throw "未生成可执行文件 $exe" }
-    if ($CompileOnly) {
-        Write-Host "CompileOnly: 跳过运行 $label"
-        return
-    }
-    & $exe @exeArgs
     $rc = $LASTEXITCODE
     if ($rc -ne 0) { throw "$label 失败（退出码 $rc）" }
 }
@@ -165,8 +158,6 @@ if ($Test -or $CompileOnly) {
     cmd /c $cmd
     if ($LASTEXITCODE -ne 0) { throw "编译失败" }
 
-    Write-Host "`n=== 运行密码学层自检 ==="
-    Invoke-TestExe "$buildDir\crypto_test.exe" @(".") "密码学层测试"
 
     Write-Host "`n=== 构建存储层自检 ==="
     $storeSrcs = $argonSrcs + $mbedtlsSrcs + $sqliteSrcs + @(
@@ -192,7 +183,6 @@ if ($Test -or $CompileOnly) {
     cmd /c $storeCmd
     if ($LASTEXITCODE -ne 0) { throw "存储层编译失败" }
 
-    Invoke-TestExe "$buildDir\store_test.exe" @(".") "存储层测试"
 
     Write-Host "`n=== 构建核心层自检 ==="
     $coreSrcs = $argonSrcs + $mbedtlsSrcs + @(
@@ -212,7 +202,6 @@ if ($Test -or $CompileOnly) {
     cmd /c $coreCmd
     if ($LASTEXITCODE -ne 0) { throw "核心层编译失败" }
 
-    Invoke-TestExe "$buildDir\core_test.exe" @() "核心层测试"
 
     Write-Host "`n=== 构建业务层自检 ==="
     $svcSrcs = $argonSrcs + $mbedtlsSrcs + $sqliteSrcs + @(
@@ -238,11 +227,13 @@ if ($Test -or $CompileOnly) {
     cmd /c $svcCmd
     if ($LASTEXITCODE -ne 0) { throw "业务层编译失败" }
 
-    Invoke-TestExe "$buildDir\service_test.exe" @() "业务层测试"
     if ($CompileOnly) {
         Write-Host "`n交叉编译完成（未运行测试）。"
     } else {
-        Write-Host "`n全部通过。"
+        # 执行逻辑移交 run-tests.ps1：编译与执行分离，交叉编译时无需运行。
+        & pwsh -NoProfile -File "windows/scripts/run-tests.ps1" `
+            -Architecture $Architecture -Root "."
+        if ($LASTEXITCODE -ne 0) { throw "测试失败" }
     }
 } else {
     Write-Host "构建目标：库（尚未定义 UI 工程）"
