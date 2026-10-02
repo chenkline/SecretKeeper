@@ -11,10 +11,18 @@
 #   powershell -File windows/scripts/build.ps1
 # 或直接：
 #   powershell -File windows/scripts/build.ps1 -Test
+#
+# 架构：
+#   -Architecture x64   （默认）本机原生构建并运行全部四层测试
+#   -Architecture arm64 交叉编译。ARM64 二进制无法在 x64 宿主上执行，
+#                       故必须配合 -CompileOnly 只编译不运行。
 
 param(
     [string]$Configuration = "Release",
-    [switch]$Test
+    [ValidateSet("x64", "arm64")]
+    [string]$Architecture = "x64",
+    [switch]$Test,
+    [switch]$CompileOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -26,8 +34,11 @@ Set-Location (Join-Path $PSScriptRoot "..\..")
 try { chcp 65001 > $null } catch { }
 $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
-$buildDir = "windows\build"
+# 中间产物按架构隔离，避免 x64 与 arm64 的同名 .obj 互相覆盖。
+$buildDir = "windows\build\$Architecture"
+$objDir = Join-Path $buildDir "obj"
 New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
+New-Item -ItemType Directory -Force -Path $objDir | Out-Null
 
 function Test-CpuSupports([string]$feature) {
     try {
@@ -43,7 +54,14 @@ function Test-CpuSupports([string]$feature) {
 }
 
 # ---- 选择 Argon2 实现 ----
-if (Test-CpuSupports "avx512f") {
+if ($Architecture -eq "arm64") {
+    # opt.c 内只有 __AVX512F__ / __AVX2__ 两条 x86 分支，ARM64 上必须走 ref.c。
+    # 这不是性能取舍而是正确性要求：宿主 CPU 探测读的是开发机的能力，
+    # 交叉编译时会误选 opt.c 并带上 x86 SIMD 宏，而上游 Makefile 明确禁止
+    # 在非 x86 目标上编译 opt.c。
+    $argonImpl = "ref.c"; $argonFlags = @()
+    Write-Host "Argon2: ARM64 目标，强制使用可移植参考实现（ref.c）"
+} elseif (Test-CpuSupports "avx512f") {
     $argonImpl = "opt.c"; $argonFlags = @("/D__AVX512F__")
     Write-Host "Argon2: 使用 AVX512 优化实现"
 } elseif (Test-CpuSupports "avx2") {
@@ -117,7 +135,21 @@ $includeArgs = @(
     "/I vendor\mbedtls\include"
 )
 
-if ($Test) {
+function Invoke-TestExe([string]$exe, [string[]]$exeArgs, [string]$label) {
+    if (-not (Test-Path $exe)) { throw "未生成可执行文件 $exe" }
+    if ($CompileOnly) {
+        Write-Host "CompileOnly: 跳过运行 $label"
+        return
+    }
+    & $exe @exeArgs
+    $rc = $LASTEXITCODE
+    if ($rc -ne 0) { throw "$label 失败（退出码 $rc）" }
+}
+
+if ($Test -or $CompileOnly) {
+    if ($CompileOnly) {
+        Write-Host "目标架构: $Architecture（仅编译，不运行）"
+    }
     Write-Host "`n=== 构建测试可执行文件 ==="
     $srcs = $argonSrcs + $mbedtlsSrcs + @(
         "windows\src\crypto\crypto.cpp",
@@ -127,16 +159,14 @@ if ($Test) {
     $cmd = "cl.exe /nologo /std:c++20 /utf-8 /EHsc /W4 $cfgFlag /MD " +
            "/D_CRT_SECURE_NO_WARNINGS " +
            ($includeArgs -join " ") + " " +
-           "/Fo:$buildDir\ /Fe:$buildDir\crypto_test.exe " +
+           "/Fo:$objDir\ /Fe:$buildDir\crypto_test.exe " +
            (($srcs | ForEach-Object { "`"$_`"" }) -join " ") +
            " $($argonFlags -join ' ') /link bcrypt.lib"
     cmd /c $cmd
     if ($LASTEXITCODE -ne 0) { throw "编译失败" }
 
     Write-Host "`n=== 运行密码学层自检 ==="
-    & "$buildDir\crypto_test.exe" "."
-    $rc = $LASTEXITCODE
-    if ($rc -ne 0) { throw "测试失败（退出码 $rc）" }
+    Invoke-TestExe "$buildDir\crypto_test.exe" @(".") "密码学层测试"
 
     Write-Host "`n=== 构建存储层自检 ==="
     $storeSrcs = $argonSrcs + $mbedtlsSrcs + $sqliteSrcs + @(
@@ -156,15 +186,13 @@ if ($Test) {
     $storeCmd = "cl.exe /nologo /std:c++20 /utf-8 /EHsc $cfgFlag /MD " +
                 "/D_CRT_SECURE_NO_WARNINGS /DSQLITE_OMIT_LOAD_EXTENSION " +
                 ($includeArgs -join " ") + " " +
-                "/Fo:$buildDir\ /Fd:$buildDir\store\ /Fe:$buildDir\store_test.exe " +
+                "/Fo:$objDir\ /Fd:$objDir\ /Fe:$buildDir\store_test.exe " +
                 (($storeSrcs | ForEach-Object { "`"$_`"" }) -join " ") +
                 " /link bcrypt.lib"
     cmd /c $storeCmd
     if ($LASTEXITCODE -ne 0) { throw "存储层编译失败" }
 
-    & "$buildDir\store_test.exe" "."
-    $storeRc = $LASTEXITCODE
-    if ($storeRc -ne 0) { throw "存储层测试失败（退出码 $storeRc）" }
+    Invoke-TestExe "$buildDir\store_test.exe" @(".") "存储层测试"
 
     Write-Host "`n=== 构建核心层自检 ==="
     $coreSrcs = $argonSrcs + $mbedtlsSrcs + @(
@@ -178,15 +206,13 @@ if ($Test) {
     $coreCmd = "cl.exe /nologo /std:c++20 /utf-8 /EHsc $cfgFlag /MD " +
                "/D_CRT_SECURE_NO_WARNINGS " +
                ($includeArgs -join " ") + " " +
-               "/Fo:$buildDir\ /Fd:$buildDir\store\ /Fe:$buildDir\core_test.exe " +
+               "/Fo:$objDir\ /Fd:$objDir\ /Fe:$buildDir\core_test.exe " +
                (($coreSrcs | ForEach-Object { "`"$_`"" }) -join " ") +
                " $($argonFlags -join ' ') /link bcrypt.lib"
     cmd /c $coreCmd
     if ($LASTEXITCODE -ne 0) { throw "核心层编译失败" }
 
-    & "$buildDir\core_test.exe"
-    $coreRc = $LASTEXITCODE
-    if ($coreRc -ne 0) { throw "核心层测试失败（退出码 $coreRc）" }
+    Invoke-TestExe "$buildDir\core_test.exe" @() "核心层测试"
 
     Write-Host "`n=== 构建业务层自检 ==="
     $svcSrcs = $argonSrcs + $mbedtlsSrcs + $sqliteSrcs + @(
@@ -206,16 +232,19 @@ if ($Test) {
     $svcCmd = "cl.exe /nologo /std:c++20 /utf-8 /EHsc $cfgFlag /MD " +
               "/D_CRT_SECURE_NO_WARNINGS /DSQLITE_OMIT_LOAD_EXTENSION " +
               ($includeArgs -join " ") + " " +
-              "/Fo:$buildDir\ /Fd:$buildDir\store\ /Fe:$buildDir\service_test.exe " +
+              "/Fo:$objDir\ /Fd:$objDir\ /Fe:$buildDir\service_test.exe " +
               (($svcSrcs | ForEach-Object { "`"$_`"" }) -join " ") +
               " $($argonFlags -join ' ') /link bcrypt.lib"
     cmd /c $svcCmd
     if ($LASTEXITCODE -ne 0) { throw "业务层编译失败" }
 
-    & "$buildDir\service_test.exe"
-    $svcRc = $LASTEXITCODE
-    if ($svcRc -ne 0) { throw "业务层测试失败（退出码 $svcRc）" }
-    Write-Host "`n全部通过。"
+    Invoke-TestExe "$buildDir\service_test.exe" @() "业务层测试"
+    if ($CompileOnly) {
+        Write-Host "`n交叉编译完成（未运行测试）。"
+    } else {
+        Write-Host "`n全部通过。"
+    }
 } else {
     Write-Host "构建目标：库（尚未定义 UI 工程）"
+    Write-Host "提示：加 -CompileOnly 可只编译四层自检程序而不运行。"
 }

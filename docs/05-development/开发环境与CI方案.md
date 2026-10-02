@@ -23,7 +23,7 @@
 | Visual Studio 2022 | 17.11+ | C++ 编译器与 MSBuild（装 **"使用 C++ 的桌面开发"** 工作负载） |
 | Windows SDK | 10.0.22621+ | Win32 / COM API |
 | Windows App SDK (C++/WinRT) | 1.6+ | WinUI 3 框架，由 NuGet 自动还原 |
-| CMake | 3.28+ | 构建脚本 |
+| CMake | 3.28+ | 构建脚本（**本机当前未安装**，Windows 端走 `windows/scripts/build.ps1`） |
 | Git | 2.43+ | 版本控制 |
 | Python | 3.11+ | 校验脚本、生成测试向量 |
 
@@ -34,6 +34,7 @@
 | SQLite 命令行工具 | 手工检查索引库 |
 | winget / Scoop | 包管理 |
 | GnuPG | 若未来 License 模块需要签名 |
+| mbedTLS / Argon2 / SQLite | **不需安装**，全部为 `vendor/` 内置源码 |
 
 ### 2.3 不需要在本地安装
 
@@ -41,6 +42,7 @@
 - Qt（Linux）→ 用 GitHub Actions
 - Android SDK → 可本地装，但**优先用 CI**，避免版本漂移
 - Linux 交叉编译工具链 → 用 GitHub Actions
+- mbedTLS / Argon2 / SQLite 的开发包 → **不需要**，三者均 vendor 在仓库内并由构建脚本直接编译
 
 ### 2.4 建议的 winget 安装命令
 
@@ -66,12 +68,19 @@ winget install Python.Python.3.12
 
 | Job | Runner | 工具链 | 产物 |
 |---|---|---|---|
-| **windows** | `windows-2022` | VS 2022 + MSBuild + CMake | MSIX bundle / exe |
-| **linux** | `ubuntu-24.04` | Qt 6 + CMake + Ninja | AppImage / tar.gz |
+| **windows** | `windows-2022` | VS 2022 + MSBuild（+ `build.ps1` 直编自检） | MSIX bundle / exe |
+| **windows-arm64** | `windows-2022` | VS 2022 ARM64 交叉工具链（+ `build.ps1 -Architecture arm64 -CompileOnly`） | 仅编译产物，不出包 |
+| **linux** | `ubuntu-24.04` | Qt 6 + CMake + Ninja + mbedTLS（vendor 同源） | AppImage / tar.gz |
 | **macos** | `macos-15` | Xcode 16 + SwiftPM | .app / .dmg |
 | **android** | `ubuntu-24.04` | JDK 17 + Android SDK 34 + Gradle | .apk |
 | **ios** | `macos-15` | Xcode 16 + SwiftPM | .xcarchive（未签名） |
 | **vectors** | `ubuntu-24.04` | Python 校验脚本 | 校验报告 |
+
+**关于 windows-arm64**：本机 VS BuildTools 未安装 `Microsoft.VisualStudio.Component.VC.Tools.ARM64`，
+而项目约定不得在开发机上补装工具，因此 ARM64 交叉编译完全交给 runner。该 job **只编译不运行**
+（x64 宿主无法执行 ARM64 二进制），功能测试仍由 x64 job 承担。由于 runner 镜像是否预装 ARM64
+交叉工具链并无可靠保证，job 先用 `vswhere -requires Microsoft.VisualStudio.Component.VC.Tools.ARM64`
+探测，缺失再调 `vs_installer.exe modify` 幂等补装，不假设预装。
 
 **关于 iOS 签名**：CI 只产出**未签名**构建（`CODE_SIGNING_ALLOWED=NO`）。正式分发需在 macOS 本机用开发者证书签名，签名流程不放入公开 CI，避免证书泄露。
 
@@ -100,6 +109,7 @@ winget install Python.Python.3.12
 
 要求：
 - 五个平台的依赖版本在仓库中显式锁定（`pubspec.lock`、`gradle/libs.versions.toml`、`Package.resolved`、CMake `FetchContent` 的 `GIT_TAG` 等）。
+- **密码学库例外**：Windows 与 Linux 使用 vendor 的 mbedTLS 3.6.7，版本随仓库代码走，不通过包管理器解析，因此不存在「宿主升级导致行为变化」的风险。裁剪配置在 `mbedtls_config.h` 末尾的 override 块中，随代码一起 review。
 - **密码学相关依赖的升级必须单独提交**，并附五端黄金向量全绿证明。
 - 定时构建用于发现上游被动变更。
 
@@ -124,7 +134,12 @@ winget install Python.Python.3.12
 
 ### 4.2 本地快速回归
 
-建议提供轻量脚本 `scripts/test-vectors.ps1`，只跑 Windows 端向量，供本地秒级反馈；全量仍以 CI 为准。
+本仓库现成的轻量回归入口有两个：
+
+- `python scripts/verify-vectors.py` —— 校验黄金向量（91 项），秒级
+- `windows/scripts/build.ps1 -Test` —— 编译并运行 Windows 端四层自检
+
+全量仍以 CI 为准。
 
 ## 5. 仓库设置
 

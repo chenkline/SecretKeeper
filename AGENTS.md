@@ -34,6 +34,10 @@ Secret/
 │   ├── 06-roadmap/
 │   └── 07-testing/
 ├── test-vectors/                      # 跨平台黄金测试向量（单一真相源）
+├── vendor/                            # 内置第三方源码（五端共用同一份，见 9.2）
+│   ├── argon2/                        # Argon2id 参考实现
+│   ├── mbedtls/                       # mbedTLS 3.6.7
+│   └── sqlite/                        # SQLite amalgamation
 ├── windows/                           # C++/WinUI 3 (C++/WinRT)
 ├── linux/                             # C / Qt
 ├── macos/                             # Swift / AppKit
@@ -48,8 +52,8 @@ Secret/
 
 | 平台 | 语言 | UI 框架 | 备注 |
 |---|---|---|---|
-| Windows | C++ | WinUI 3 / C++/WinRT | MSVC + Windows SDK 11 |
-| Linux | C | Qt | Qt 仅用于 Linux |
+| Windows | C++ | WinUI 3 / C++/WinRT | MSVC + Windows SDK 11，密码学用 mbedTLS |
+| Linux | C | Qt | Qt 仅用于 Linux，密码学用 mbedTLS |
 | macOS | Swift | AppKit | |
 | Android | Kotlin | Jetpack Compose | 必须原生，禁止跨平台方案 |
 | iOS | Swift | SwiftUI | 必须原生，禁止跨平台方案 |
@@ -62,7 +66,9 @@ Secret/
 
 | 项目 | 决策 |
 |---|---|
-| 密钥派生 | Argon2id，m=10MiB、t=3、p=1，输出 32 字节 |
+| 密码学库（Windows / Linux） | **mbedTLS 3.6.7**，源码 vendor 在 `vendor/mbedtls/`（Apache-2.0） |
+| 其余三端密码学库 | 不强制，只要逐字节对齐黄金向量；建议同样用 mbedTLS 便于交叉比对 |
+| 密钥派生 | Argon2id，m=10MiB、t=3、p=1，输出 32 字节（`vendor/argon2`，非 mbedTLS 提供） |
 | 盐 | **每条记录独立 16 字节随机盐，明文随记录保存** |
 | 主密钥 | RSA-2048 密钥对 |
 | 封装数据密钥 | RSA-OAEP-SHA256（用主密钥**公钥**加密） |
@@ -101,6 +107,7 @@ Secret/
 3. 任一平台实现若与规范不符，**以规范为准修正实现**，而非反向修改规范去迁就某个平台。
 4. 任何新增或修改的密码学参数必须同步更新 `test-vectors/` 并让五端同时通过。
 5. 引入第三方密码库时，必须确认其默认参数与本仓库一致（尤其是 RSA-OAEP 的哈希与填充方式、GCM 的 IV 长度）。
+6. 任何密码学库必须**锁死版本并 vendor 入库**，不得依赖宿主系统的库版本。Windows 与 Linux 固定 mbedTLS 3.6.7；其余三端即便用系统库（OpenSSL / CryptoKit / java.security），也必须通过同一份黄金向量。
 
 ---
 
@@ -156,33 +163,104 @@ GBK 控制台上会炸。
 
 | 目录 | 来源 | 为什么内置 |
 |---|---|---|
-| `vendor/argon2/` | Argon2 官方参考实现 20190702（CC0/Apache-2.0） | Windows CNG 不提供 Argon2id，且五端必须编译同一份实现才能保证跨端一致 |
+| `vendor/argon2/` | Argon2 官方参考实现 20190702（CC0/Apache-2.0） | 五端必须编译同一份实现才能保证跨端一致。mbedTLS 不提供 Argon2id，故该实现独立保留 |
+| `vendor/mbedtls/` | mbedTLS 3.6.7，仅 `library/` + `include/`（Apache-2.0） | Windows 与 Linux 两端必须同版本同源码，否则 OAEP / GCM 行为可能在细节上分叉 |
 | `vendor/sqlite/` | SQLite amalgamation 3.45.0（public-domain dedication） | 五端编译同一份 `sqlite3.c`，避免各端 SQLite 版本差异造成行为分叉 |
 
-两者都**必须入库**（`.gitignore` 已加例外）。本机缺少对应开发工具，且项目约束
-不安装新工具。改前先读各自的 `README.md`。
+三者都**必须入库**（`.gitignore` 已为 `vendor/argon2`、`vendor/mbedtls`、`vendor/sqlite`
+加例外规则）。本机缺少对应开发工具，且项目约束不安装新工具。改前先读各自的 `README.md`。
+
+**mbedTLS 裁剪纪律**：功能裁剪只允许追加在 `vendor/mbedtls/include/mbedtls/mbedtls_config.h`
+**文件末尾的 override 块**里，不得内联改写上游原始行。这样上游文件保持字节一致，将来同步
+新版时 diff 可读。当前裁剪：关闭 PSA_C、ECP/ECDSA/ECDH/DHM/LMS、CHACHA20/CCM、
+AES 以外的分组密码；保留 RSA_C、PKCS1_V15/V21、BIGNUM、MD、SHA256、AES、GCM、
+CIPHER_C、ASN1_PARSE、PKCS8、PK_PARSE、PK_WRITE、OID、CTR_DRBG、ENTROPY、PLATFORM_C。
+
+**PSA 保持关闭**：`MBEDTLS_PSA_CRYPTO_C` 一旦打开，3.6 的经典入口仍可编译，但会引入 PSA
+属性配置负担，且本项目不需要它。不要"顺手修好"这个 `#undef`。
+
+**Windows 链接库是 `bcrypt.lib`**：`vendor/mbedtls/library/entropy_poll.c` 调用
+`BCryptGenRandom` 取平台熵。`advapi32.lib` 是错的。
 
 ### 9.3 本机与 CI 的环境差异
 
 - VS BuildTools 在**非默认路径** `D:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools`（不是 `Program Files (x86)`）
 - 本机**无 CMake**，Windows 构建走 `windows/scripts/build.ps1`；Linux/macOS 走 CMake/SwiftPM
+- 本机 **MSVC 缺 ARM64 目标工具与库**（VS 组件 `Microsoft.VisualStudio.Component.VC.Tools.ARM64` 未安装），
+  Windows SDK 的 arm64 库却是齐的。因此 ARM64 **只能交叉编译且只能走 CI**：
+  `-Architecture arm64 -CompileOnly`（只编译不运行，x64 宿主执行不了 ARM64 二进制）。
+  ARM64 目标下 Argon2 被强制切到 `ref.c`，不得带任何 x86 SIMD 宏。
 - Python 位于 `D:\veighna_studio\`，已装 `argon2-cffi` 与 `cryptography`
 - 系统有本地代理 `127.0.0.1:7899`，git 与 GitHub API 需走它；直连 github.com:443 会间歇超时
 - 推送认证用 `.local/context.md` 里的 token，经 `http.https://github.com/.extraheader` 传入；该文件已被 gitignore，**严禁提交**
 
-### 9.4 CNG 缺少非对称算法（已知环境限制）
+### 9.4 密码学库从 CNG 换成 mbedTLS（已解决）
 
-Windows 11 build 22631 与 GitHub `windows-2022` runner 的 CNG **均不提供**
-RSA/ECDH/ECDSA/DH/DSA：
+**结论：已解决，盲区已消除。** 保留历史事实用于警示。
+
+**当初的问题**：Windows CNG 在本机与 CI 上都无法执行 RSA。Windows 11 build 22631 与
+GitHub `windows-2022` runner 的 CNG **均不提供** RSA/ECDH/ECDSA/DH/DSA：
 
 - 一律返回 `STATUS_NOT_SUPPORTED (0xC00000BB)`
 - `BCryptGenerateKeyPair` 返回成功，但后续 `BCryptExportKey` / `BCryptEncrypt`
   返回 `STATUS_INVALID_HANDLE (0xC0000008)`
 - AES / SHA256 / ChaCha20-Poly1305 正常
 
-因此**本机与 CI 都无法执行 RSA 测试**。`cng_has_asymmetric_support()` 会主动探测
-并让测试显式跳过。**完整 RSA 覆盖需要其他环境**，不要误以为测试全绿就代表
-RSA 路径正确。
+即：**本机与 CI 都无法执行 RSA 测试**，只能让测试显式 SKIP。这不是可以忍受的状态，
+因为 RSA 是主密钥的核心，SKIP 掉的路径等于没测。
+
+**现在的做法**：密码学层全量换成 vendor 的 mbedTLS 3.6.7（纯软件，RSA 恒可用）。
+
+- `has_asymmetric_support()` **恒返回 true**，改名自 `cng_has_asymmetric_support()`
+  （共 8 处引用：`crypto.h`、`crypto.cpp`、`core/master_key_service.cpp`、
+  `core/secret_service.cpp`、`tests/crypto_test.cpp` 2 处、`tests/service_test.cpp` 2 处）。
+- 保留该函数而不是删掉，是为了让测试能**断言跳过路径永不触发**。它是构建缺陷的探针，
+  不是能力开关。
+- Windows 侧只需链接 `bcrypt.lib`（`BCryptGenRandom` 提供平台熵），不再依赖 CNG 密钥 API。
+
+**换库后 RSA 路径首次真实执行**，四层测试 0 失败、0 跳过（见 9.6）。
+
+### 9.5 mbedTLS 3.6 API 坑位（已实测踩过，勿重犯）
+
+这 12 条每一条都曾导致**静默错误**——编译通过、测试通过或直接跳过，只有换库前后对照
+才暴露出来。换用 mbedTLS 或升级其版本时，逐条对照。
+
+| # | 坑 | 正确写法 |
+|---|---|---|
+| 1 | 只用**负数**表示错误 | `check()` 必须写 `rc < 0`，写 `rc != 0` 会把正数返回值当失败 |
+| 2 | 部分入口成功时返回**写入长度**而非 0 | `mbedtls_pk_write_pubkey_der` / `mbedtls_pk_write_key_der` 属此类，必须用 `rc < 0` 判定 |
+| 3 | DER 写入**从缓冲区末尾向前** | 编码起点是 `buf + size - len`，不是 `buf` |
+| 4 | `mbedtls_asn1_write_mpi()` **已输出完整 INTEGER** | 含 tag+len+符号位补零+值，**不能再包一层** tag/len |
+| 5 | 缓冲区逆向填充 ⇒ **必须先写 E 再写 N** | 否则得到 `SEQUENCE { e, n }` |
+| 6 | 3.6 把 PKCS#1 RSAPublicKey 编解码移入 `rsa_internal.h`（非公开 API） | 公钥按 PKCS#1 存取，本地用公开 API（`asn1` / `asn1write` / `rsa_import` / `rsa_export`）自实现 `write_pkcs1_pubkey` / `parse_pkcs1_pubkey`；**不得**把私有头编入产品 |
+| 7 | `mbedtls_gcm_crypt_and_tag()` **内部不设密钥** | 加密前必须 `mbedtls_gcm_setkey()`，且第四参单位是**位**不是字节（`key_len * 8`） |
+| 8 | `argon2id_hash_raw` 参数顺序 | `(t_cost, m_cost, parallelism, pwd, pwdlen, salt, saltlen, hash, hashlen)`；且本版 vendor **没有** allocator 回调 API（内部直接 `malloc`），不要恢复已删除的 `argon_alloc`/`argon_free` |
+| 9 | `mbedtls_pk_setup(ctx, info)` 只分配自己的 rsa 上下文 | 不接受外部 key；`mbedtls_rsa_info()` 已移除，改用 `mbedtls_pk_info_from_type(MBEDTLS_PK_RSA)`；`MBEDTLS_PRIVATE(pk_ctx)` 展开为 `private_pk_ctx`，外部不可赋值。正确做法：`pk_setup` 后用 `mbedtls_pk_rsa()` 取回指针填充 |
+| 10 | `mbedtls_rsa_gen_key` 是 **5 参无 seed** | `(ctx, f_rng, p_rng, nbits, exponent)`；生成后 `hash_id` 留 `MBEDTLS_MD_NONE`，**必须**显式 `mbedtls_rsa_set_padding(&rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256)`，否则得到一把无法封装任何东西的密钥 |
+| 11 | GCM 错误宏无 `_DATA` 后缀 | 是 `MBEDTLS_ERR_GCM_BAD_INPUT` |
+| 12 | OAEP 是 PSA 风格签名 | 封装 `(ctx, f_rng, p_rng, label, label_len, ilen, input, output)`；解封 `(ctx, f_rng, p_rng, label, label_len, olen, input, output, output_max_len)`。空 label（`nullptr, 0`）即标准 OAEP，与 `test-vectors/rsa-oaep.json` 的 `label: null` 一致；MGF1 与 OAEP 哈希均为 SHA-256。解析后校验 `mbedtls_pk_get_type(&pk) == MBEDTLS_PK_RSA` 再显式 `set_padding`，不依赖 DER 里恢复的哈希值 |
+
+**两个被 CNG 掩盖的真实 bug**（不是 mbedTLS 的坑，但同样值得记）：
+
+- **解密缓冲区长度算错**：GCM 是流模式，**密文长度 == 明文长度**。旧代码按密文向量总长
+  （含 16 字节 tag 尾）分配输出，导致恢复出的 DER 尾部多出 16 个零字节，RSA 解析器直接
+  拒绝。已新增 `plain_size()` 统一口径（`windows/src/core/master_key_service.cpp`，6 处调用）。
+  `secret_service.cpp` 本来就减了尾，是对的。
+- **测试 SKIP 文案误导**：旧的 SKIP 提示写 "this host CNG"，会让读者以为 CNG 环境限制仍在。
+  现已改为 "RSA reports unavailable on this host / mbedTLS is pure software, so this
+  indicates a build defect"。文档提到这段时须与之一致。
+
+### 9.6 当前自检基线
+
+| 层 | 位置 | 自检项数 | 失败 | 跳过 |
+|---|---|---|---|---|
+| 密码学层 | `windows/src/crypto/` | 86 | 0 | 0 |
+| 存储层 | `windows/src/store/` | 81 | 0 | 0 |
+| 核心层 | `windows/src/core/` | 178 | 0 | 0 |
+| 业务层 | `windows/src/core/` | 54 | 0 | **0（RSA 真实执行）** |
+| 黄金向量 | `scripts/verify-vectors.py` | 91 | 0 | — |
+
+**"跳过 0" 是硬要求。** 任何一层出现 `skipped != 0` 都是构建缺陷，不是环境限制。
 
 ---
 
