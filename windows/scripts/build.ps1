@@ -135,9 +135,6 @@ $includeArgs = @(
     "/I vendor\mbedtls\include"
 )
 
-    $rc = $LASTEXITCODE
-    if ($rc -ne 0) { throw "$label 失败（退出码 $rc）" }
-}
 
 if ($Test -or $CompileOnly) {
     if ($CompileOnly) {

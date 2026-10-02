@@ -169,6 +169,7 @@ Secret/
 | 坑 | 现象 | 处理 |
 |---|---|---|
 | 控制台非 UTF-8 | Python 打印中文抛 `UnicodeEncodeError`，C++ `Write-Host` 抛 `NativeCommandFailed`，job 直接变红 | 在脚本**内部**重配（`sys.stdout.reconfigure` / `chcp 65001`），不要依赖 CI 环境变量，这样本地与 CI 行为一致 |
+| **Python stdout 默认 GBK** | 本机 PowerShell 7.6 已是 UTF-8（chcp 65001、`Console.OutputEncoding=utf-8`），原生命令中文也能正确捕获。此时读 Python 输出仍然乱码，根因是 `sys.stdout.encoding == "gbk"`，**不是控制台代码页** | 本机已设用户级 `PYTHONIOENCODING=utf-8` 与 `PYTHONUTF8=1`；脚本内仍应 `sys.stdout.reconfigure(encoding="utf-8")` 以保证 CI 与他人环境一致。排查乱码时先看 `sys.stdout.encoding`，不要先动 `chcp` |
 | VS 路径写死 | runner 镜像的 Visual Studio SKU 随镜像更新变化，写死 `Enterprise`/`Community` 路径迟早失效 | 用 `vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64` 查询，失败再递归兜底 |
 | SDK 装不上 | Android job 装 SDK 要下数 GB 且需交互式接受许可协议，许可步骤失败就让整个 job 变红，而此时并无东西需要构建 | 先探测工程是否存在，不存在则整段跳过 |
 

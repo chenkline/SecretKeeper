@@ -14,8 +14,9 @@
     <!-- 平台默认值。必须在此声明，否则下面按 '$(Platform)' 条件的
          PropertyGroup / ItemDefinitionGroup 不会生效。 -->
     <Platform Condition="'$(Platform)' == ''">x64</Platform>
-    <ApplicationType>Windows Application</ApplicationType>
-    <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
+    <!-- 必须留空：设为 "Windows Application" 会让 MSBuild 去找 UWP 工具链，
+         而 v143 不提供该工作流，报 MSB8020。WinUI 3 是桌面应用。 -->
+    <ApplicationType></ApplicationType>
     <WindowsTargetPlatformVersion>10.0.22621.0</WindowsTargetPlatformVersion>
     <WindowsTargetPlatformMinVersion>10.0.17763.0</WindowsTargetPlatformMinVersion>
     <!-- unpackaged（self-contained）模式：依赖随 exe 一起分发，不要求系统
