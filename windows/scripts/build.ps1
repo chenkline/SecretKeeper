@@ -73,19 +73,54 @@ $sqliteSrcs = @(
     "vendor\sqlite\sqlite3.c"
 )
 
+# mbedTLS, trimmed via the override block at the bottom of mbedtls_config.h:
+# TLS / X.509 / net / file I/O are disabled, so these are the only translation
+# units that survive the preprocessor. entropy_poll.c is needed for the platform
+# entropy source that seeds the CTR-DRBG.
+$mbedtlsSrcs = @(
+    "vendor\mbedtls\library\aes.c",
+    "vendor\mbedtls\library\aesni.c",
+    "vendor\mbedtls\library\asn1parse.c",
+    "vendor\mbedtls\library\asn1write.c",
+    "vendor\mbedtls\library\bignum.c",
+    "vendor\mbedtls\library\base64.c",
+    "vendor\mbedtls\library\bignum_core.c",
+    "vendor\mbedtls\library\cipher.c",
+    "vendor\mbedtls\library\cipher_wrap.c",
+    "vendor\mbedtls\library\constant_time.c",
+    "vendor\mbedtls\library\ctr_drbg.c",
+    "vendor\mbedtls\library\entropy.c",
+    "vendor\mbedtls\library\entropy_poll.c",
+    "vendor\mbedtls\library\gcm.c",
+    "vendor\mbedtls\library\memory_buffer_alloc.c",
+    "vendor\mbedtls\library\md.c",
+    "vendor\mbedtls\library\oid.c",
+    "vendor\mbedtls\library\pk.c",
+    "vendor\mbedtls\library\pkparse.c",
+    "vendor\mbedtls\library\pem.c",
+    "vendor\mbedtls\library\pk_wrap.c",
+    "vendor\mbedtls\library\pkwrite.c",
+    "vendor\mbedtls\library\platform.c",
+    "vendor\mbedtls\library\platform_util.c",
+    "vendor\mbedtls\library\rsa.c",
+    "vendor\mbedtls\library\rsa_alt_helpers.c",
+    "vendor\mbedtls\library\sha256.c",
+    "vendor\mbedtls\library\sha512.c",
+    "vendor\mbedtls\library\version.c"
+)
+
 $includeArgs = @(
     "/I windows\src\crypto",
     "/I windows\src\store",
     "/I vendor\argon2\include",
-    "/I vendor\sqlite"
+    "/I vendor\sqlite",
+    "/I vendor\mbedtls\include"
 )
 
 if ($Test) {
     Write-Host "`n=== 构建测试可执行文件 ==="
-    $srcs = $argonSrcs + @(
+    $srcs = $argonSrcs + $mbedtlsSrcs + @(
         "windows\src\crypto\crypto.cpp",
-        "windows\src\crypto\der.cpp",
-        "windows\src\crypto\bignum.cpp",
         "windows\src\container\container.cpp",
         "windows\tests\crypto_test.cpp"
     )
@@ -104,10 +139,8 @@ if ($Test) {
     if ($rc -ne 0) { throw "测试失败（退出码 $rc）" }
 
     Write-Host "`n=== 构建存储层自检 ==="
-    $storeSrcs = $argonSrcs + $sqliteSrcs + @(
+    $storeSrcs = $argonSrcs + $mbedtlsSrcs + $sqliteSrcs + @(
         "windows\src\crypto\crypto.cpp",
-        "windows\src\crypto\der.cpp",
-        "windows\src\crypto\bignum.cpp",
         "windows\src\core\text.cpp",
         "windows\src\core\error.cpp",
         "windows\src\core\backoff.cpp",
@@ -134,10 +167,8 @@ if ($Test) {
     if ($storeRc -ne 0) { throw "存储层测试失败（退出码 $storeRc）" }
 
     Write-Host "`n=== 构建核心层自检 ==="
-    $coreSrcs = $argonSrcs + @(
+    $coreSrcs = $argonSrcs + $mbedtlsSrcs + @(
         "windows\src\crypto\crypto.cpp",
-        "windows\src\crypto\der.cpp",
-        "windows\src\crypto\bignum.cpp",
         "windows\src\core\text.cpp",
         "windows\src\core\error.cpp",
         "windows\src\core\backoff.cpp",
@@ -158,10 +189,8 @@ if ($Test) {
     if ($coreRc -ne 0) { throw "核心层测试失败（退出码 $coreRc）" }
 
     Write-Host "`n=== 构建业务层自检 ==="
-    $svcSrcs = $argonSrcs + $sqliteSrcs + @(
+    $svcSrcs = $argonSrcs + $mbedtlsSrcs + $sqliteSrcs + @(
         "windows\src\crypto\crypto.cpp",
-        "windows\src\crypto\der.cpp",
-        "windows\src\crypto\bignum.cpp",
         "windows\src\container\container.cpp",
         "windows\src\core\text.cpp",
         "windows\src\core\error.cpp",

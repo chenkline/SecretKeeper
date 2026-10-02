@@ -45,6 +45,15 @@ std::span<const std::uint8_t> cipher_body(std::span<const std::uint8_t> v) {
   return v.subspan(0, v.size() - kCipherTail);
 }
 
+// Length of the plaintext that cipher_body() recovers. AES-GCM is a stream mode:
+// the ciphertext is exactly as long as the plaintext, so the stored vector is
+// (plaintext || tag) and the plaintext length is (size - tag). Sizing the output
+// buffer from the vector length instead would append kTagLength zero bytes to the
+// recovered DER, and the RSA parser rejects such a trailing-garbage key.
+std::size_t plain_size(std::span<const std::uint8_t> cipher) {
+  return cipher.size() - kCipherTail;
+}
+
 }  // namespace
 
 std::vector<MasterKeyListItem> MasterKeyService::list() const {
@@ -90,7 +99,7 @@ Error MasterKeyService::create(std::string_view name, std::span<const std::uint8
                                bool is_first) {
   if (password.empty()) return Error::kPasswordWrong;
   if (db_.master_key_count() >= store::kMaxMasterKeys) return Error::kMasterKeyQuotaExceeded;
-  if (!crypto::cng_has_asymmetric_support()) return Error::kCryptoUnsupported;
+  if (!crypto::has_asymmetric_support()) return Error::kCryptoUnsupported;
 
   const crypto::Id id = crypto::generate_id();
   crypto::Salt salt{};
@@ -151,7 +160,7 @@ Error MasterKeyService::public_key_der(std::string_view master_key_id, const cry
   const Error e = load_file(master_key_id, &f);
   if (e != Error::kOk) return e;
 
-  crypto::SecureBytes plain(f.pub_key_cipher.size());
+  crypto::SecureBytes plain(plain_size(f.pub_key_cipher));
   const crypto::CryptoError rc = crypto::aes_gcm_decrypt(
       kek.data(), kek.size(), f.pub_key_nonce, std::span<const std::uint8_t>(f.master_key_id),
       cipher_body(f.pub_key_cipher), f.pub_key_tag, plain.data());
@@ -167,7 +176,7 @@ Error MasterKeyService::private_key_der(std::string_view master_key_id, const cr
   const Error e = load_file(master_key_id, &f);
   if (e != Error::kOk) return e;
 
-  crypto::SecureBytes plain(f.priv_key_cipher.size());
+  crypto::SecureBytes plain(plain_size(f.priv_key_cipher));
   const crypto::CryptoError rc = crypto::aes_gcm_decrypt(
       kek.data(), kek.size(), f.priv_key_nonce, std::span<const std::uint8_t>(f.master_key_id),
       cipher_body(f.priv_key_cipher), f.priv_key_tag, plain.data());
@@ -198,8 +207,8 @@ Error MasterKeyService::export_to(std::string_view master_key_id, const crypto::
   const Error e = load_file(master_key_id, &f);
   if (e != Error::kOk) return e;
 
-  crypto::SecureBytes pub_plain(f.pub_key_cipher.size());
-  crypto::SecureBytes priv_plain(f.priv_key_cipher.size());
+  crypto::SecureBytes pub_plain(plain_size(f.pub_key_cipher));
+  crypto::SecureBytes priv_plain(plain_size(f.priv_key_cipher));
   if (crypto::aes_gcm_decrypt(kek.data(), kek.size(), f.pub_key_nonce,
                               std::span<const std::uint8_t>(f.master_key_id),
                               cipher_body(f.pub_key_cipher), f.pub_key_tag,
@@ -261,8 +270,8 @@ Error MasterKeyService::import_from(std::span<const std::uint8_t> export_bytes,
   container::MasterKeyFile src = std::move(*parsed);
   const crypto::Kek prot_kek = crypto::derive_kek(protection_password, src.salt);
 
-  crypto::SecureBytes pub_plain(src.pub_key_cipher.size());
-  crypto::SecureBytes priv_plain(src.priv_key_cipher.size());
+  crypto::SecureBytes pub_plain(plain_size(src.pub_key_cipher));
+  crypto::SecureBytes priv_plain(plain_size(src.priv_key_cipher));
   if (crypto::aes_gcm_decrypt(prot_kek.data(), prot_kek.size(), src.pub_key_nonce,
                               std::span<const std::uint8_t>(src.master_key_id),
                               cipher_body(src.pub_key_cipher), src.pub_key_tag,

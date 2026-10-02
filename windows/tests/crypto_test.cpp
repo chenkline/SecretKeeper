@@ -13,7 +13,6 @@
 
 #include "../src/container/container.h"
 #include "../src/crypto/crypto.h"
-#include "../src/crypto/der.h"
 
 namespace container = secretkeeper::container;
 
@@ -109,7 +108,6 @@ std::string json_string(const std::string& text, const std::string& key,
 }
 
 using namespace secretkeeper::crypto;
-namespace der = secretkeeper::der;
 
 }  // namespace
 
@@ -210,10 +208,11 @@ int main(int argc, char** argv) {
 
   // ----------------------------------------------------------- RSA-2048
   std::printf("RSA-2048 OAEP-SHA256\n");
-  if (!cng_has_asymmetric_support()) {
+  if (!has_asymmetric_support()) {
     std::printf(
-        "  SKIPPED: this host CNG has no asymmetric algorithms (RSA/ECC/DH).\n"
-        "  Known limitation of trimmed/container Windows images.\n");
+        "  SKIPPED: RSA reports unavailable on this host.\n"
+        "  mbedTLS is pure software, so this must not happen; treat it as a\n"
+        "  build/configuration defect rather than an environment limitation.\n");
   } else {
     const RsaKeyPair kp = generate_rsa2048();
     check(kp.public_der.size() > 0, "exported PKCS#1 public DER");
@@ -255,40 +254,40 @@ int main(int argc, char** argv) {
     check(!bad.has_value(), "oversized plaintext rejected");
   }
 
-  // ------------------------------------------------------ DER / CNG 互转
-  std::printf("DER <-> CNG (private exponent d restored)\n");
-  if (cng_has_asymmetric_support()) {
+  // ------------------------------------------------------ RSA DER 往返
+  //
+  // mbedTLS produces PKCS#1 RSAPublicKey and PKCS#8 PrivateKeyInfo directly,
+  // so there is no blob conversion any more. What matters now is that the
+  // DER we hand to the container layer is parseable by the OAEP helpers, which
+  // is what the wrap/unwrap round trip above already exercises. This block adds
+  // the negative cases that a malformed DER must be rejected.
+  std::printf("RSA DER parse (malformed input rejected)\n");
+  if (has_asymmetric_support()) {
     const RsaKeyPair kp = generate_rsa2048();
-    const auto pub = der::parse_pkcs1_public(kp.public_der.data(),
-                                              kp.public_der.size());
-    check(pub.has_value(), "PKCS#1 public parses");
-    if (pub) {
-      const auto again = der::write_pkcs1_public(*pub);
-      check(again.size() == kp.public_der.size() &&
-                std::memcmp(again.data(), kp.public_der.data(), again.size()) == 0,
-            "PKCS#1 public roundtrip identical");
-    }
-    const auto priv = der::parse_pkcs8_private(kp.private_der.data(),
-                                               kp.private_der.size());
-    check(priv.has_value(), "PKCS#8 private parses (d restored+verified)");
-    if (priv) {
-      const auto again = der::write_pkcs8_private(*priv);
-      check(again.size() == kp.private_der.size() &&
-                std::memcmp(again.data(), kp.private_der.data(), again.size()) == 0,
-            "PKCS#8 private roundtrip identical");
-      const auto blob = der::pkcs8_to_cng_private_blob(kp.private_der.data(),
-                                                       kp.private_der.size());
-      check(blob.has_value(), "PKCS#8 converts back to CNG blob");
-    }
+    check(kp.public_der.size() > 0, "PKCS#1 public DER produced");
+    check(kp.private_der.size() > 0, "PKCS#8 private DER produced");
 
-    // 畸形输入必须被拒绝
-    const std::uint8_t junk[] = {0x30, 0x03, 0x02, 0x01, 0x00};
-    check(!der::parse_pkcs1_public(junk, sizeof(junk)).has_value(),
-          "truncated PKCS#1 rejected");
-    check(!der::parse_pkcs8_private(junk, sizeof(junk)).has_value(),
-          "truncated PKCS#8 rejected");
+    // Malformed DER must never be silently accepted by the OAEP entry points.
+    const std::uint8_t truncated[] = {0x30, 0x03, 0x02, 0x01, 0x00};
+    const auto bad_pub = rsa_oaep_encrypt(
+        std::span<const std::uint8_t>(truncated, sizeof(truncated)),
+        std::span<const std::uint8_t>(kp.public_der.data(), 32));
+    check(!bad_pub.has_value(), "truncated PKCS#1 rejected");
+
+    const auto bad_priv = rsa_oaep_decrypt(
+        std::span<const std::uint8_t>(truncated, sizeof(truncated)),
+        std::span<const std::uint8_t>(kp.public_der.data(), kRsaModulusBytes));
+    check(!bad_priv.has_value(), "truncated PKCS#8 rejected");
+
+    // Wrong wrapped length must be rejected rather than read out of bounds.
+    std::array<std::uint8_t, kRsaModulusBytes> shortwrap{};
+    std::memcpy(shortwrap.data(), kp.public_der.data(),
+                std::min(shortwrap.size(), kp.public_der.size()));
+    const auto bad_len = rsa_oaep_decrypt(
+        std::span<const std::uint8_t>(kp.private_der.data(), kp.private_der.size()),
+        std::span<const std::uint8_t>(shortwrap.data(), shortwrap.size() - 1));
+    check(!bad_len.has_value(), "short wrapped key rejected");
   }
-
 
   // ---------------------------------------------------- 容器格式往返
   std::printf("Container roundtrip (SMK1 / SSC1)\n");

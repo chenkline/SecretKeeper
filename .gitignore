@@ -31,6 +31,10 @@ vendor/
 vendor/*
 !vendor/argon2/
 !vendor/sqlite/
+# mbedTLS 同样必须入库：Windows 与 Linux 两端编译同一份 3.6.7 源码，
+# 版本一致是跨端密码学一致性的前提（引入说明见 vendor/mbedtls/README.md）。
+# 仅忽略编译中间产物。
+!vendor/mbedtls/
 Pods/
 .build/
 DerivedData/

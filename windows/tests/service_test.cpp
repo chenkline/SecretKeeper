@@ -1,8 +1,9 @@
 // SecretKeeper - service layer end-to-end self-check.
 //
 // Covers the main key and secret business flows against a real SQLite index and
-// real data files. Every test that needs RSA is skipped with an explicit notice
-// when the host CNG lacks asymmetric algorithms, rather than silently passing.
+// real data files. mbedTLS is pure software, so every RSA-dependent flow runs on
+// every host; the has_asymmetric_support() branch exists to assert that, not to
+// excuse a skipped path.
 //
 // Test output must stay pure ASCII.
 
@@ -51,6 +52,7 @@ std::span<const std::uint8_t> pwd(const char* s) {
 }  // namespace
 
 int main() {
+  std::setvbuf(stdout, nullptr, _IONBF, 0);
   const std::filesystem::path tmp =
       std::filesystem::temp_directory_path() / "secretkeeper_service_test";
   std::error_code ec;
@@ -88,7 +90,7 @@ int main() {
   //
   // On a host without RSA the service rejects with kCryptoUnsupported before it
   // ever reaches the key lookup, so the expected error depends on the host.
-  const bool has_rsa = crypto::cng_has_asymmetric_support();
+  const bool has_rsa = crypto::has_asymmetric_support();
   const core::Error kEnvGate = has_rsa ? core::Error::kMasterKeyNotFound
                                        : core::Error::kCryptoUnsupported;
 
@@ -122,9 +124,9 @@ int main() {
         "151 CJK chars rejected as too long");
 
   // ---- RSA-dependent paths ----
-  if (!crypto::cng_has_asymmetric_support()) {
-    std::printf("\nRSA-dependent flows SKIPPED: this host CNG has no asymmetric\n"
-                "algorithms. See AGENTS.md 9.4.\n");
+  if (!crypto::has_asymmetric_support()) {
+    std::printf("\nRSA-dependent flows SKIPPED: RSA reports unavailable on this host.\n"
+                "mbedTLS is pure software, so this indicates a build defect.\n");
     skip("master key create / secret add / export / import / detail / delete");
     db.close();
     std::printf("\n%d checks, %d failures, %d skipped\n", g_checks, g_failures, g_skipped);

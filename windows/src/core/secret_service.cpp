@@ -68,7 +68,7 @@ Error SecretService::add(std::string_view title, std::string_view plaintext,
   if (plaintext.empty()) return Error::kEmptySecret;
   if (text::count_code_points(plaintext) > text::kMaxSecretLength) return Error::kSecretTooLong;
   if (db_.secret_count() >= store::kMaxSecrets) return Error::kSecretQuotaExceeded;
-  if (!crypto::cng_has_asymmetric_support()) return Error::kCryptoUnsupported;
+  if (!crypto::has_asymmetric_support()) return Error::kCryptoUnsupported;
   if (!db_.find_master_key(master_key_id)) return Error::kMasterKeyNotFound;
 
   crypto::SecureBytes pub_der;

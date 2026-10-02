@@ -1,9 +1,14 @@
 #pragma once
 
-// 机密心 - 密码学层公共接口
+// SecretKeeper - cryptography layer public interface.
 //
-// 各平台实现保持同名同语义，便于对照实现与排查。
-// 本文件只声明原语，不含业务语义；所有密钥材料均要求调用方传入可清零缓冲区。
+// All five platforms keep the same names and semantics so implementations can be
+// compared side by side. This header declares primitives only; it carries no
+// business meaning. Every caller must pass zeroable buffers for key material.
+//
+// Windows and Linux both use mbedTLS (vendored, see vendor/mbedtls/README.md).
+// The other three platforms may pick their own provider as long as they reproduce
+// the golden vectors byte for byte -- mbedTLS is not mandated there.
 
 #include <array>
 #include <cstdint>
@@ -14,7 +19,8 @@
 
 namespace secretkeeper::crypto {
 
-// ---- 固定参数（与 docs/02-crypto 一致，任何变更须重生成 test-vectors）----
+// ---- Fixed parameters (must match docs/02-crypto; any change requires
+// regenerating test-vectors) ----
 inline constexpr std::uint32_t kKdfMemoryKiB = 10240;
 inline constexpr std::uint32_t kKdfIterations = 3;
 inline constexpr std::uint32_t kKdfParallelism = 1;
@@ -34,13 +40,14 @@ using Nonce = std::array<std::uint8_t, kNonceLength>;
 using Tag = std::array<std::uint8_t, kTagLength>;
 using Id = std::array<std::uint8_t, kIdLength>;
 
-// 可清零的字节缓冲，用于承载密钥材料；析构时自动抹除。
+// Zeroable byte buffer for key material; wiped on destruction.
 class SecureBytes {
  public:
   SecureBytes() = default;
   explicit SecureBytes(std::size_t n) : data_(n, 0) {}
   SecureBytes(const std::uint8_t* p, std::size_t n) : data_(p, p + n) {}
-  // 密钥材料禁止拷贝：拷贝会产生无法追踪的副本，违背清零约定。
+  // Copying key material is banned: copies cannot be tracked, which breaks the
+  // zeroisation guarantee.
   SecureBytes(const SecureBytes&) = delete;
   SecureBytes& operator=(const SecureBytes&) = delete;
   SecureBytes(SecureBytes&& o) noexcept : data_(std::move(o.data_)) {
@@ -67,7 +74,8 @@ class SecureBytes {
   std::vector<std::uint8_t> data_;
 };
 
-// ---- 错误类型：区分认证失败与其它失败，对外统一映射为密码错误 ----
+// ---- Error type: distinguishes auth failure from other failures; the UI maps
+// every one of them onto the single requirement-mandated wording. ----
 enum class CryptoError {
   kOk = 0,
   kAuthFailed,
@@ -78,23 +86,27 @@ enum class CryptoError {
 
 const char* to_string(CryptoError e);
 
-// ---- 环境能力探测 ----
-// 精简版 / 容器化 Windows 镜像可能只提供 CNG 对称算法（AES、SHA、ChaCha20），
-// 而不提供 RSA / ECC / DH。此时 RSA 相关调用会返回 STATUS_INVALID_HANDLE 或
-// STATUS_NOT_SUPPORTED。启动时探测一次，避免把环境缺陷误报为实现缺陷。
-bool cng_has_asymmetric_support();
+// ---- Capability probe ----
+// mbedTLS is pure software, so RSA is always available and this always returns
+// true. It stays in the interface for one reason: the test suite branches on it,
+// which lets the build assert that no RSA-dependent path is silently skipped.
+bool has_asymmetric_support();
 
-// ---- 随机数（CNG BCryptGenRandom，不得使用非密码学随机源）----
+// ---- Randomness ----
+// mbedTLS CTR-DRBG seeded from the platform entropy source. Never a
+// non-cryptographic RNG.
 void random_bytes(std::span<std::uint8_t> out);
 Id generate_id();
 
-// ---- 密钥派生 ----
+// ---- Key derivation ----
 // KEK = Argon2id(password, salt, m, t, p, outlen=32)
-// salt 须由调用方生成并随记录保存，这是跨端一致的前提。
+// The caller generates the salt and stores it with the record; that is what makes
+// cross-platform consistency possible.
 Kek derive_kek(std::span<const std::uint8_t> password, const Salt& salt);
 
 // ---- AES-256-GCM ----
-// 公钥与私钥加密必须传入互不相同的 nonce；复用会导致密钥泄露。
+// Encrypting the public key and the private key MUST use different nonces:
+// reusing one makes pubKeyCipher XOR privKeyCipher directly recoverable.
 void aes_gcm_encrypt(const std::uint8_t* key, std::size_t key_len,
                      const Nonce& nonce,
                      std::span<const std::uint8_t> aad,
@@ -116,8 +128,8 @@ struct RsaKeyPair {
 
 RsaKeyPair generate_rsa2048();
 
-// 公钥封装数据密钥：RSA-OAEP，MGF1 与 OAEP 哈希均为 SHA-256（显式指定，
-// 不可依赖各库默认值）。失败返回 nullopt。
+// Wrap a data key with the public key using RSA-OAEP, MGF1 hash and OAEP hash
+// both explicitly SHA-256 (never rely on a library default). nullopt on failure.
 std::optional<std::array<std::uint8_t, kRsaModulusBytes>> rsa_oaep_encrypt(
     std::span<const std::uint8_t> public_der, std::span<const std::uint8_t> data_key);
 
