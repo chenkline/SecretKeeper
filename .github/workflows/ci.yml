@@ -158,6 +158,44 @@ jobs:
           path: windows/build/
           if-no-files-found: ignore
 
+  # ---------- Windows UI (WinUI 3) ----------
+  # UI 工程只能在带完整 VS + Windows App SDK + MSIX 工具链的 runner 上构建。
+  # 本机 BuildTools 缺这些组件且约定不补装，因此 UI 构建完全交给 CI。
+  windows-ui:
+    name: Windows UI (WinUI 3)
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: 定位 MSBuild
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $install = & $vswhere -latest -products * `
+            -requires Microsoft.Component.MSBuild `
+            -property installationPath
+          if (-not $install) {
+            Write-Host "::error::未找到 MSBuild"; exit 1
+          }
+          $msbuild = Join-Path $install "MSBuild\Current\Bin\MSBuild.exe"
+          "MSBUILD=$msbuild" >> $env:GITHUB_ENV
+          Write-Host "MSBuild: $msbuild"
+      - name: 还原 NuGet 包
+        shell: pwsh
+        run: |
+          & $env:MSBUILD "windows/src/ui/App.vcxproj" /t:Restore /p:Configuration=Release /v:minimal
+      - name: 构建 WinUI 3 应用
+        shell: pwsh
+        run: |
+          & $env:MSBUILD "windows/src/ui/App.vcxproj" `
+            /t:Build /p:Configuration=Release /p:Platform=x64 /m /v:minimal
+      - name: 上传构建产物
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-ui-build
+          path: windows/build/ui/
+          if-no-files-found: warn
+
   # ---------- Linux ----------
   linux:
     name: Linux (C/Qt)
