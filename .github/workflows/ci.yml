@@ -196,27 +196,28 @@ jobs:
           # 真实的平台工具集名在 Platforms\<平台>\PlatformToolsets\ 下，
           # 与 VC\Tools\MSVC\<版本号> 不是一回事。写死 v143 会在镜像上
           # 报 MSB8020/MSB8003，必须探测后传给 MSBuild。
+          #
+          # 注意：写入 $env:GITHUB_ENV 的值**只在后续步骤**生效，本步骤内
+          # 必须用局部变量 $toolset，否则会误判为"未探测到"而退出。
+          $toolset = $null
           $platSets = Join-Path $install "MSBuild\Microsoft\VC\v170\Platforms"
-          if (Test-Path $platSets) {
-            $x64Sets = Join-Path $platSets "x64\PlatformToolsets"
-            if (Test-Path $x64Sets) {
-              $sets = Get-ChildItem $x64Sets -Directory | Select-Object -ExpandProperty Name
-              Write-Host "x64 platform toolsets: $($sets -join ', ')"
-              if ($sets -contains "v143") {
-                "TOOLSET=v143" >> $env:GITHUB_ENV
-              } elseif ($sets.Count -gt 0) {
-                # 取版本号最大的一个（目录名形如 v143、v144）
-                $best = $sets | Sort-Object { [int]($_ -replace '[^0-9]','') } | Select-Object -Last 1
-                Write-Host "fallback toolset: $best"
-                "TOOLSET=$best" >> $env:GITHUB_ENV
-              }
+          $x64Sets = Join-Path $platSets "x64\PlatformToolsets"
+          if (Test-Path $x64Sets) {
+            $sets = @(Get-ChildItem $x64Sets -Directory | Select-Object -ExpandProperty Name)
+            Write-Host "x64 platform toolsets: $($sets -join ', ')"
+            # ClangCL 是备选工具链，不适合常规 C++ 项目，排除。
+            $cands = @($sets | Where-Object { $_ -match '^v\d+$' })
+            if ($cands.Count -gt 0) {
+              # 取版本号最大者（v143 > v142）
+              $toolset = $cands | Sort-Object { [int]($_ -replace '[^0-9]', '') } | Select-Object -Last 1
             }
           }
-          if (-not $env:TOOLSET) {
-            Write-Host "::error::未探测到可用的平台工具集"
+          if (-not $toolset) {
+            Write-Host "::error::未探测到可用的平台工具集（候选: $($sets -join ', ')）"
             exit 1
           }
-          Write-Host "using PlatformToolset=$env:TOOLSET"
+          Write-Host "using PlatformToolset=$toolset"
+          "TOOLSET=$toolset" >> $env:GITHUB_ENV
       - name: 还原 NuGet 包
         shell: pwsh
         run: |
