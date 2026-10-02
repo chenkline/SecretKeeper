@@ -113,6 +113,7 @@ if ($Test) {
         "windows\src\core\backoff.cpp",
         "windows\src\core\kek_cache.cpp",
         "windows\src\core\master_key_service.cpp",
+        "windows\src\core\secret_service.cpp",
         "windows\src\container\container.cpp",
         "windows\src\store\hex.cpp",
         "windows\src\store\index_db.cpp",
@@ -155,6 +156,36 @@ if ($Test) {
     & "$buildDir\core_test.exe"
     $coreRc = $LASTEXITCODE
     if ($coreRc -ne 0) { throw "核心层测试失败（退出码 $coreRc）" }
+
+    Write-Host "`n=== 构建业务层自检 ==="
+    $svcSrcs = $argonSrcs + $sqliteSrcs + @(
+        "windows\src\crypto\crypto.cpp",
+        "windows\src\crypto\der.cpp",
+        "windows\src\crypto\bignum.cpp",
+        "windows\src\container\container.cpp",
+        "windows\src\core\text.cpp",
+        "windows\src\core\error.cpp",
+        "windows\src\core\backoff.cpp",
+        "windows\src\core\kek_cache.cpp",
+        "windows\src\core\master_key_service.cpp",
+        "windows\src\core\secret_service.cpp",
+        "windows\src\store\hex.cpp",
+        "windows\src\store\index_db.cpp",
+        "windows\src\store\file_store.cpp",
+        "windows\tests\service_test.cpp"
+    )
+    $svcCmd = "cl.exe /nologo /std:c++20 /utf-8 /EHsc $cfgFlag /MD " +
+              "/D_CRT_SECURE_NO_WARNINGS /DSQLITE_OMIT_LOAD_EXTENSION " +
+              ($includeArgs -join " ") + " " +
+              "/Fo:$buildDir\ /Fd:$buildDir\store\ /Fe:$buildDir\service_test.exe " +
+              (($svcSrcs | ForEach-Object { "`"$_`"" }) -join " ") +
+              " $($argonFlags -join ' ') /link bcrypt.lib"
+    cmd /c $svcCmd
+    if ($LASTEXITCODE -ne 0) { throw "业务层编译失败" }
+
+    & "$buildDir\service_test.exe"
+    $svcRc = $LASTEXITCODE
+    if ($svcRc -ne 0) { throw "业务层测试失败（退出码 $svcRc）" }
     Write-Host "`n全部通过。"
 } else {
     Write-Host "构建目标：库（尚未定义 UI 工程）"
