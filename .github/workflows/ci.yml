@@ -186,6 +186,17 @@ jobs:
           $msbuild = Join-Path $install "MSBuild\Current\Bin\MSBuild.exe"
           "MSBUILD=$msbuild" >> $env:GITHUB_ENV
           Write-Host "MSBuild: $msbuild"
+          # 探测本镜像实际安装了哪些平台工具集。runner 镜像的 VS 版本会变，
+          # 写死 v143 在某些镜像上会报 MSB8020（工具集找不到）。
+          $vcRoot = Join-Path $install "VC\Tools\MSVC"
+          if (Test-Path $vcRoot) {
+            $sets = Get-ChildItem $vcRoot -Directory | Select-Object -ExpandProperty Name
+            Write-Host "installed MSVC tool dirs: $($sets -join ', ')"
+          }
+          $platSets = Join-Path $install "MSBuild\Microsoft\VC\v170\Platforms"
+          if (Test-Path $platSets) {
+            Write-Host "platform toolsets: $((Get-ChildItem $platSets -Directory | Select-Object -ExpandProperty Name) -join ', ')"
+          }
       - name: 还原 NuGet 包
         shell: pwsh
         run: |
