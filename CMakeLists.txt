@@ -54,9 +54,13 @@ endif()
 # ---- mbedTLS ----
 # 已在 vendor/mbedtls/include/mbedtls/mbedtls_config.h 末尾的 override 块裁剪过，
 # 因此只编译存活的编译单元（TLS / X.509 / net / file I/O 已关闭）。
-add_library(sk_mbedtls STATIC
+# mbedTLS 的 library/aesni.c 是 x86 AES-NI 指令的汇编实现，在 ARM64
+# （macos-15 / Apple Silicon、Linux aarch64）上既无法编译，其符号
+# （mbedtls_aesce_*）也无人提供，会在链接阶段报 Undefined symbols。
+# mbedtls_config.h 无条件 #define MBEDTLS_AESNI_C，因此这里必须按架构剔除，
+# 且不能改动 vendor 文件本身。
+set(SK_MBEDTLS_SOURCES
   vendor/mbedtls/library/aes.c
-  vendor/mbedtls/library/aesni.c
   vendor/mbedtls/library/asn1parse.c
   vendor/mbedtls/library/asn1write.c
   vendor/mbedtls/library/bignum.c
@@ -85,6 +89,59 @@ add_library(sk_mbedtls STATIC
   vendor/mbedtls/library/sha512.c
   vendor/mbedtls/library/version.c
 )
+
+# aesni.c 是 x86 AES-NI 汇编，aesce.c 是 Armv8 AES 指令。mbedtls_config.h 把
+# MBEDTLS_AESNI_C 与 MBEDTLS_AESCE_C **同时**无条件 #define，若按 config 的字面
+# 编译，在 x86 上缺 aesce_* 符号、在 ARM64 上缺 aesni_* 符号，两端都链接失败。
+# 因此按目标架构只编入对应的那一个，其余用 -D 置 0 关掉相应路径。
+# 判定目标架构不能只看 CMAKE_SYSTEM_PROCESSOR：它在交叉编译时不走
+# toolchain 文件时可能仍是宿主架构（x86_64），导致 ARM64 目标误编 aesni.c。
+# 以「宿主是否 Windows/Apple Silicon」结合 CMAKE_SYSTEM_PROCESSOR 双条件，
+# 并允许 -DSK_TARGET_ARCH=arm64 显式覆盖。
+# 判定目标架构不能只看 CMAKE_SYSTEM_PROCESSOR：交叉编译且不经 toolchain 文件时
+# 它报告的仍是**宿主**架构（在 x86 上交叉编译 aarch64 时它是 x86_64），
+# 于是 ARM64 目标会误编 aesni.c 并在链接期缺 aesce_* 符号。
+# 因此优先读显式覆盖项，其次用编译器自身的目标三元组（最可靠），
+# 最后才退回 CMAKE_SYSTEM_PROCESSOR。
+if(DEFINED SK_TARGET_ARCH)
+  set(SK_ARCH "${SK_TARGET_ARCH}")
+else()
+  set(SK_DETECTED_ARCH "")
+  if(CMAKE_C_COMPILER)
+    execute_process(COMMAND "${CMAKE_C_COMPILER}" -dumpmachine
+                    OUTPUT_VARIABLE SK_CC_TRIPLE ERROR_QUIET
+                    OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(SK_CC_TRIPLE MATCHES "aarch64|arm64")
+      set(SK_DETECTED_ARCH "arm64")
+    elseif(SK_CC_TRIPLE MATCHES "x86_64|amd64|i[36]86")
+      set(SK_DETECTED_ARCH "x64")
+    endif()
+  endif()
+  if(SK_DETECTED_ARCH STREQUAL "")
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64|i[36]86|x86)$")
+      set(SK_DETECTED_ARCH "x64")
+    else()
+      set(SK_DETECTED_ARCH "arm64")
+    endif()
+  endif()
+  set(SK_ARCH "${SK_DETECTED_ARCH}")
+endif()
+
+# 注意：此处必须先 add_library 再设 target 属性，否则 CMake 报
+# "Cannot specify compile definitions for target which is not built by this project"。
+if(SK_ARCH STREQUAL "x64")
+  list(APPEND SK_MBEDTLS_SOURCES vendor/mbedtls/library/aesni.c)
+  set(SK_MBEDTLS_ACCEL "aesni.c (x86 AES-NI)")
+else()
+  list(APPEND SK_MBEDTLS_SOURCES vendor/mbedtls/library/aesce.c)
+  set(SK_MBEDTLS_ACCEL "aesce.c (Armv8 AES)")
+endif()
+add_library(sk_mbedtls STATIC ${SK_MBEDTLS_SOURCES})
+if(NOT SK_ARCH STREQUAL "x64")
+  # 关掉 x86 路径：aesni.c 未编入，其符号必须无人引用。
+  target_compile_definitions(sk_mbedtls PUBLIC MBEDTLS_AESNI_C=0)
+endif()
+message(STATUS "mbedTLS 加速实现: ${SK_ARCH} -> ${SK_MBEDTLS_ACCEL}")
 target_include_directories(sk_mbedtls PUBLIC vendor/mbedtls/include)
 if(MSVC)
   target_compile_options(sk_mbedtls PRIVATE /W0)

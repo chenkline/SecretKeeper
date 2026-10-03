@@ -231,6 +231,21 @@ GCC/Clang 会把它当成链接器输入文件，直接报
 其他应用的 Ctrl+V 读不到。`Fl::paste` 不返回内容，而是把文本投递给接收控件的
 `FL_PASTE` 事件，因此需自备一个隐藏的 `Fl_Box` 并从 `label()` 取回文本。
 
+**mbedTLS 的 AES 加速必须按架构选源文件**：`mbedtls_config.h` 把
+`MBEDTLS_AESNI_C`（x86 AES-NI，源文件 `library/aesni.c`）与
+`MBEDTLS_AESCE_C`（Armv8 AES，源文件 `library/aesce.c`）**同时无条件 #define**，
+但两者互斥。若只按 config 字面编译，x86 上缺 `aesce_*`、ARM64 上缺 `aesni_*` 符号，
+**链接期**才报 Undefined symbols。根 CMakeLists.txt 按目标架构只编入对应的一个，
+并在非 x86 时额外 `target_compile_definitions(... MBEDTLS_AESNI_C=0)`。
+注意 mbedTLS 内部一律用 `#if defined()` 判定，赋 0 仍算「已定义」，
+真正起作用的是**不编译 aesni.c**，`=0` 只是第二道保险。
+
+**架构判定不能用 `CMAKE_SYSTEM_PROCESSOR`**：交叉编译且不经 toolchain 文件时，
+它报告的是**宿主**架构（在 x86 上交叉编译 aarch64 时它是 x86_64），
+会让 ARM64 目标误编 `aesni.c`。根 CMakeLists.txt 的判定顺序是
+`-DSK_TARGET_ARCH` 显式覆盖 → `CMAKE_C_COMPILER -dumpmachine` 三元组 →
+才退回 `CMAKE_SYSTEM_PROCESSOR`。macOS Apple Silicon 与 Linux aarch64 都走这条。
+
 **PSA 保持关闭**：`MBEDTLS_PSA_CRYPTO_C` 一旦打开，3.6 的经典入口仍可编译，但会引入 PSA
 属性配置负担，且本项目不需要它。不要"顺手修好"这个 `#undef`。
 
