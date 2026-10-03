@@ -335,6 +335,34 @@ GitHub `windows-2022` runner 的 CNG **均不提供** RSA/ECDH/ECDSA/DH/DSA：
 `windows/scripts/run-tests.ps1`。注意 crypto 与 store 两层要读仓库里的
 `test-vectors/`，**必须传入仓库根路径**，否则读不到向量而失败。
 
+### 9.7 桌面三端 CI 状态（全部通过）
+
+| job | 验证内容 | 状态 |
+|---|---|---|
+| Windows (C++/FLTK) | 四层自检 + ARM64 直编链路 | 通过 |
+| Windows UI (FLTK + CMake) | 构建 exe + **校验无第三方 DLL 依赖** | 通过 |
+| Windows ARM64 (交叉编译) | `build.ps1 -CompileOnly` | 通过 |
+| Linux (C++/FLTK) | 同一份核心代码 + CTest | 通过 |
+| macOS (C++/FLTK) | 同一份核心代码 + CTest（Apple Silicon） | 通过 |
+| 向量校验 | 91 项黄金向量 | 通过 |
+| Android / iOS | 工程尚未创建，CI 探测后跳过 | 通过 |
+
+**本地可用 WSL 验证 Linux 与 ARM64**：本机装有 Ubuntu 24.04（WSL2）。
+`sudo` 需密码，但可用 `wsl.exe -d Ubuntu --user root` 免密安装依赖。
+交叉编译 ARM64 用 `gcc-aarch64-linux-gnu` / `g++-aarch64-linux-gnu`：
+
+```
+wsl -d Ubuntu -- bash -lc "cd /mnt/d/src/github/Secret && \
+  cmake -S . -B build/aarch64 -G Ninja -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
+    -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++ -DSK_BUILD_APP=OFF && \
+  cmake --build build/aarch64 --target sk_crypto_test sk_store_test sk_core_test sk_service_test"
+```
+
+这条链路能在提交前复现 macOS ARM64 的链接问题，不必等CI。
+`SK_BUILD_APP=OFF` 是因为 WSL 未装 X11/arm64 开发库，FLTK 需要它们；
+但四层自检不需要界面，能独立验证密码学与存储层。
+
 **"跳过 0" 是硬要求。** 任何一层出现 `skipped != 0` 都是构建缺陷，不是环境限制。
 
 ---
