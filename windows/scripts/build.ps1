@@ -1,15 +1,14 @@
-# 机密心 - Windows 端构建脚本（MSVC / 无 CMake 依赖）
+# SecretKeeper - Windows 端四层自检构建脚本（MSVC 直编，不经 CMake）
 #
-# 存在的原因：
-#   1) 本机与部分 CI 环境没有 CMake，而项目要求不安装新工具；
-#   2) 内置 Argon2 参考实现要求 opt.c 与 ref.c **二选一**
-#      （上游 Makefile 即如此，两者同时编译会重复定义 fill_segment）。
-#      本脚本负责探测 CPU 是否支持相应指令集来选择。
+# 图形界面由根 CMakeLists.txt 构建（见 README），本脚本只负责四层自检：
+#   - 图形界面无法在无显示环境下验证，但密码学 / 存储 / 核心 / 业务四层是纯逻辑，
+#     因此单独提供一条不依赖 CMake 的直编链路，便于 CI 做分层验证；
+#   - 内置 Argon2 参考实现要求 opt.c 与 ref.c **二选一**
+#     （上游 Makefile 即如此，两者同时编译会重复定义 fill_segment）。
+#     本脚本负责探测 CPU 是否支持相应指令集来选择，CMake 走 check_cxx_source_compiles。
 #
 # 用法（需先加载 MSVC 环境）：
 #   call vcvars64.bat
-#   powershell -File windows/scripts/build.ps1
-# 或直接：
 #   powershell -File windows/scripts/build.ps1 -Test
 #
 # 架构：
@@ -128,8 +127,7 @@ $mbedtlsSrcs = @(
 )
 
 $includeArgs = @(
-    "/I windows\src\crypto",
-    "/I windows\src\store",
+    "/I src\include",
     "/I vendor\argon2\include",
     "/I vendor\sqlite",
     "/I vendor\mbedtls\include"
@@ -142,9 +140,9 @@ if ($Test -or $CompileOnly) {
     }
     Write-Host "`n=== 构建测试可执行文件 ==="
     $srcs = $argonSrcs + $mbedtlsSrcs + @(
-        "windows\src\crypto\crypto.cpp",
-        "windows\src\container\container.cpp",
-        "windows\tests\crypto_test.cpp"
+        "src\common\crypto.cpp",
+        "src\common\container.cpp",
+        "tests\crypto_test.cpp"
     )
     $cmd = "cl.exe /nologo /std:c++20 /utf-8 /EHsc /W4 $cfgFlag /MD " +
            "/D_CRT_SECURE_NO_WARNINGS " +
@@ -158,18 +156,18 @@ if ($Test -or $CompileOnly) {
 
     Write-Host "`n=== 构建存储层自检 ==="
     $storeSrcs = $argonSrcs + $mbedtlsSrcs + $sqliteSrcs + @(
-        "windows\src\crypto\crypto.cpp",
-        "windows\src\core\text.cpp",
-        "windows\src\core\error.cpp",
-        "windows\src\core\backoff.cpp",
-        "windows\src\core\kek_cache.cpp",
-        "windows\src\core\master_key_service.cpp",
-        "windows\src\core\secret_service.cpp",
-        "windows\src\container\container.cpp",
-        "windows\src\store\hex.cpp",
-        "windows\src\store\index_db.cpp",
-        "windows\src\store\file_store.cpp",
-        "windows\tests\store_test.cpp"
+        "src\common\crypto.cpp",
+        "src\common\text.cpp",
+        "src\common\error.cpp",
+        "src\common\backoff.cpp",
+        "src\common\kek_cache.cpp",
+        "src\common\master_key_service.cpp",
+        "src\common\secret_service.cpp",
+        "src\common\container.cpp",
+        "src\common\hex.cpp",
+        "src\common\index_db.cpp",
+        "src\common\file_store.cpp",
+        "tests\store_test.cpp"
     )
     $storeCmd = "cl.exe /nologo /std:c++20 /utf-8 /EHsc $cfgFlag /MD " +
                 "/D_CRT_SECURE_NO_WARNINGS /DSQLITE_OMIT_LOAD_EXTENSION " +
@@ -183,12 +181,12 @@ if ($Test -or $CompileOnly) {
 
     Write-Host "`n=== 构建核心层自检 ==="
     $coreSrcs = $argonSrcs + $mbedtlsSrcs + @(
-        "windows\src\crypto\crypto.cpp",
-        "windows\src\core\text.cpp",
-        "windows\src\core\error.cpp",
-        "windows\src\core\backoff.cpp",
-        "windows\src\core\kek_cache.cpp",
-        "windows\tests\core_test.cpp"
+        "src\common\crypto.cpp",
+        "src\common\text.cpp",
+        "src\common\error.cpp",
+        "src\common\backoff.cpp",
+        "src\common\kek_cache.cpp",
+        "tests\core_test.cpp"
     )
     $coreCmd = "cl.exe /nologo /std:c++20 /utf-8 /EHsc $cfgFlag /MD " +
                "/D_CRT_SECURE_NO_WARNINGS " +
@@ -202,18 +200,18 @@ if ($Test -or $CompileOnly) {
 
     Write-Host "`n=== 构建业务层自检 ==="
     $svcSrcs = $argonSrcs + $mbedtlsSrcs + $sqliteSrcs + @(
-        "windows\src\crypto\crypto.cpp",
-        "windows\src\container\container.cpp",
-        "windows\src\core\text.cpp",
-        "windows\src\core\error.cpp",
-        "windows\src\core\backoff.cpp",
-        "windows\src\core\kek_cache.cpp",
-        "windows\src\core\master_key_service.cpp",
-        "windows\src\core\secret_service.cpp",
-        "windows\src\store\hex.cpp",
-        "windows\src\store\index_db.cpp",
-        "windows\src\store\file_store.cpp",
-        "windows\tests\service_test.cpp"
+        "src\common\crypto.cpp",
+        "src\common\container.cpp",
+        "src\common\text.cpp",
+        "src\common\error.cpp",
+        "src\common\backoff.cpp",
+        "src\common\kek_cache.cpp",
+        "src\common\master_key_service.cpp",
+        "src\common\secret_service.cpp",
+        "src\common\hex.cpp",
+        "src\common\index_db.cpp",
+        "src\common\file_store.cpp",
+        "tests\service_test.cpp"
     )
     $svcCmd = "cl.exe /nologo /std:c++20 /utf-8 /EHsc $cfgFlag /MD " +
               "/D_CRT_SECURE_NO_WARNINGS /DSQLITE_OMIT_LOAD_EXTENSION " +

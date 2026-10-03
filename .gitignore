@@ -35,6 +35,9 @@ vendor/*
 # 版本一致是跨端密码学一致性的前提（引入说明见 vendor/mbedtls/README.md）。
 # 仅忽略编译中间产物。
 !vendor/mbedtls/
+# FLTK 同样必须入库：桌面三端静态链接同一份 1.4.5，界面行为一致性的前提。
+# 引入说明与裁剪纪律见 vendor/fltk/README.md。
+!vendor/fltk/
 Pods/
 .build/
 DerivedData/

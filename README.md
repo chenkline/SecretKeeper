@@ -21,16 +21,20 @@
 
 | 平台 | 语言 | UI |
 |---|---|---|
-| Windows | C++ | WinUI 3 / C++/WinRT |
-| Linux | C | Qt |
-| macOS | Swift | AppKit |
+| Windows | C++17 | FLTK 1.4.5 |
+| Linux | C++17 | FLTK 1.4.5 |
+| macOS | C++17 | FLTK 1.4.5 |
 | Android | Kotlin | Jetpack Compose |
 | iOS | Swift | SwiftUI |
 
-五端为**完全独立的原生实现**，不共享业务代码；跨平台一致性由统一的数据格式规范与黄金测试向量保证。
+桌面三端（Windows / Linux / macOS）**共享同一套 C++ 业务与界面代码**，一致性由代码共享
+直接保证；Android 与 iOS 保持各自的原生实现，靠统一的数据格式规范与黄金测试向量对齐。
 
-密码学方面，Windows 与 Linux 固定使用 **mbedTLS 3.6.7**（源码 vendor 在 `vendor/mbedtls/`，
-Apache-2.0），Argon2id 来自 `vendor/argon2`；其余三端不强制，但必须逐字节通过同一份黄金向量。
+密码学方面，桌面三端固定使用 **mbedTLS 3.6.7**（源码 vendor 在 `vendor/mbedtls/`，
+Apache-2.0），Argon2id 来自 `vendor/argon2`；移动两端不强制，但必须逐字节通过同一份黄金向量。
+
+界面框架统一为 **FLTK 1.4.5**（LGPL-2.1，源码 vendor 在 `vendor/fltk/`），静态链接，
+产物是不依赖任何第三方 DLL 的单文件可执行程序。
 
 Windows 端密码学 / 存储 / 核心 / 业务四层自检均已通过，**RSA 路径真实执行、0 跳过**：
 

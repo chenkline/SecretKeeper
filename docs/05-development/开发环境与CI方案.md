@@ -21,11 +21,13 @@
 | 软件 | 版本 | 用途 |
 |---|---|---|
 | Visual Studio 2022 | 17.11+ | C++ 编译器与 MSBuild（装 **"使用 C++ 的桌面开发"** 工作负载） |
-| Windows SDK | 10.0.22621+ | Win32 / COM API |
-| Windows App SDK (C++/WinRT) | 1.6+ | WinUI 3 框架，由 NuGet 自动还原 |
-| CMake | 3.28+ | 构建脚本（**本机当前未安装**，Windows 端走 `windows/scripts/build.ps1`） |
+| Windows SDK | 10.0.22621+ | 平台熵 `BCryptGenRandom` |
+| CMake | 3.28+ | 桌面三端统一构建脚本 |
 | Git | 2.43+ | 版本控制 |
 | Python | 3.11+ | 校验脚本、生成测试向量 |
+
+框架（FLTK）与密码学库（mbedTLS / Argon2 / SQLite）全部为 `vendor/` 内置源码，
+**无需任何包管理器安装**。
 
 ### 2.2 可选
 
@@ -34,12 +36,13 @@
 | SQLite 命令行工具 | 手工检查索引库 |
 | winget / Scoop | 包管理 |
 | GnuPG | 若未来 License 模块需要签名 |
+| FLTK | **不需安装**，`vendor/fltk` 内置源码 |
 | mbedTLS / Argon2 / SQLite | **不需安装**，全部为 `vendor/` 内置源码 |
 
 ### 2.3 不需要在本地安装
 
 - Xcode（iOS / macOS）→ 用 GitHub Actions
-- Qt（Linux）→ 用 GitHub Actions
+- Linux 的 X11 开发包 → 用 GitHub Actions
 - Android SDK → 可本地装，但**优先用 CI**，避免版本漂移
 - Linux 交叉编译工具链 → 用 GitHub Actions
 - mbedTLS / Argon2 / SQLite 的开发包 → **不需要**，三者均 vendor 在仓库内并由构建脚本直接编译
@@ -55,6 +58,20 @@ winget install Python.Python.3.12
 
 安装 Visual Studio 时务必勾选 **"使用 C++ 的桌面开发"**，否则缺少 MSVC 工具链。
 
+### 2.5 PowerShell 的 UTF-8 环境
+
+Windows 控制台默认代码页不是 UTF-8，直接跑构建脚本时 Python 与 C++ 的中文输出会乱码，
+进而让脚本以非零码退出。仓库提供 `scripts/ps-profile.ps1`，在**每个新开的 PowerShell 会话
+开始时**执行一次即可：
+
+```powershell
+. .\scripts\ps-profile.ps1
+```
+
+它会设置 `chcp 65001`、把控制台输入输出编码与 `$OutputEncoding` 统一为无 BOM UTF-8，
+并设置 `PYTHONUTF8=1` / `PYTHONIOENCODING=utf-8`。CI 脚本内部自行完成同样的设置，
+不依赖该 profile。
+
 ## 3. GitHub Actions 方案
 
 ### 3.1 总原则
@@ -68,10 +85,10 @@ winget install Python.Python.3.12
 
 | Job | Runner | 工具链 | 产物 |
 |---|---|---|---|
-| **windows** | `windows-2022` | VS 2022 + MSBuild（+ `build.ps1` 直编自检） | MSIX bundle / exe |
+| **windows** | `windows-2022` | VS 2022 + CMake（+ `build.ps1` 直编自检） | 单文件 exe |
 | **windows-arm64** | `windows-2022` | VS 2022 ARM64 交叉工具链（+ `build.ps1 -Architecture arm64 -CompileOnly`） | 仅编译产物，不出包 |
-| **linux** | `ubuntu-24.04` | Qt 6 + CMake + Ninja + mbedTLS（vendor 同源） | AppImage / tar.gz |
-| **macos** | `macos-15` | Xcode 16 + SwiftPM | .app / .dmg |
+| **linux** | `ubuntu-24.04` | X11 开发包 + CMake + Ninja + mbedTLS（vendor 同源） | tar.gz |
+| **macos** | `macos-15` | Xcode 16 命令行工具 + CMake + mbedTLS（vendor 同源） | tar.gz |
 | **android** | `ubuntu-24.04` | JDK 17 + Android SDK 34 + Gradle | .apk |
 | **ios** | `macos-15` | Xcode 16 + SwiftPM | .xcarchive（未签名） |
 | **vectors** | `ubuntu-24.04` | Python 校验脚本 | 校验报告 |
@@ -89,7 +106,7 @@ winget install Python.Python.3.12
 - 推送到主干分支
 - 发起 Pull Request
 - 手动触发
-- **每日定时全量构建**（用于捕捉上游依赖的破坏性变更，如 Qt / Gradle 发布新版本）
+- **每日定时全量构建**（用于捕捉上游依赖的破坏性变更，如 Gradle 发布新版本）
 
 ### 3.4 缓存策略
 
@@ -97,9 +114,7 @@ winget install Python.Python.3.12
 |---|---|
 | Gradle | `gradle/libs` |
 | SwiftPM | `spm/<Package.resolved 哈希>` |
-| Qt | `qt/<版本>` |
 | CMake 构建目录 | `cmake/<job>-<分支>` |
-| NuGet | `nuget` |
 
 缓存键必须包含 **lock 文件的哈希**，依赖变更时自动失效。
 

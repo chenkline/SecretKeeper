@@ -25,7 +25,7 @@
 
 ## 已锁定的技术决策摘要
 
-- 五端完全独立原生实现，共享的只有格式规范与测试向量。
+- 桌面三端（Windows / Linux / macOS）共享同一套 C++ 业务与界面代码；移动两端独立原生实现，跨端一致性由格式规范与测试向量保证。
 - 主密钥为 RSA-2048 密钥对；公钥用 RSA-OAEP-SHA256 封装数据密钥，公钥与私钥**均**由 KEK 以 AES-256-GCM 保护（各自独立随机 nonce）。
 - KEK 由 Argon2id 派生，**每条记录独立 16 字节随机盐并明文随记录保存**。
 - 密码学：Windows 与 Linux 固定使用 **mbedTLS 3.6.7**（`vendor/mbedtls/`，Apache-2.0），Argon2id 来自 `vendor/argon2`；macOS / iOS / Android 不强制，但必须逐字节对齐黄金向量。

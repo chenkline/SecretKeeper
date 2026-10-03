@@ -33,14 +33,21 @@ Secret/
 │   ├── 05-development/
 │   ├── 06-roadmap/
 │   └── 07-testing/
+├── src/                               # 桌面三端共享代码
+│   ├── include/                       # 跨端共享头文件
+│   ├── common/                        # 跨端共享实现（四层）
+│   ├── app/                           # FLTK 界面（三端共享同一份）
+│   ├── windows/                       # Windows 平台层（Win32 剪贴板 / %APPDATA%）
+│   ├── linux/                         # Linux 平台层（XDG 目录）
+│   └── macos/                         # macOS 平台层（~/Library/Application Support）
+├── tests/                             # 四层自检（三端共用）
 ├── test-vectors/                      # 跨平台黄金测试向量（单一真相源）
-├── vendor/                            # 内置第三方源码（五端共用同一份，见 9.2）
+├── vendor/                            # 内置第三方源码（见 9.2）
 │   ├── argon2/                        # Argon2id 参考实现
 │   ├── mbedtls/                       # mbedTLS 3.6.7
-│   └── sqlite/                        # SQLite amalgamation
-├── windows/                           # C++/WinUI 3 (C++/WinRT)
-├── linux/                             # C / Qt
-├── macos/                             # Swift / AppKit
+│   ├── sqlite/                        # SQLite amalgamation
+│   └── fltk/                          # FLTK 1.4.5
+├── build/                             # 构建输出（windows/ linux/ macos/）
 ├── android/                           # Kotlin / Jetpack Compose
 ├── ios/                               # Swift / SwiftUI
 └── .github/workflows/                 # GitHub Actions CI
@@ -52,13 +59,22 @@ Secret/
 
 | 平台 | 语言 | UI 框架 | 备注 |
 |---|---|---|---|
-| Windows | C++ | WinUI 3 / C++/WinRT | MSVC + Windows SDK 11，密码学用 mbedTLS |
-| Linux | C | Qt | Qt 仅用于 Linux，密码学用 mbedTLS |
-| macOS | Swift | AppKit | |
+| Windows | C++17 | FLTK 1.4.5 | MSVC + CMake，密码学用 mbedTLS |
+| Linux | C++17 | FLTK 1.4.5 | 仅依赖 X11 生态库 |
+| macOS | C++17 | FLTK 1.4.5 | |
 | Android | Kotlin | Jetpack Compose | 必须原生，禁止跨平台方案 |
 | iOS | Swift | SwiftUI | 必须原生，禁止跨平台方案 |
 
-**铁律：五个平台的实现彼此独立，不共享业务/UI 代码。** 唯一共享的是 `test-vectors/` 中的测试数据与 `docs/03-data/` 中的格式规范。
+**铁律一：桌面三端（Windows / Linux / macOS）共享同一套 C++ 业务与界面代码。**
+`src/common`（四层实现）、`src/include`（四层头文件）、`src/app`（FLTK 界面）是唯一实现；
+`src/windows`、`src/linux`、`src/macos` 各只有一个 `platform.{h,cpp}`，封装剪贴板、
+用户数据目录与原生文件对话框。修复缺陷只改一处，自动覆盖三端。
+
+**铁律二：移动两端（Android / iOS）保持各自原生实现，不共享代码。**
+它们靠 `test-vectors/` 的黄金向量与 `docs/03-data/` 的格式规范强制对齐桌面三端。
+
+**铁律三：`src/common/` 内的代码不得引用任何平台 API。** 确需 OS 能力时，
+由 `src/<platform>/` 提供薄封装供界面层调用。
 
 ---
 
@@ -66,8 +82,8 @@ Secret/
 
 | 项目 | 决策 |
 |---|---|
-| 密码学库（Windows / Linux） | **mbedTLS 3.6.7**，源码 vendor 在 `vendor/mbedtls/`（Apache-2.0） |
-| 其余三端密码学库 | 不强制，只要逐字节对齐黄金向量；建议同样用 mbedTLS 便于交叉比对 |
+| 密码学库（Windows / Linux / macOS） | **mbedTLS 3.6.7**，源码 vendor 在 `vendor/mbedtls/`（Apache-2.0） |
+| Android / iOS 密码学库 | 不强制，只要逐字节对齐黄金向量 |
 | 密钥派生 | Argon2id，m=10MiB、t=3、p=1，输出 32 字节（`vendor/argon2`，非 mbedTLS 提供） |
 | 盐 | **每条记录独立 16 字节随机盐，明文随记录保存** |
 | 主密钥 | RSA-2048 密钥对 |
@@ -107,7 +123,7 @@ Secret/
 3. 任一平台实现若与规范不符，**以规范为准修正实现**，而非反向修改规范去迁就某个平台。
 4. 任何新增或修改的密码学参数必须同步更新 `test-vectors/` 并让五端同时通过。
 5. 引入第三方密码库时，必须确认其默认参数与本仓库一致（尤其是 RSA-OAEP 的哈希与填充方式、GCM 的 IV 长度）。
-6. 任何密码学库必须**锁死版本并 vendor 入库**，不得依赖宿主系统的库版本。Windows 与 Linux 固定 mbedTLS 3.6.7；其余三端即便用系统库（OpenSSL / CryptoKit / java.security），也必须通过同一份黄金向量。
+6. 任何密码学库必须**锁死版本并 vendor 入库**，不得依赖宿主系统的库版本。桌面三端固定 mbedTLS 3.6.7；移动两端即便用系统库（CryptoKit / java.security），也必须通过同一份黄金向量。
 
 ---
 
@@ -142,13 +158,16 @@ Secret/
 
 ### 8.1 改动纪律（最小改动，铁律）
 
-- **不得变更存量文件的换行符格式。** 仓库内换行符并不统一：绝大多数文件是 LF，
-  但以下两个文件是 **CRLF**，改它们时必须逐字节保持 CRLF：
-  - `windows/src/container/container.cpp`
-  - `windows/src/container/container.h`
+- **全仓库统一 LF，不留例外。** `.gitattributes` 已声明 `* text=auto eol=lf`，
+  任何文件都不得写入 CRLF。这条纪律来之不易：历史上 `src/common/container.cpp`
+  是 CRLF、`.github/workflows/ci.yml` 与 `scripts/gen-vectors.py` 是 CRLF/LF 混排，
+  git 因此把整份文件判定为重写，真实改动被淹没。
 
-  弄错方向的后果一样严重：把 CRLF 改回 LF（或反之）会让 git 把整份文件判定为重写，
-  既污染 review，也让真实改动被淹没。
+  写文件时固定 `io.open(p, "w", encoding="utf-8", newline="\n")`。若不慎写成 CRLF，
+  git 会把整份文件判定为重写，review 时看不出真实改动。
+
+  例外：`vendor/` 下的第三方源码按上游原样入库，`.gitattributes` 已用 `vendor/** -text`
+  关闭其换行符转换。改动 vendor 前先读各自的 `README.md`。
 - **不得重写整个文件。** 修改一律走"读取原文 → 精确替换锚点 → 原样写回"，
   禁止"解析成结构再序列化"这类会顺手归一化换行符、缩进或末尾空行的做法。
 - 写文件固定用 `io.open(p, "w", encoding="utf-8", newline=<原换行符>)`，
@@ -181,7 +200,8 @@ GBK 控制台上会炸。
 | 目录 | 来源 | 为什么内置 |
 |---|---|---|
 | `vendor/argon2/` | Argon2 官方参考实现 20190702（CC0/Apache-2.0） | 五端必须编译同一份实现才能保证跨端一致。mbedTLS 不提供 Argon2id，故该实现独立保留 |
-| `vendor/mbedtls/` | mbedTLS 3.6.7，仅 `library/` + `include/`（Apache-2.0） | Windows 与 Linux 两端必须同版本同源码，否则 OAEP / GCM 行为可能在细节上分叉 |
+| `vendor/mbedtls/` | mbedTLS 3.6.7，仅 `library/` + `include/`（Apache-2.0） | 桌面三端必须同版本同源码，否则 OAEP / GCM 行为可能在细节上分叉 |
+| `vendor/fltk/` | FLTK 1.4.5，仅 `src/` + `FL/`（LGPL-2.1） | 三端静态链接同一份 FLTK，界面行为一致；静态链接不触发 LGPL 的动态链接义务，产物无第三方 DLL 依赖 |
 | `vendor/sqlite/` | SQLite amalgamation 3.45.0（public-domain dedication） | 五端编译同一份 `sqlite3.c`，避免各端 SQLite 版本差异造成行为分叉 |
 
 三者都**必须入库**（`.gitignore` 已为 `vendor/argon2`、`vendor/mbedtls`、`vendor/sqlite`
@@ -193,6 +213,12 @@ GBK 控制台上会炸。
 AES 以外的分组密码；保留 RSA_C、PKCS1_V15/V21、BIGNUM、MD、SHA256、AES、GCM、
 CIPHER_C、ASN1_PARSE、PKCS8、PK_PARSE、PK_WRITE、OID、CTR_DRBG、ENTROPY、PLATFORM_C。
 
+**FLTK 必须关掉 `FLTK_MSVC_RUNTIME_DLL`**：该选项默认 ON（/MD），且会在
+`add_subdirectory` 内部覆盖 `CMAKE_MSVC_RUNTIME_LIBRARY`，与本工程的静态运行库
+（/MT）冲突，链接阶段必报一屏 `LNK2038 RuntimeLibrary 不匹配`。根 CMakeLists.txt
+在 `add_subdirectory(vendor/fltk)` 之前置 `FLTK_MSVC_RUNTIME_DLL OFF`。改构建选项时
+不要把这个开关挪到后面，否则又会被 FLTK 覆盖。
+
 **PSA 保持关闭**：`MBEDTLS_PSA_CRYPTO_C` 一旦打开，3.6 的经典入口仍可编译，但会引入 PSA
 属性配置负担，且本项目不需要它。不要"顺手修好"这个 `#undef`。
 
@@ -202,7 +228,8 @@ CIPHER_C、ASN1_PARSE、PKCS8、PK_PARSE、PK_WRITE、OID、CTR_DRBG、ENTROPY�
 ### 9.3 本机与 CI 的环境差异
 
 - VS BuildTools 在**非默认路径** `D:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools`（不是 `Program Files (x86)`）
-- 本机**无 CMake**，Windows 构建走 `windows/scripts/build.ps1`；Linux/macOS 走 CMake/SwiftPM
+- 本机已有 **CMake 4.4.3**（`C:\Program Files\CMake\bin`），三端统一用根 `CMakeLists.txt`；四层自检仍走 `windows/scripts/build.ps1`（`cl.exe` 直编，供 ARM64 交叉编译复用）
+- PowerShell 里中文显示为乱码、或 Python 抛 `UnicodeEncodeError` 时，先 `. .\scripts\ps-profile.ps1`。该文件入库但**不自动改写用户 `$PROFILE`**，需手动 source；CI 脚本内部自行重配编码，不依赖它
 - 本机 **MSVC 缺 ARM64 目标工具与库**（VS 组件 `Microsoft.VisualStudio.Component.VC.Tools.ARM64` 未安装），
   Windows SDK 的 arm64 库却是齐的。因此 ARM64 **只能交叉编译且只能走 CI**：
   `-Architecture arm64 -CompileOnly`（只编译不运行，x64 宿主执行不了 ARM64 二进制）。
@@ -261,7 +288,7 @@ GitHub `windows-2022` runner 的 CNG **均不提供** RSA/ECDH/ECDSA/DH/DSA：
 
 - **解密缓冲区长度算错**：GCM 是流模式，**密文长度 == 明文长度**。旧代码按密文向量总长
   （含 16 字节 tag 尾）分配输出，导致恢复出的 DER 尾部多出 16 个零字节，RSA 解析器直接
-  拒绝。已新增 `plain_size()` 统一口径（`windows/src/core/master_key_service.cpp`，6 处调用）。
+  拒绝。已新增 `plain_size()` 统一口径（`src/common/master_key_service.cpp`，6 处调用）。
   `secret_service.cpp` 本来就减了尾，是对的。
 - **测试 SKIP 文案误导**：旧的 SKIP 提示写 "this host CNG"，会让读者以为 CNG 环境限制仍在。
   现已改为 "RSA reports unavailable on this host / mbedTLS is pure software, so this
@@ -269,13 +296,17 @@ GitHub `windows-2022` runner 的 CNG **均不提供** RSA/ECDH/ECDSA/DH/DSA：
 
 ### 9.6 当前自检基线
 
-| 层 | 位置 | 自检项数 | 失败 | 跳过 |
+| 层 | 测试文件 | 自检项数 | 失败 | 跳过 |
 |---|---|---|---|---|
-| 密码学层 | `windows/src/crypto/` | 86 | 0 | 0 |
-| 存储层 | `windows/src/store/` | 81 | 0 | 0 |
-| 核心层 | `windows/src/core/` | 178 | 0 | 0 |
-| 业务层 | `windows/src/core/` | 54 | 0 | **0（RSA 真实执行）** |
+| 密码学层 | `tests/crypto_test.cpp` | 86 | 0 | 0 |
+| 存储层 | `tests/store_test.cpp` | 81 | 0 | 0 |
+| 核心层 | `tests/core_test.cpp` | 178 | 0 | 0 |
+| 业务层 | `tests/service_test.cpp` | 54 | 0 | **0（RSA 真实执行）** |
 | 黄金向量 | `scripts/verify-vectors.py` | 91 | 0 | — |
+
+四层自检由 CMake 的 CTest 驱动（`ctest --test-dir build/<平台>`），也可走
+`windows/scripts/run-tests.ps1`。注意 crypto 与 store 两层要读仓库里的
+`test-vectors/`，**必须传入仓库根路径**，否则读不到向量而失败。
 
 **"跳过 0" 是硬要求。** 任何一层出现 `skipped != 0` 都是构建缺陷，不是环境限制。
 
