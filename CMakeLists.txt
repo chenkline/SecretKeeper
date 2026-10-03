@@ -139,6 +139,10 @@ endif()
 
 # ---- FLTK 1.4.5 ----
 # 静态链接，产物不依赖任何第三方 DLL。裁剪纪律见 vendor/fltk/README.md。
+# 本项目不用 OpenGL。FLTK_BUILD_GL 默认 ON，且其 find_path(OPENGL_INCLUDE_DIR)
+# 探测失败时不会优雅降级，而是让 CMake Generate 阶段直接报
+# "variables are used but set to NOTFOUND"。故显式关闭。
+set(FLTK_BUILD_GL           OFF CACHE BOOL "" FORCE)
 set(FLTK_BUILD_EXAMPLES     OFF CACHE BOOL "" FORCE)
 set(FLTK_BUILD_TEST         OFF CACHE BOOL "" FORCE)
 set(FLTK_BUILD_FLUID        OFF CACHE BOOL "" FORCE)
