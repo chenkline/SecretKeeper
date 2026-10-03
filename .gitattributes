@@ -1,0 +1,18 @@
+# SecretKeeper 换行符纪律
+#
+# 全仓库统一使用 LF。历史原因：Windows 上开发时个别文件被写成 CRLF，
+# 其中 src/common/container.cpp 更是 CRLF 与 LF 混排，导致 git 把整份文件
+# 判定为重写，真实改动被淹没。
+#
+# 这里显式声明三条规则，使换行符不再依赖各开发机的 core.autocrlf 设置：
+#   1. 默认按文本处理并以 LF 存入仓库
+#   2. Windows 上检出时不转换，保持 LF
+#   3. vendor/ 下的第三方源码保持原样（*.H 等二进制/库文件不参与转换）
+
+* text=auto eol=lf
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 第三方源码：按上游原样入库，不做换行符归一
+vendor/** -text
