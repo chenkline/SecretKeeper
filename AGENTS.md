@@ -219,6 +219,18 @@ CIPHER_C、ASN1_PARSE、PKCS8、PK_PARSE、PK_WRITE、OID、CTR_DRBG、ENTROPY�
 在 `add_subdirectory(vendor/fltk)` 之前置 `FLTK_MSVC_RUNTIME_DLL OFF`。改构建选项时
 不要把这个开关挪到后面，否则又会被 FLTK 覆盖。
 
+**`/utf-8` 只能在 MSVC 下加**：`add_compile_options(/utf-8)` 若无条件生效，
+GCC/Clang 会把它当成链接器输入文件，直接报
+`cc: error: /utf-8: linker input file not found`。根 CMakeLists.txt 已用
+`if(MSVC)` 包住。同理 `FLTK_BUILD_GL` 必须 OFF，否则 Linux 上
+`find_path(OPENGL_INCLUDE_DIR)` 探测失败会让 CMake Generate 阶段中断。
+
+**FLTK 1.4 的剪贴板 API 与旧版不同**：只有 `Fl::copy(text, len, destination)`
+与 `Fl::paste(receiver, source)`，没有 `Fl::clipboard_set/paste`。
+`destination` 必须显式传 **1**（系统剪贴板）——默认的 0 是 X11 选择缓冲，
+其他应用的 Ctrl+V 读不到。`Fl::paste` 不返回内容，而是把文本投递给接收控件的
+`FL_PASTE` 事件，因此需自备一个隐藏的 `Fl_Box` 并从 `label()` 取回文本。
+
 **PSA 保持关闭**：`MBEDTLS_PSA_CRYPTO_C` 一旦打开，3.6 的经典入口仍可编译，但会引入 PSA
 属性配置负担，且本项目不需要它。不要"顺手修好"这个 `#undef`。
 

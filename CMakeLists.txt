@@ -30,9 +30,11 @@ else()
 endif()
 
 # ---------------------------------------------------------------- 全局编译选项
-add_compile_options(/utf-8)
+# /utf-8 是 MSVC 专有开关，必须只在 MSVC 下加。源文件含中文注释，
+# 不加则 MSVC 按 GBK 解析导致编译错误；但若无条件加到 GCC/Clang，
+# 会被当成链接器输入文件而报 "linker input file not found"。
 if(MSVC)
-  add_compile_options(/W4 /EHsc)
+  add_compile_options(/utf-8 /W4 /EHsc)
   # 产物为单文件 exe：静态运行库，无需随包分发 VC++ redistributable。
   set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 else()

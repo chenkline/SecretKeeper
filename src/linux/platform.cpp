@@ -6,6 +6,7 @@
 
 #include <FL/Fl.H>
 #include <FL/Fl_Native_File_Chooser.H>
+#include <FL/Fl_Box.H>
 #include <FL/fl_ask.H>
 
 #include <cstdlib>
@@ -40,15 +41,33 @@ fs::path data_directory() {
   return fs::temp_directory_path() / "SecretKeeper";
 }
 
-bool clipboard_set(const std::string& utf8) { return Fl::clipboard_set(utf8.c_str()); }
-
-bool clipboard_get(std::string* out) {
-  if (Fl::clipboard_paste() == nullptr) return false;
-  out->assign(Fl::clipboard_paste());
+bool clipboard_set(const std::string& utf8) {
+  // FLTK 1.4 replaced clipboard_set/paste with copy/paste. Destination 1 is the
+  // system clipboard; on X11 the default (0) would only touch the selection
+  // buffer, which a Ctrl+V from another application does not read.
+  Fl::copy(utf8.c_str(), static_cast<int>(utf8.size()), 1);
   return true;
 }
 
-bool clipboard_clear() { return Fl::clipboard_set(""); }
+bool clipboard_get(std::string* out) {
+  // Fl::paste() delivers the text through the receiver widget's callback rather
+  // than returning it, so a hidden 1x1 Fl_Box collects it for us.
+  out->clear();
+  Fl_Box receiver(0, 0, 1, 1);
+  receiver.hide();
+  Fl::paste(receiver, 1);
+  Fl::flush();
+  if (const char* pasted = receiver.label(); pasted != nullptr && pasted[0] != '\0') {
+    out->assign(pasted);
+  }
+  return !out->empty();
+}
+
+bool clipboard_clear() {
+  Fl::copy("", 0, 1);
+  return true;
+}
+
 
 std::optional<std::string> choose_open_file(const std::string& title,
                                             const std::string& pattern) {
