@@ -30,7 +30,7 @@ jobs:
 
   # ---------- Windows ----------
   windows:
-    name: Windows (C++/WinUI3)
+    name: Windows (C++/FLTK)
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
@@ -168,126 +168,63 @@ jobs:
   # ---------- Windows UI (WinUI 3) ----------
   # UI 工程只能在带完整 VS + Windows App SDK + MSIX 工具链的 runner 上构建。
   # 本机 BuildTools 缺这些组件且约定不补装，因此 UI 构建完全交给 CI。
+  # ---------- Windows 图形界面 ----------
+  # FLTK 为纯静态库 + /MT 运行库，产物是单文件 exe，无第三方 DLL。
+  # 这里只验证「能构建」；界面行为无法在无显示环境的 runner 上验证，
+  # 因此交互逻辑仍由本地手工验证，功能正确性由四层自检与黄金向量保证。
   windows-ui:
-    name: Windows UI (WinUI 3)
+    name: Windows UI (FLTK + CMake)
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
-      - name: 定位 MSBuild
+      - name: 配置
         shell: pwsh
         run: |
-          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $install = & $vswhere -latest -products * `
-            -requires Microsoft.Component.MSBuild `
-            -property installationPath
-          if (-not $install) {
-            Write-Host "::error::未找到 MSBuild"; exit 1
+          cmake -S . -B build/windows -A x64
+      - name: 构建
+        shell: pwsh
+        run: |
+          cmake --build build/windows --config Release --parallel
+      - name: 校验产物无第三方 DLL 依赖
+        shell: pwsh
+        run: |
+          $exe = "build/windows/Release/SecretKeeper.exe"
+          if (-not (Test-Path $exe)) {
+            Write-Host "::error::未产出 SecretKeeper.exe"; exit 1
           }
-          $msbuild = Join-Path $install "MSBuild\Current\Bin\MSBuild.exe"
-          "MSBUILD=$msbuild" >> $env:GITHUB_ENV
-          Write-Host "MSBuild: $msbuild"
-          # 探测本镜像实际安装了哪些平台工具集。runner 镜像的 VS 版本会变，
-          # 写死 v143 在某些镜像上会报 MSB8020（工具集找不到）。
-          $vcRoot = Join-Path $install "VC\Tools\MSVC"
-          if (Test-Path $vcRoot) {
-            $sets = Get-ChildItem $vcRoot -Directory | Select-Object -ExpandProperty Name
-            Write-Host "installed MSVC tool dirs: $($sets -join ', ')"
-          }
-          # 真实的平台工具集名在 Platforms\<平台>\PlatformToolsets\ 下，
-          # 与 VC\Tools\MSVC\<版本号> 不是一回事。写死 v143 会在镜像上
-          # 报 MSB8020/MSB8003，必须探测后传给 MSBuild。
-          #
-          # 注意：写入 $env:GITHUB_ENV 的值**只在后续步骤**生效，本步骤内
-          # 必须用局部变量 $toolset，否则会误判为"未探测到"而退出。
-          $toolset = $null
-          $platSets = Join-Path $install "MSBuild\Microsoft\VC\v170\Platforms"
-          $x64Sets = Join-Path $platSets "x64\PlatformToolsets"
-          if (Test-Path $x64Sets) {
-            $sets = @(Get-ChildItem $x64Sets -Directory | Select-Object -ExpandProperty Name)
-            Write-Host "x64 platform toolsets: $($sets -join ', ')"
-            # ClangCL 是备选工具链，不适合常规 C++ 项目，排除。
-            $cands = @($sets | Where-Object { $_ -match '^v\d+$' })
-            if ($cands.Count -gt 0) {
-              # 取版本号最大者（v143 > v142）
-              $toolset = $cands | Sort-Object { [int]($_ -replace '[^0-9]', '') } | Select-Object -Last 1
+          $dumpbin = Get-ChildItem "${env:ProgramFiles(x86)}\Microsoft Visual Studio" `
+            -Recurse -Filter dumpbin.exe -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match "bin\\Hostx64\\x64" } |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $dumpbin) { Write-Host "::warning::dumpbin 不可用，跳过依赖检查"; exit 0 }
+          # 只允许系统 DLL；出现 fltk/msvcp/vcruntime 等即说明静态链接失败。
+          $allowed = @("bcrypt","COMCTL32","WS2_32","KERNEL32","USER32","GDI32",
+                       "SHELL32","ole32","COMDLG32","ADVAPI32","api-ms-win-crt")
+          $deps = & $dumpbin /dependents $exe | Select-String -Pattern "\.dll"
+          $bad = @()
+          foreach ($d in $deps) {
+            $name = ($d.ToString() -split "\s+")[-1]
+            if ($allowed -notcontains [System.IO.Path]::GetFileNameWithoutExtension($name)) {
+              $bad += $name
             }
           }
-          if (-not $toolset) {
-            Write-Host "::error::未探测到可用的平台工具集（候选: $($sets -join ', ')）"
-            exit 1
+          if ($bad.Count -gt 0) {
+            Write-Host "::error::存在非系统 DLL 依赖: $($bad -join ', ')"; exit 1
           }
-          Write-Host "using PlatformToolset=$toolset"
-          "TOOLSET=$toolset" >> $env:GITHUB_ENV
-
-          # MSB8020 在工具集目录存在时仍会发生，根因通常是该目录下的
-          # Toolset.props / Toolset.targets 缺失（即 C++ 工程支持组件
-          # Microsoft.VisualStudio.Component.VC.Tools.x86.x64 未装全）。
-          # 这里显式列出内容，把"缺什么"变成可见事实而不是猜测。
-          $tsDir = Join-Path $x64Sets $toolset
-          if (Test-Path $tsDir) {
-            $files = @(Get-ChildItem $tsDir -File | Select-Object -ExpandProperty Name)
-            Write-Host "toolset dir [$toolset]: $($files -join ', ')"
-            foreach ($req in @("Toolset.props", "Toolset.targets")) {
-              if (-not (Test-Path (Join-Path $tsDir $req))) {
-                Write-Host "::error::缺少 $req —— C++ 工程支持组件不完整"
-              }
-            }
-          } else {
-            Write-Host "::error::工具集目录不存在: $tsDir"
-          }
-          # 同时确认编译器本体存在
-          $cl = Join-Path $install "VC\Tools\MSVC"
-          if (Test-Path $cl) {
-            $vers = @(Get-ChildItem $cl -Directory | Select-Object -ExpandProperty Name)
-            Write-Host "MSVC compiler dirs: $($vers -join ', ')"
-            foreach ($v in $vers) {
-              $clExe = Join-Path $cl "$v\bin\Hostx64\x64\cl.exe"
-              Write-Host "  cl.exe present for $v : $(Test-Path $clExe)"
-            }
-          } else {
-            Write-Host "::error::VC\Tools\MSVC 不存在，MSVC 编译器未安装"
-          }
-      - name: 还原 NuGet 包
-        shell: pwsh
-        run: |
-          & $env:MSBUILD "windows/src/ui/App.vcxproj" /t:Restore /p:Configuration=Release /v:minimal
-      - name: 构建 WinUI 3 应用
-        shell: pwsh
-        run: |
-          & $env:MSBUILD "windows/src/ui/App.vcxproj" `
-            /t:Build /p:Configuration=Release /p:Platform=x64 `
-            /p:PlatformToolset=$env:TOOLSET /m /v:minimal
-      - name: 诊断 App SDK 引导与链接项
-        if: always()
-        shell: pwsh
-        run: |
-          $pkg = "$env:USERPROFILE\.nuget\packages\microsoft.windowsappsdk"
-          if (Test-Path $pkg) {
-            Write-Host "=== App SDK 包目录 ==="
-            Get-ChildItem $pkg -Directory | ForEach-Object { Write-Host "  $($_.Name)" }
-            Write-Host "=== 含 Bootstrap 的文件 ==="
-            Get-ChildItem $pkg -Recurse -Include *.h,*.lib,*.dll -ErrorAction SilentlyContinue |
-              Where-Object { $_.Name -match 'Bootstrap' } |
-              ForEach-Object { Write-Host "  $($_.FullName)" }
-            Write-Host "=== SelfContained 相关 targets 属性 ==="
-            Get-ChildItem $pkg -Recurse -Filter *.targets -ErrorAction SilentlyContinue |
-              Select-String -Pattern 'SelfContained|Bootstrap' |
-              Select-Object -First 40 |
-              ForEach-Object { Write-Host "  $($_.Filename):$($_.LineNumber): $($_.Line.Trim())" }
-          } else {
-            Write-Host "::warning::App SDK 包未找到，还原可能失败"
-          }
+          Write-Host "依赖检查通过：无第三方 DLL"
       - name: 上传构建产物
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: windows-ui-build
-          path: windows/build/ui/
+          path: build/windows/Release/SecretKeeper.exe
           if-no-files-found: warn
 
   # ---------- Linux ----------
+  # 与 Windows / macOS 共用 src/common、src/include 与根 CMakeLists.txt，
+  # 因此这里复跑的是同一份核心代码，跨端一致性由此保证。
   linux:
-    name: Linux (C/Qt)
+    name: Linux (C++/FLTK)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -298,24 +235,24 @@ jobs:
         run: pip install "argon2-cffi>=23.1" "cryptography>=42"
       - name: 校验黄金向量
         run: python scripts/verify-vectors.py
-      - name: 安装 Qt 与依赖
+      # FLTK 在 X11 下需要这组头文件；libdecor/libdecor 会自动探测，缺失即跳过。
+      - name: 安装构建依赖
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build qt6-base-dev libssl-dev libsodium-dev libsqlite3-dev
+          sudo apt-get install -y cmake ninja-build \
+            libx11-dev libxext-dev libxft-dev libxinerama-dev \
+            libxcursor-dev libxrender-dev libfontconfig1-dev libfreetype6-dev
+      - name: 配置
+        run: cmake -S . -B build/linux -G Ninja -DCMAKE_BUILD_TYPE=Release
       - name: 构建并测试
         run: |
-          if [ -f linux/CMakeLists.txt ]; then
-            cmake -S linux -B linux/build -G Ninja -DCMAKE_BUILD_TYPE=Release
-            cmake --build linux/build
-            ctest --test-dir linux/build --output-on-failure
-          else
-            echo "::notice::linux 工程尚未创建，跳过构建"
-          fi
+          cmake --build build/linux --parallel
+          ctest --test-dir build/linux --output-on-failure
 
 
   # ---------- macOS ----------
   macos:
-    name: macOS (Swift/AppKit)
+    name: macOS (C++/FLTK)
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -326,14 +263,12 @@ jobs:
         run: pip install "argon2-cffi>=23.1" "cryptography>=42"
       - name: 校验黄金向量
         run: python scripts/verify-vectors.py
+      - name: 配置
+        run: cmake -S . -B build/macos -DCMAKE_BUILD_TYPE=Release
       - name: 构建并测试
         run: |
-          if [ -d macos ]; then
-            swift build --package-path macos -c release
-            swift test --package-path macos -c release
-          else
-            echo "::notice::macos 工程尚未创建，跳过构建"
-          fi
+          cmake --build build/macos --parallel
+          ctest --test-dir build/macos --output-on-failure
 
   # ---------- Android ----------
   android:
