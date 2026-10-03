@@ -9,5 +9,6 @@
          不要在单个工程里再写 Version，否则会出现版本分裂。 -->
     <PackageVersion Include="Microsoft.WindowsAppSDK" Version="1.6.250228001" />
     <PackageVersion Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.1742" />
+    <PackageVersion Include="Microsoft.Windows.CppWinRT" Version="2.0.240111.5" />
   </ItemGroup>
 </Project>

@@ -1,105 +1,166 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <!-- 必须导入 Microsoft.Cpp.Default.props，否则工程没有 Build 目标
-       （CI 上表现为 MSB4057: The target "Build" does not exist）。 -->
-  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
-  <PropertyGroup Label="Globals">
-    <CppWinRTOptimized>true</CppWinRTOptimized>
-    <CppWinRTRootNamespaceAutoMerge>true</CppWinRTRootNamespaceAutoMerge>
-    <MinimalCoreWin>true</MinimalCoreWin>
-    <ProjectGuid>{8E4B1C2A-5D3F-4A6B-9C8E-1F2D3A4B5C6D}</ProjectGuid>
-    <ProjectName>App</ProjectName>
-    <RootNamespace>App</RootNamespace>
-    <DefaultLanguage>zh-CN</DefaultLanguage>
-    <!-- 平台默认值。必须在此声明，否则下面按 '$(Platform)' 条件的
-         PropertyGroup / ItemDefinitionGroup 不会生效。 -->
-    <Platform Condition="'$(Platform)' == ''">x64</Platform>
-    <!-- 必须留空：设为 "Windows Application" 会让 MSBuild 去找 UWP 工具链，
-         而 v143 不提供该工作流，报 MSB8020。WinUI 3 是桌面应用。 -->
-    <ApplicationType></ApplicationType>
-    <WindowsTargetPlatformVersion>10.0.22621.0</WindowsTargetPlatformVersion>
-    <WindowsTargetPlatformMinVersion>10.0.17763.0</WindowsTargetPlatformMinVersion>
-    <!-- unpackaged（self-contained）模式：依赖随 exe 一起分发，不要求系统
-         预装 Windows App Runtime，也不需要签名证书。CI 上若同时设
-         AppxPackage=true 而 WindowsPackageType=None 会报
-         "Improper project configuration"，故此处必须成对关闭。 -->
-    <AppxPackage>false</AppxPackage>
-    <WindowsPackageType>None</WindowsPackageType>
-    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
-    <SelfContained>true</SelfContained>
-    <EnableMsixTooling>false</EnableMsixTooling>
-    <EnableCoreMrtTooling>false</EnableCoreMrtTooling>
+  <PropertyGroup>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
   </PropertyGroup>
-  <!-- MSB8013 的根因：缺这一段，MSBuild 判定 Release|x64 组合不存在。
-       每个要支持的 平台×配置 组合都必须列出来并标 Include。 -->
+  <!-- 平台×配置组合必须在 Default.props 之前声明，否则 MSBuild 判定
+       组合不存在（MSB8013）。 -->
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="Debug|ARM64">
       <Configuration>Debug</Configuration>
       <Platform>ARM64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="Release|x64">
-      <Configuration>Release</Configuration>
-      <Platform>x64</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Release|ARM64">
       <Configuration>Release</Configuration>
       <Platform>ARM64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
-  <PropertyGroup Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
-    <!-- PlatformToolset 不设成固定版本：runner 镜像的 VS 版本会变，
-         写死会在某些镜像上报 MSB8020/MSB8003。这里给一个条件默认值——
-         仅当外部未指定时才生效；CI 会探测真实工具集名后用
-         /p:PlatformToolset=... 覆盖，本地直接构建则回落到 v143。 -->
-    <PlatformToolset Condition="'$(PlatformToolset)' == ''">v143</PlatformToolset>
-    <CharacterSet>Unicode</CharacterSet>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{8E4B1C2A-5D3F-4A6B-9C8E-1F2D3A4B5C6D}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <!-- 本机与 runner 均已安装 10.0.20348.0；写 10.0.22621.0 会触发
+         MSB8036（SDK 不存在），因为 runner 不带更新的 SDK。 -->
+    <WindowsTargetPlatformVersion>10.0.20348.0</WindowsTargetPlatformVersion>
+    <!-- Windows App SDK 1.x 的最低系统版本 -->
+    <WindowsTargetPlatformMinVersion>10.0.17763.0</WindowsTargetPlatformMinVersion>
+    <ProjectName>App</ProjectName>
+    <RootNamespace>SecretKeeper</RootNamespace>
+    <DefaultLanguage>zh-CN</DefaultLanguage>
+    <Platform Condition="'$(Platform)' == ''">x64</Platform>
+    <!-- 必须声明 TargetFrameworkVersion。NuGet 的 ResolveNuGetPackageAssets
+         需要至少一个 framework 引用，缺失会报「序列不包含任何元素」。
+         C++ 项目用 .NET Framework 作为包的解析目标。 -->
+    <!-- 原生 C++ 工程会被 Microsoft.CppBuild.targets 刻意清空
+         TargetFrameworkMoniker（这是 MSBuild 的既定行为），但 NuGet 6.10 的
+         ResolveNuGetPackageAssets 仍要求至少一个 moniker，否则在
+         GetTargetOrAttemptFallback 里对空序列调 First() 抛
+         「序列不包含任何元素」。
+
+         这里给 NuGet 单独提供一个 moniker，只用于包资产解析，
+         不影响 C++ 编译。 -->
+    <NuGetTargetMoniker Condition="'$(NuGetTargetMoniker)' == ''">native,Version=v0.0</NuGetTargetMoniker>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)'=='Release' and '$(Platform)'=='x64'" Label="Configuration">
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+
+  <!-- unpackaged（self-contained）模式：依赖随 exe 分发，不要求系统预装
+       Windows App Runtime，也不需要签名证书。 -->
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset Condition="'$(PlatformToolset)' == ''">v143</PlatformToolset>
     <UseDebugLibraries>false</UseDebugLibraries>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)'=='Debug' and '$(Platform)'=='x64'" Label="Configuration">
-    <UseDebugLibraries>true</UseDebugLibraries>
-  </PropertyGroup>
-  <PropertyGroup>
+    <AppxPackage>false</AppxPackage>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <SelfContained>true</SelfContained>
+    <EnableMsixTooling>false</EnableMsixTooling>
+    <EnableCoreMrtTooling>false</EnableCoreMrtTooling>
     <OutDir>$(ProjectDir)..\..\build\ui\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)..\..\build\ui\obj\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
-  <ItemDefinitionGroup Condition="'$(Platform)'=='x64'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset Condition="'$(PlatformToolset)' == ''">v143</PlatformToolset>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <AppxPackage>false</AppxPackage>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <SelfContained>true</SelfContained>
+    <EnableMsixTooling>false</EnableMsixTooling>
+    <EnableCoreMrtTooling>false</EnableCoreMrtTooling>
+    <OutDir>$(ProjectDir)..\..\build\ui\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)..\..\build\ui\obj\$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset Condition="'$(PlatformToolset)' == ''">v143</PlatformToolset>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <AppxPackage>false</AppxPackage>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <SelfContained>true</SelfContained>
+    <EnableMsixTooling>false</EnableMsixTooling>
+    <EnableCoreMrtTooling>false</EnableCoreMrtTooling>
+    <OutDir>$(ProjectDir)..\..\build\ui\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)..\..\build\ui\obj\$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset Condition="'$(PlatformToolset)' == ''">v143</PlatformToolset>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <AppxPackage>false</AppxPackage>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <SelfContained>true</SelfContained>
+    <EnableMsixTooling>false</EnableMsixTooling>
+    <EnableCoreMrtTooling>false</EnableCoreMrtTooling>
+    <OutDir>$(ProjectDir)..\..\build\ui\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)..\..\build\ui\obj\$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+
+  <!-- 关键：必须显式导入 Microsoft.Cpp.props。
+       该文件负责设置 _ToolsetFound=true，缺失会导致 MSB8020
+       "无法找到 v143 的生成工具"，即使 PlatformToolset 与工具集目录都正确。
+       已用最小对照工程验证：加此行后 MSB8020 消失，编译产出 exe。
+
+       它同时负责导入 NuGet 生成的 .nuget.g.props —— App SDK 的
+       include/lib 路径与 XAML 编译器 targets 都由那个文件引入，
+       顺序颠倒会导致 winrt/Microsoft.UI.Xaml.h 找不到。 -->
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup>
+    <!-- 关键：下面两个开关必须在导入 Microsoft.Cpp.props 之后 -->
+    <EnableXamlCompiler>true</EnableXamlCompiler>
+    <XamlRequiresCompilation>true</XamlRequiresCompilation>
+  </PropertyGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props"
+            Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')"
+            Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
+  </PropertyGroup>
+
+  <ImportGroup Label="ExtensionSettings" />
+
+  <ItemDefinitionGroup>
     <ClCompile>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\\;$(ProjectDir)..\\crypto;$(ProjectDir)..\\core;$(ProjectDir)..\\store;$(ProjectDir)..\\container;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\crypto;$(ProjectDir)..\core;$(ProjectDir)..\store;$(ProjectDir)..\container;$(IntDir);$(IntDir)Generated Files;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_UNICODE;UNICODE;NOMINMAX;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>bcrypt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>bcrypt.lib;ole32.lib;oleaut32.lib;uuid.lib;shell32.lib;shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Platform)'=='ARM64'">
-    <ClCompile>
-      <LanguageStandard>stdcpp20</LanguageStandard>
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\;$(ProjectDir)..\crypto;$(ProjectDir)..\core;$(ProjectDir)..\store;$(ProjectDir)..\container;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_UNICODE;UNICODE;NOMINMAX;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-    </ClCompile>
-    <Link>
-      <AdditionalDependencies>bcrypt.lib;%(AdditionalDependencies)</AdditionalDependencies>
-    </Link>
-  </ItemDefinitionGroup>
+
   <ItemGroup>
-    <ClInclude Include="App.h" />
+    <Midl Include="App.idl" />
+    <Midl Include="MainWindow.idl" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ClInclude Include="App.xaml.h" />
     <ClInclude Include="MainWindow.xaml.h">
       <DependentUpon>MainWindow.xaml</DependentUpon>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="App.cpp">
+    <ClCompile Include="App.xaml.cpp">
       <DependentUpon>App.xaml</DependentUpon>
     </ClCompile>
     <ClCompile Include="MainWindow.xaml.cpp">
@@ -116,8 +177,70 @@
     </Page>
   </ItemGroup>
   <ItemGroup>
+    <Manifest Include="app.manifest" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" />
+    <PackageReference Include="Microsoft.Windows.CppWinRT" />
   </ItemGroup>
+
+  <PropertyGroup>
+    <BuildCompileTargets>
+      MarkupCompilePass1;
+      $(BuildCompileTargets);
+    </BuildCompileTargets>
+  </PropertyGroup>
+
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+
+  <!-- XAML 编译器（MarkupCompilePass2）只消费 @(XamlReferencesToCompile)，而该
+       item 由 @(WinMDReferenceToCompile) 派生（Microsoft.CppBuild.targets:1070），
+       后者又来自 Microsoft.Common.CurrentVersion.targets:2479 的
+       FindReferenceAssembliesForReferences —— 那是**托管程序集专用** target，
+       只认 ReferenceAssembly 元数据。原生 C++ 工程的 winmd 走不到这条路，
+       实测 ReferencePath 有 107 项而 ReferencePathWithRefAssemblies 为 0，
+       于是 XAML 编译器拿不到任何 WinUI 元数据，报 WMC1007。
+
+       官方给的 ImplicitlyExpandTargetPlatform 依赖 TargetPlatformIdentifier=UAP，
+       实测会触发 MSB3774（要求 MSIX 的 Microsoft.VCLibs SDK），对 unpackaged
+       工程是死路，因此只能在此显式补齐。
+
+       @(CsWinRTInputs) 是 App SDK 包自带的 winmd 清单（16 个），
+       必须在 Windows Kits 之前，以满足 XAML 编译器的搜索优先级。 -->
+  <Target Name="SkFillXamlReferences" BeforeTargets="MarkupCompilePass2">
+    <ItemGroup>
+      <XamlReferencesToCompile Remove="@(XamlReferencesToCompile)" />
+      <XamlReferencesToCompile Include="@(CsWinRTInputs)" />
+      <XamlReferencesToCompile Include="@(CppWinRTDirectWinMDReferences)" />
+      <XamlReferencesToCompile Include="$(WindowsSDK_MetadataPathVersioned)\**\*.winmd" />
+    </ItemGroup>
+  </Target>
+  <!-- 
+  <PropertyGroup>
+    <BuildCompileTargets>
+      MarkupCompilePass1;
+      $(BuildCompileTargets);
+      MarkupCompilePass2
+    </BuildCompileTargets>
+  </PropertyGroup>
+  -->
+ 
+  <!-- 显式挂接 MarkupCompilePass1 到 BuildCompile 之前 -->
+  <Target Name="XamlMarkupCompilePass1"
+          BeforeTargets="BuildCompile"
+          Condition="'$(EnableXamlCompiler)' == 'true' and '$(XamlRequiresCompilation)' == 'true'">
+    <CallTarget Targets="MarkupCompilePass1" />
+  </Target>
+
+  <!-- 显式挂接 MarkupCompilePass2 到 BuildCompile 之后、BuildLink 之前 -->
+  <Target Name="XamlMarkupCompilePass2"
+          AfterTargets="BuildCompile"
+          BeforeTargets="BuildLink"
+          Condition="'$(EnableXamlCompiler)' == 'true' and '$(XamlRequiresCompilation)' == 'true'">
+    <CallTarget Targets="MarkupCompilePass2" />
+  </Target>
+
+  <!-- ===== 最后导入扩展目标 ===== --> 
+  <ImportGroup Label="ExtensionTargets" />
 </Project>
