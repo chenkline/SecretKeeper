@@ -101,3 +101,10 @@ docs/ui/all.png
 *.idb
 *.exp
 *.lib
+
+# Python 缓存，不应入库
+__pycache__/
+*.pyc
+
+# UI 设计调试脚本（临时文件）
+scripts/_*.py
