@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SecretKeeper UI 设计图</title><style>
+ body { margin:0; background:#F3F5F6; font-family:"Noto Sans SC",system-ui,sans-serif; color:#1D2C31; }
+ header { padding:28px 32px 20px; background:#1D2C31; color:#fff; }
+ h1 { margin:0 0 8px; font-size:24px; }
+ .sub { color:#96AFB3; font-size:13px; line-height:1.8; }
+ .sub b { color:#68C3AD; font-weight:500; }
+ .sub code { font-family:Consolas,monospace; font-size:12px; color:#C8DDE0; }
+ ol { margin:12px 0 0; padding-left:20px; color:#96AFB3; font-size:13px; line-height:1.9; }
+ .list { display:flex; flex-wrap:wrap; gap:6px; padding:12px 32px 0; }
+ .list a { font-size:12px; text-decoration:none; color:#68C3AD; background:rgba(255,255,255,.08);
+           padding:4px 10px; border-radius:100px; font-family:Consolas,monospace; }
+ .list a:hover { background:#14786D; color:#fff; }
+ .card { background:#fff; border:1px solid #DFE5E7; border-radius:12px; padding:14px;
+         box-shadow:0 1px 2px rgba(29,44,49,.08); }
+ .name { font-size:12px; color:#547078; margin-bottom:10px; font-family:Consolas,monospace; }
+ .m { display:grid; grid-template-columns:1fr; gap:20px; padding:0 32px 32px; }
+ section { padding:26px 32px 6px; }
+ h2 { margin:0 0 4px; font-size:17px; }
+ .desc { color:#718087; font-size:12px; margin:0 0 14px; }
+ .tag { font-size:11px; padding:2px 9px; border-radius:100px; font-family:"Noto Sans SC",sans-serif;
+        background:#E8F4F0; color:#14786D; white-space:nowrap; }
+</style></head><body><header>
+ <h1>SecretKeeper UI 设计图</h1> <div class="sub">  设计源：仓库内 <code>docs/ui/.figma-export/Page_1_0-1.json</code>（Figma REST API 原始数据），  由 <code>scripts/render-figma-svg.py</code> 直接渲染为 SVG，不依赖 Figma 在线图片。<br>  编号依据操作先后顺序（从上到下）给出。<br>  修改要点已由 <code>scripts/ui_patches.py</code> 直接写入设计树，不需要在 Figma 中编辑。 </div> <ol>  <li>解锁与锁定</li>  <li>主密钥管理：主密钥管理与详情 → 生成 → 导入 → 导出</li>  <li>机密信息管理：列表 → 新增 → 导入与密码验证</li>  <li>安全设置</li>  <li>移动端同流程的 11 张画板</li>  <li>安全状态与错误反馈说明板</li> </ol> <div class="list">
+<a href="#01">01 解锁与锁定</a>
+<a href="#02">02 主密钥管理与详情</a>
+<a href="#03">03 生成主密钥</a>
+<a href="#04">04 导入主密钥</a>
+<a href="#05">05 主密钥文件导出</a>
+<a href="#06">06 机密信息管理</a>
+<a href="#07">07 新增机密信息</a>
+<a href="#08">08 导入机密信息与密码验证</a>
+<a href="#09">09 安全设置</a>
+<a href="#10">10 解锁</a>
+<a href="#11">11 机密信息列表</a>
+<a href="#12">12 机密信息详情</a>
+<a href="#13">13 缺失主密钥详情</a>
+<a href="#14">14 新增机密信息</a>
+<a href="#15">15 主密钥管理</a>
+<a href="#16">16 生成主密钥</a>
+<a href="#17">17 导入主密钥</a>
+<a href="#18">18 导入机密信息</a>
+<a href="#19">19 导出与备份删除确认</a>
+<a href="#20">20 安全设置</a>
+<a href="#21">21 安全状态与错误反馈说明板</a>
+</div></header>
+<section id="01"><h2>01 · 桌面端 · 解锁与锁定</h2><p class="desc">启动后的锁定态与解锁流程：输入默认主密钥密码，错误时按指定秒数退避。</p></section>
+<div class="m">
+<div class="card">
+ <div class="name">01-桌面端_解锁与锁定.svg</div>
+ <img class="img" src="svg/01-桌面端_解锁与锁定.svg" alt="01 解锁与锁定" loading="lazy">
+</div>
+</div>
+<section id="02"><h2>02 · 桌面端 · 主密钥管理与详情</h2><p class="desc">主密钥列表与详情：默认 / 备选标识、切换、删除；「导入主密钥」与「导冨备份」入口均在此页。</p></section>
+<div class="m">
+<div class="card">
+ <div class="name">02-桌面端_主密钥管理与详情.svg</div>
+ <img class="img" src="svg/02-桌面端_主密钥管理与详情.svg" alt="02 主密钥管理与详情" loading="lazy">
+</div>
+</div>
+<section id="03"><h2>03 · 桌面端 · 生成主密钥</h2><p class="desc">生成 RSA-2048 主密钥：设名称（可选）、设主密钥密码并确认。</p></section>
+<div class="m">
+<div class="card">
+ <div class="name">03-桌面端_生成主密钥.svg</div>
+ <img class="img" src="svg/03-桌面端_生成主密钥.svg" alt="03 生成主密钥" loading="lazy">
+</div>
+</div>
+<section id="04"><h2>04 · 桌面端 · 导入主密钥</h2><p class="desc">从之前导出的备份文件恢复主密钥：选文件 → 文件保护密码 → 新的主密钥密码 → 导入为备选主密钥。</p></section>
+<div class="m">
+<div class="card">
+ <div class="name">04-桌面端_导入主密钥.svg</div>
+ <img class="img" src="svg/04-桌面端_导入主密钥.svg" alt="04 导入主密钥" loading="lazy">
+</div>
+</div>
+<section id="05"><h2>05 · 桌面端 · 主密钥文件导出</h2><p class="desc">导出主密钥：先验证主密钥当前密码，再为导出文件新设保护密码并确认。</p></section>
+<div class="m">
+<div class="card">
+ <div class="name">05-桌面端_主密钥文件导出.svg</div>
+ <img class="img" src="svg/05-桌面端_主密钥文件导出.svg" alt="05 主密钥文件导出" loading="lazy">
+</div>
+</div>
+<section id="06"><h2>06 · 桌面端 · 机密信息管理</h2><p class="desc">机密信息列表：标题（可选）/ 主密钥 ID / 主密钥名称；主密钥缺失时在 ID 后显示黄色问号。「导入」与「新增」并排。</p></section>
+<div class="m">
+<div class="card">
+ <div class="name">06-桌面端_机密信息管理.svg</div>
+ <img class="img" src="svg/06-桌面端_机密信息管理.svg" alt="06 机密信息管理" loading="lazy">
+</div>
+</div>
+<section id="07"><h2>07 · 桌面端 · 新增机密信息</h2><p class="desc">新增一条机密信息：选择所属主密钥、填写标题（可选）与机密内容（单条不超过 150 字符）。</p></section>
+<div class="m">
+<div class="card">
+ <div class="name">07-桌面端_新增机密信息.svg</div>
+ <img class="img" src="svg/07-桌面端_新增机密信息.svg" alt="07 新增机密信息" loading="lazy">
+</div>
+</div>
+<section id="08"><h2>08 · 桌面端 · 导入机密信息与密码验证</h2><p class="desc">导入机密信文件：验证文件保护密码后再导入，文件保护密码不能与密信内容主密钥密码混用。</p></section>
+<div class="m">
+<div class="card">
+ <div class="name">08-桌面端_导入机密信息与密码验证.svg</div>
+ <img class="img" src="svg/08-桌面端_导入机密信息与密码验证.svg" alt="08 导入机密信息与密码验证" loading="lazy">
+</div>
+</div>
+<section id="09"><h2>09 · 桌面端 · 安全设置</h2><p class="desc">安全设置：空闲自动锁定时长、剪贴板定时清除、错误密码退避策略。</p></section>
+<div class="m">
+<div class="card">
+ <div class="name">09-桌面端_安全设置.svg</div>
+ <img class="img" src="svg/09-桌面端_安全设置.svg" alt="09 安全设置" loading="lazy">
+</div>
+</div>
+<section id="10"><h2>10 · 移动端 · 解锁</h2><p class="desc">与桌面端对应：输入默认主密钥密码解锁，错误时按指定秒数退避。</p></section>
+<div class="m">
+<div class="card">
+ <div class="name">10-移动端_解锁.svg</div>
+ <img class="img" src="svg/10-移动端_解锁.svg" alt="10 解锁" loading="lazy">
+</div>
+</div>
+<section id="11"><h2>11 · 移动端 · 机密信息列表</h2><p class="desc">机密信息列表：「导入」与「新增」并排于列表上方；导出仅保留在详情页。</p></section>
+<div class="m">
+<div class="card">
+ <div class="name">11-移动端_机密信息列表.svg</div>
+ <img class="img" src="svg/11-移动端_机密信息列表.svg" alt="11 机密信息列表" loading="lazy">
+</div>
+</div>
+<section id="12"><h2>12 · 移动端 · 机密信息详情</h2><p class="desc">查看一条机密信息：显示、复制到剪贴板、导出、删除。</p></section>
+<div class="m">
+<div class="card">
+ <div class="name">12-移动端_机密信息详情.svg</div>
+ <img class="img" src="svg/12-移动端_机密信息详情.svg" alt="12 机密信息详情" loading="lazy">
+</div>
+</div>
+<section id="13"><h2>13 · 移动端 · 缺失主密钥详情</h2><p class="desc">机密信息所属主密钥不存在时的详情：主密钥 ID 后带黄色问号，密码不可解密。</p></section>
+<div class="m">
+<div class="card">
+ <div class="name">13-移动端_缺失主密钥详情.svg</div>
+ <img class="img" src="svg/13-移动端_缺失主密钥详情.svg" alt="13 缺失主密钥详情" loading="lazy">
+</div>
+</div>
+<section id="14"><h2>14 · 移动端 · 新增机密信息</h2><p class="desc">新增一条机密信息：选择所属主密钥、填写标题（可选）与机密内容。</p></section>
+<div class="m">
+<div class="card">
+ <div class="name">14-移动端_新增机密信息.svg</div>
+ <img class="img" src="svg/14-移动端_新增机密信息.svg" alt="14 新增机密信息" loading="lazy">
+</div>
+</div>
+<section id="15"><h2>15 · 移动端 · 主密钥管理</h2><p class="desc">主密钥列表：默认 / 备选标识、切换、删除。</p></section>
+<div class="m">
+<div class="card">
+ <div class="name">15-移动端_主密钥管理.svg</div>
+ <img class="img" src="svg/15-移动端_主密钥管理.svg" alt="15 主密钥管理" loading="lazy">
+</div>
+</div>
+<section id="16"><h2>16 · 移动端 · 生成主密钥</h2><p class="desc">添加主密钥·生成 TAB：设名称（可选）、设主密钥密码并确认。</p></section>
+<div class="m">
+<div class="card">
+ <div class="name">16-移动端_生成主密钥.svg</div>
+ <img class="img" src="svg/16-移动端_生成主密钥.svg" alt="16 生成主密钥" loading="lazy">
+</div>
+</div>
+<section id="17"><h2>17 · 移动端 · 导入主密钥</h2><p class="desc">添加主密钥·从文件导入 TAB：选文件、输入文件保护密码与新的主密钥密码。</p></section>
+<div class="m">
+<div class="card">
+ <div class="name">17-移动端_导入主密钥.svg</div>
+ <img class="img" src="svg/17-移动端_导入主密钥.svg" alt="17 导入主密钥" loading="lazy">
+</div>
+</div>
+<section id="18"><h2>18 · 移动端 · 导入机密信息</h2><p class="desc">导入机密信文件：验证文件保护密码。</p></section>
+<div class="m">
+<div class="card">
+ <div class="name">18-移动端_导入机密信息.svg</div>
+ <img class="img" src="svg/18-移动端_导入机密信息.svg" alt="18 导入机密信息" loading="lazy">
+</div>
+</div>
+<section id="19"><h2>19 · 移动端 · 导出与备份删除确认</h2><p class="desc">导出机密信息与删除的二次确认弹窗。</p></section>
+<div class="m">
+<div class="card">
+ <div class="name">19-移动端_导出与备份删除确认.svg</div>
+ <img class="img" src="svg/19-移动端_导出与备份删除确认.svg" alt="19 导出与备份删除确认" loading="lazy">
+</div>
+</div>
+<section id="20"><h2>20 · 移动端 · 安全设置</h2><p class="desc">安全设置：空闲自动锁定时长、剪贴板定时清除、错误密码退避策略。</p></section>
+<div class="m">
+<div class="card">
+ <div class="name">20-移动端_安全设置.svg</div>
+ <img class="img" src="svg/20-移动端_安全设置.svg" alt="20 安全设置" loading="lazy">
+</div>
+</div>
+<section id="21"><h2>21 · 规范 · 安全状态与错误反馈说明板</h2><p class="desc">静态状态组件总览：已锁定 / 已解锁、错误提示与禁用态按钮的统一视觉规范。</p></section>
+<div class="m">
+<div class="card">
+ <div class="name">21-安全状态与错误反馈说明板.svg</div>
+ <img class="img" src="svg/21-安全状态与错误反馈说明板.svg" alt="21 安全状态与错误反馈说明板" loading="lazy">
+</div>
+</div>
+</body></html>

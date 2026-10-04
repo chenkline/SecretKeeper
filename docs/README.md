@@ -15,6 +15,43 @@
 | 6 | [开发环境与CI方案](05-development/开发环境与CI方案.md) | 环境安装清单与 CI 设计 |
 | 7 | [测试与验收方案](07-testing/测试与验收方案.md) | 测试向量与验收标准 |
 | 8 | [版本规划与扩展预留](06-roadmap/版本规划与扩展预留.md) | v1.0.0 二维码/License 预留 |
+| 9 | [UI 设计图](ui/index.html) | 21 张画板预览（桌面 9 / 移动 11 / 说明板 1） |
+
+## UI 设计图（`docs/ui/`）
+
+界面设计稿。**设计源是仓库内的 Figma JSON，不再依赖 Figma 在线编辑**：
+`scripts/render-figma-svg.py` 直接把 JSON 渲染为 SVG，`scripts/ui_patches.py`
+以程序方式改写设计树（菜单重构、入口归位、新增画板、插入字段）。
+改设计只需改这两个脚本并重新生成，无需回到 Figma。
+
+| 文件 | 内容 |
+|---|---|
+| [index.html](ui/index.html) | 预览页，21 张画板，按操作先后顺序编号 |
+| [UI设计规范](ui/UI设计规范.md) | 从 Figma JSON 提取的色彩 / 字号 / 间距 / 圆角 / 全部文案 |
+| `svg/` | 21 张画板单体（01–21） |
+| `.figma-export/` | Figma REST API 原始数据，渲染源，需入库 |
+
+重新生成全部画板：
+
+```
+python scripts/render-figma-svg.py
+```
+
+只重生成某张（便于快速迭代）：
+
+```
+python scripts/render-figma-svg.py 3:26936
+```
+
+渲染器内置两道硬门禁：输出必须通过 XML 解析，且 `<text>` 节点数必须与 JSON 中
+该画板的 TEXT 节点数**逐一相等**。第二条是必要的——文字不渲染时 XML 依然合法，
+只有计数比对才能拦住这类静默失败。
+
+首次拉取 Figma 数据（需 `.local/context.md` 中的 token）：
+
+```
+python scripts/fetch-figma.py
+```
 
 ## 文档分层
 

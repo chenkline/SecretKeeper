@@ -79,6 +79,13 @@ out/
 Thumbs.db
 desktop.ini
 
+# ---- UI 设计图旧导出（不入库）----
+# all.svg / all.png 是旧设计源的归档，已被 .figma-export/ 的 JSON 取代。
+# 保留在本地仅供绘对（Figma 免费版无导出功能，删了拿不回来），
+# 但不入库：合计约 14 MB，且 Copy as SVG 的文字已转轮廓、不可编辑。
+docs/ui/all.svg
+docs/ui/all.png
+
 # ---- 临时文件 ----
 *.log
 *.tmp
