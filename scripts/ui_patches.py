@@ -1572,6 +1572,25 @@ def patch_secret_import_page(root: dict) -> None:
     set_button_label(root, "导入操作", "验证并导入", "导入", min_width=96.0)
 
 
+def patch_secret_page_board(root: dict) -> None:
+    """06 机密信息管理：走共用的侧栏 / 页脚 / 文案修改。"""
+    patch_desktop_common(root, "机密信息管理")
+    patch_secret_page(root)
+    # 列表下方的「ID 后的黄色 ? …」说明在 928 宽里放不下，
+    # 缩短为一行能完整显示的版本。
+    # 详情卡内两条说明在 340 宽里放不下，会被 clipsContent 裁掉尾巴。
+    for node in walk_all(root):
+        if node.get("type") != "TEXT":
+            continue
+        chars = node.get("characters", "")
+        if chars.startswith("ID 后的黄色"):
+            set_text(node, "ID 后的黄色 ? 表示主密钥缺失；名称为空不代表缺失。")
+        elif chars.startswith("默认隐藏明文"):
+            set_text(node, "默认隐藏明文；离开窗口或切换界面时重新上锁。")
+        elif chars.startswith("备主密钥加密的信息"):
+            set_text(node, "查看或复制前需验证对应主密钥密码。")
+
+
 def patch_security_page(root: dict) -> None:
     """09 安全设置：删右栏通栏。"""
     patch_desktop_common(root, "安全设置")
@@ -1904,7 +1923,7 @@ _PATCHES: dict[str, list[Callable[[dict], None]]] = {
     "03": [patch_generate_page],
     "04": [patch_import_page],
     "05": [patch_export_page],
-    "06": [patch_secret_page],
+    "06": [lambda r: patch_secret_page_board(r)],
     "07": [patch_secret_add_page],
     "08": [patch_secret_import_page],
     "09": [patch_security_page],
