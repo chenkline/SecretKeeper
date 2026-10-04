@@ -1134,40 +1134,36 @@ def relayout(node: dict) -> None:
 
     # 交叉轴 STRETCH：只在容器本身被 patch 显式加宽过时才重算子节点宽度，
     # 否则原始设计里 padding 推算出来的细微差值会被放大成整块溢出。
-    if children[0].get("layoutAlign") == "STRETCH" and _child_stretch_needed(node):
-        for child in children:
-            cb = box(child)
-            if child.get("layoutAlign") == "STRETCH":
-                if vertical:
-                    cb["width"] = inner_w
-                else:
-                    cb["height"] = inner_h
+    for child in children:
+        cb = box(child)
+        if child.get("layoutAlign") == "STRETCH":
+            if vertical:
+                cb["width"] = inner_w
+            else:
+                cb["height"] = inner_h
 
-    # 主轴上「吃掉剩余空间」有两种写法，二者等价：
-    #   layoutGrow == 1
-    #   layoutSizing 主轴方向 == FILL（HORIZONTAL 看宽、VERTICAL 看高）
-    # 交叉轴上的 FILL 不在此列——它由交叉轴对齐负责，不占主轴位置。
-    primary_fill = "layoutSizingVertical" if vertical else "layoutSizingHorizontal"
-
-    def _eats_space(node: dict) -> bool:
-        return (node.get("layoutGrow") == 1.0
-                or node.get(primary_fill) == "FILL")
-
-    grown = [c for c in children if _eats_space(c)]
+    # 主轴上「吃掉剩余空间」只有一种判定：layoutGrow == 1。
+    # layoutSizing 的 FILL 是**交叉轴**撑满，由交叉轴对齐负责，
+    # 不能混进主轴剩余空间的分配——混了会把该子节点的宽度算成 0
+    # （07 新增机密信息的选择器就是这样被压扁的）。
+    #
+    # HUG 轴（layoutSizingVertical=HUG 且 VERTICAL）表示高度由内容决定，
+    # 这时即使 grow 也不该按 share 定高，否则容器一进 relayout 就被压成 0。
+    hug_axis = "layoutSizingVertical" if vertical else "layoutSizingHorizontal"
+    grown = [c for c in children
+             if c.get("layoutGrow") == 1.0 and c.get(hug_axis) != "HUG"]
     fixed = [c for c in children if c not in grown]
     free = (inner_w if not vertical else inner_h) - gap * (len(children) - 1)
     used = sum((float(box(c).get("width", 0)) if not vertical
                 else float(box(c).get("height", 0))) for c in fixed)
-    share = max((free - used) / len(grown), 0.0) if grown and not fixed else 0.0
-    if grown and free - used > 0:
-        for child in grown:
-            cb = box(child)
-            if vertical:
-                # 竖排容器里 grow 的是宽度（交叉轴），由交叉轴对齐负责
-                cb["width"] = max(float(cb.get("width", 0)), share) if len(grown) == 1 \
-                    else float(cb.get("width", 0))
-            else:
-                cb["width"] = share if len(grown) == 1 else float(cb.get("width", 0))
+    share = max((free - used) / len(grown), 0.0) if grown else 0.0
+    if len(grown) == 1 and free - used > 0:
+        # 只有一个 grow 成员时，它独占全部剩余空间
+        cb = box(grown[0])
+        if vertical:
+            cb["height"] = share
+        else:
+            cb["width"] = share
 
     # ABSOLUTE 子节点脱离 auto-layout 流：既不占主轴位置也不被对齐属性搬动，
     # 贴右元素必须标成 ABSOLUTE，否则 SPACE_BETWEEN 会把它当流内成员一起排。
