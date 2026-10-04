@@ -365,6 +365,23 @@ EXPORT_ORIGINAL_PWD = {
 }
 
 
+def _fix_field_hint_width(field: dict) -> None:
+    """把字段内所有 TEXT 子节点的宽度对齐到字段宽度。
+
+    字段里的辅助说明既可能是 FRAME（内含字段提示）也可能是裸 TEXT，
+    两者都要跟着字段一起变宽，否则通栏后会停在旧宽度处、看起来居中。
+    """
+    fb = box(field)
+    fw = float(fb.get("width", 0))
+    for child in field.get("children", []) or []:
+        cb = box(child)
+        if child.get("type") == "TEXT":
+            cb["x"] = float(fb.get("x", 0))
+            cb["width"] = fw
+        else:
+            _widen(child, fw - float(cb.get("width", 0)))
+
+
 def patch_export_original_password(root: dict) -> None:
     """\u5728\u5bfc\u51fa\u5361\u7247\u9876\u90e8\u63d2\u5165\u300c\u4e3b\u5bc6\u94a5\u539f\u5bc6\u7801\u300d\u5b57\u6bb5\u3002
 
@@ -410,6 +427,12 @@ def patch_export_original_password(root: dict) -> None:
 
     field = pristine
     set_text(field["children"][0], EXPORT_ORIGINAL_PWD["label"])
+    # 克隆自「导出文件保护密码」字段，它的辅助行是 532 宽的独立 TEXT。
+    # 卡片随后会被 widen_workspace 加宽，TEXT 不吃 _widen，
+    # 这里必须先按字段宽度归位，否则辅助行会停在卡片中间。
+    # hint 是随后新建的 TEXT，坐标按字段左边给；widen_workspace 之后
+    # 字段会变宽，这里再按最终宽度重设一次，保证与标签、输入区左对齐。
+    _fix_field_hint_width(field)
     input_area = find(field, "\u8f93\u5165\u533a\u57df")
     set_text(input_area["children"][0], EXPORT_ORIGINAL_PWD["masked"])
     drop(field, "\u5b57\u6bb5\u8f85\u52a9")
@@ -1138,9 +1161,12 @@ def strip_footer(root: dict) -> None:
 
     页脚只是在重复「完全离线」这一实现选择，对用户没有操作价值；
     锁定状态由顶栏「立即锁定」按钮与导航高亮表达。
+
+    两处页脚嵌在「导航底部」「主内容」里而不是它们的直属子节点，
+    所以要递归删，不能只删一层。
     """
-    drop(root, "本地安全状态")
-    drop_text(root, "离线状态")
+    prune(root, "本地安全状态")
+    prune(root, "离线状态")
 
     bottom = find(root, "导航底部")
     if bottom is None:
@@ -1148,6 +1174,18 @@ def strip_footer(root: dict) -> None:
     bb = box(bottom)
     bb["height"] = 40.0
     bb["y"] = float(bb.get("y", 0)) + 29.0
+
+
+def prune(node: dict, name: str) -> bool:
+    """递归删除所有名为 name 的后代节点，返回是否删掉了东西。"""
+    children = node.get("children") or []
+    kept = [c for c in children if c is not None and c.get("name") != name]
+    removed = len(kept) != len(children)
+    for child in kept:
+        if prune(child, name):
+            removed = True
+    node["children"] = kept
+    return removed
 
 
 def set_button_label(root: dict, container: str, old: str, new: str,
@@ -1182,6 +1220,11 @@ def set_button_label(root: dict, container: str, old: str, new: str,
             lb = box(label)
             lb["x"] = float(lb.get("x", 0)) + extra / 2
             lb["width"] = text_w
+        # 按钮内若有图标（如 file-output），与文字一起右移半个加宽量，
+        # 否则加宽后文字居中、图标还留在原处，两者会叠在一起。
+        for icon in target.get("children", []) or []:
+            if icon.get("type") == "FRAME":
+                shift(icon, extra / 2, 0)
         index = holder["children"].index(target)
         for sibling in holder["children"][index + 1:]:
             shift(sibling, extra, 0)
@@ -1216,8 +1259,9 @@ def rename_text(root: dict, container: str, node_name: str, old: str, new: str) 
 # ---------------------------------------------------------------------------
 # 桌面端逐板
 # ---------------------------------------------------------------------------
-def patch_desktop_common(root: dict) -> None:
-    """桌面九张画板共用的改动：删页脚、删「备选」。"""
+def patch_desktop_common(root: dict, active: str) -> None:
+    """桌面九张画板共用的改动：侧栏三项菜单、删页脚、删「备选」。"""
+    patch_navigation(root, active)
     strip_footer(root)
     rewrite_beixuan(root)
 
@@ -1229,7 +1273,7 @@ def patch_unlock_picker(root: dict) -> None:
     版本号在安全设置页已经能查到，锁定说明讲的是隐藏明文与密钥
     轮换这些实现细节，不该出现在用户面前。
     """
-    patch_desktop_common(root)
+    patch_desktop_common(root, "主密钥管理")
     patch_unlock_lock_note(root)
     for node in walk_all(root):
         if node.get("type") != "TEXT":
@@ -1259,57 +1303,67 @@ def patch_unlock_picker(root: dict) -> None:
 
 def patch_master_key_page(root: dict) -> None:
     """02 主密钥管理与详情：「导出备份」改为「导出主密钥」。"""
-    patch_desktop_common(root)
+    patch_desktop_common(root, "主密钥管理")
     set_button_label(root, "详情操作", "导出备份", "导出主密钥", min_width=132.0)
 
 
 def patch_generate_page(root: dict) -> None:
     """03 生成主密钥：删右栏通栏，按钮改「保存主密钥」。"""
-    patch_desktop_common(root)
+    patch_desktop_common(root, "主密钥管理")
     widen_workspace(root, "生成工作区")
     set_button_label(root, "生成操作", "生成并保存", "保存主密钥", min_width=132.0)
 
 
 def patch_import_page(root: dict) -> None:
     """04 导入主密钥：密码框对齐 05 样式、按钮改名、删右栏。"""
-    patch_desktop_common(root)
+    patch_desktop_common(root, "主密钥管理")
     _align_pwd_fields(root)
     widen_workspace(root, "导入工作区")
     set_button_label(root, "导入操作", "导入为备选主密钥", "导入主密钥", min_width=132.0)
 
 
 def patch_export_page(root: dict) -> None:
-    """05 主密钥文件导出：删右栏，绿色提示移到按钮上方，按钮改名。"""
-    patch_desktop_common(root)
+    """05 主密钥文件导出：补主密钥原密码框、删右栏、提示移到按钮上方、按钮改名。"""
+    patch_desktop_common(root, "主密钥管理")
+    patch_export_original_password(root)
     widen_workspace(root, "导出工作区")
+    # 归位必须放在 widen_workspace 之后：新插入的原密码字段是在加宽前
+    # 按 532 宽算的辅助行坐标，卡片通栏后它不会自动跟上。
+    for field in walk_all(find(root, "导出工作区") or {}):
+        if field.get("name") == "表单字段":
+            _fix_field_hint_width(field)
     _move_export_tip(root)
     set_button_label(root, "导出操作", "导出加密主密钥", "导出主密钥", min_width=132.0)
 
 
 def _move_export_tip(root: dict) -> None:
-    """把右栏的绿色「导出不会删除原内容」提示移到主栏按钮上方。
+    """把绿色「导出不会删除原内容」提示移到主栏按钮上方。
 
-    提示本身要留（说明导出是无损的），只是原先挂在右栏辅助说明里，
-    右栏删除后会一起消失，所以先摘出来再插回主栏。
+    提示要留（说明导出无损），只是原先挂在右栏辅助说明里，
+    右栏删除时会一起消失。必须先从卡片子节点里摘掉再插入，
+    否则同一个节点会同时挂在两处，渲染出两条一样的提示。
     """
-    area = find(root, "导出工作区")
-    if area is None:
+    card = find(find(root, "导出工作区"), "内容卡片")
+    if card is None:
         return
-    tail = find(area, "安全提示")
-    if tail is None:
+    children = card.get("children", []) or []
+    tip = next((c for c in children if c.get("name") == "安全提示"), None)
+    actions = next((c for c in children if c.get("name") == "导出操作"), None)
+    if tip is None or actions is None or tip in (actions.get("children") or []):
         return
 
-    actions = find(area, "导出操作")
-    if actions is None:
-        return
-    ab = box(actions)
-    tb = box(tail)
-    shift(tail, 0, -(float(ab.get("y", 0)) - float(tb.get("y", 0))) + 60.0)
-    new_y = float(ab.get("y", 0)) - float(tb.get("height", 68)) - 12.0
-    place(actions, tail, y=new_y)
-    actions["children"] = [tail] + [c for c in actions.get("children", []) or []
-                                    if c is not tail]
-    grow_to_fit(find(area, "内容卡片") or actions, pad=24.0)
+    card["children"] = [c for c in children if c is not tip]
+    tip_w = float(box(card).get("width", 0)) - 48.0
+    tb, ab = box(tip), box(actions)
+    shift(tip, 0, float(ab.get("y", 0)) - float(tb.get("y", 0))
+         - float(tb.get("height", 0)) - 12.0)
+    tb["width"] = tip_w
+    _widen(tip, tip_w - float(tb.get("width", 0)))
+    for text in walk_all(tip):
+        if text.get("type") == "TEXT":
+            box(text)["width"] = tip_w - 52.0
+    actions["children"] = [tip] + [c for c in actions.get("children", []) or []
+                                    if c is not tip]
 
 
 def _make_pwd_field(x: float, y: float, w: float, label: str, hint: str) -> dict:
@@ -1414,14 +1468,14 @@ def _align_pwd_fields(root: dict) -> None:
 
 def patch_secret_add_page(root: dict) -> None:
     """07 新增机密信息：删右栏通栏，按钮改「保存」。"""
-    patch_desktop_common(root)
+    patch_desktop_common(root, "机密信息管理")
     widen_workspace(root, "新增工作区")
     set_button_label(root, "保存操作", "加密并保存", "保存", min_width=96.0)
 
 
 def patch_secret_import_page(root: dict) -> None:
     """08 导入机密信息：删右栏、文案改「关联的主密钥」、绿勾、按钮改名。"""
-    patch_desktop_common(root)
+    patch_desktop_common(root, "机密信息管理")
     widen_workspace(root, "导入工作区")
 
     block = find(root, "找到的主密钥")
@@ -1438,7 +1492,7 @@ def patch_secret_import_page(root: dict) -> None:
 
 def patch_security_page(root: dict) -> None:
     """09 安全设置：删右栏通栏。"""
-    patch_desktop_common(root)
+    patch_desktop_common(root, "安全设置")
     widen_workspace(root, "设置工作区")
 
 
