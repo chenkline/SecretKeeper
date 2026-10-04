@@ -1085,6 +1085,443 @@ def widen_workspace(root: dict, area_name: str, pad: float = 24.0) -> None:
 
 
 # ---------------------------------------------------------------------------
+# 移动端逐板
+# ---------------------------------------------------------------------------
+def patch_mobile_common(root: dict) -> None:
+    """移动端画板共用：删「备选」。"""
+    rewrite_beixuan(root)
+
+
+def patch_mobile_unlock(root: dict) -> None:
+    note = find(root, "\u672c\u5730\u5b89\u5168\u8bf4\u660e")
+    if note is None:
+        return
+    # \u8fd9\u5757\u539f\u6765\u6709\u4e24\u884c\uff1a\u4e00\u884c\u662f\u201c\u660e\u6587\u5df2\u9690\u85cf\uff0c\u5185\u5b58\u5bc6\u94a5\u7f13\u5b58\u5df2\u6e05\u7a7a\u201d\uff08\u6280\u672f\u7ec6\u8282\uff0c\u4e0d\u7ed9\u7528\u6237\u770b\uff09\uff0c
+    # \u4e00\u884c\u662f\u7248\u672c\u53f7\u3002\u5f53\u524d\u5b9e\u73b0\u662f\u628a\u7b2c\u4e00\u884c**\u6539\u5199**\u6210\u7248\u672c\u53f7\u5185\u5bb9\uff0c\u7ed3\u679c\u4e24\u884c\u5b8c\u5168\u76f8\u540c\u3002
+    # \u6b63\u786e\u505a\u6cd5\u662f\u5220\u6389\u7b2c\u4e00\u884c\uff08\u6574\u4e2a\u5b50\u8282\u70b9\uff09\uff0c\u53ea\u7559\u7248\u672c\u53f7\u90a3\u884c\u3002
+    drop_text(note, "\u660e\u6587\u5df2\u9690\u85cf")
+
+
+GAP = 8.0  # \u6309\u94ae\u4e4b\u95f4\u7684\u95f4\u8ddd\uff0c\u4e0e\u684c\u9762\u7aef\u4fdd\u6301\u4e00\u81f4
+
+
+def patch_mobile_secret_list(root: dict) -> None:
+    content = find(root, "\u9875\u9762\u5185\u5bb9")
+    if content is None:
+        return
+
+    header = find(content, "\u5bb9\u91cf\u4e0e\u65b0\u589e")
+    footer = find(content, "\u6587\u4ef6\u5165\u53e3")
+    add_button = find(header, "\u64cd\u4f5c\u6309\u94ae")
+
+    # \u5e95\u90e8\u300c\u5bfc\u51fa\u4e0e\u5907\u4efd\u300d\u6309\u94ae\u5220\u9664\uff1a\u5bfc\u51fa\u4ec5\u4fdd\u7559\u5728\u8be6\u60c5\u9875
+    import_btn = None
+    if footer is not None:
+        buttons = [c for c in footer.get("children", []) or [] if c.get("name") == "\u64cd\u4f5c\u6309\u94ae"]
+        if buttons:
+            import_btn = buttons[0]
+        content["children"] = [c for c in content["children"] if c is not footer]
+
+    # \u91cd\u6392\u4e0b\u65b9\u5185\u5bb9\uff0c\u56e0\u4e3a\u5e95\u90e8\u6574\u5757\u88ab\u5220\u9664\uff0c\u9700\u8981\u6536\u7d27\u9ad8\u5ea6
+    shift(find(content, "\u8bf4\u660e"), 0, -48.0)
+
+    if import_btn is not None and header is not None:
+        # \u5bfc\u5165\u79fb\u5230\u5217\u8868\u4e0a\u65b9\uff0c\u4e0e\u300c\u65b0\u589e\u300d\u5e76\u6392\u3002
+        # \u6ce8\u610f\uff1a\u65b0\u6309\u94ae\u662f\u4ece\u9875\u811a\u62bd\u8d70\u7684\uff0cy \u4ecd\u662f\u5e95\u90e8\u7684\u5750\u6807\uff0c
+        # \u76f4\u63a5 append \u5230 header \u4f1a\u8ba9\u5b83\u6e32\u67d3\u5728\u5217\u8868\u4e0b\u65b9\u3002\u5fc5\u987b\u663e\u5f0f\u6539\u5199 y\u3002
+        set_text(find(import_btn, "\u6309\u94ae\u6587\u5b57"), "\u5bfc\u5165")
+
+        add_box = box(find(header, "\u64cd\u4f5c\u6309\u94ae"))
+        new_w = 72.0
+        # \u5fc5\u987b\u7528 shift() \u800c\u4e0d\u662f\u76f4\u63a5\u5199\u7236\u8282\u70b9\u5750\u6807\uff1a
+        # Figma \u5b50\u8282\u70b9\u5750\u6807\u662f\u72ec\u7acb\u7edd\u5bf9\u503c\uff0c\u76f4\u63a5\u6539\u7236\u8282\u70b9\u4f1a\u8ba9\u56fe\u6807\u4e0e\u6587\u5b57
+        # \u7559\u5728\u539f\u5730\uff08\u8868\u73b0\u4e3a\u6309\u94ae\u662f\u4e2a\u7a7a\u767d\u6846\uff09\u3002
+        dst_x = float(add_box.get("x", 0)) - GAP - new_w
+        dst_y = float(add_box.get("y", 0))
+        shift(import_btn, dst_x - float(box(import_btn).get("x", 0)),
+              dst_y - float(box(import_btn).get("y", 0)))
+        target = box(import_btn)
+        target["width"] = new_w
+        target["height"] = float(add_box.get("height", 34))
+
+        # \u7f29\u5bbd\u5230 72px \u540e\uff0c\u539f\u6765 170px \u5bbd\u7684\u5185\u5bb9\u504f\u79fb\u4f1a\u8ba9\u56fe\u6807\u4e0e\u6587\u5b57\u6324\u5728\u53f3\u4fa7\u3002
+        # \u91c7\u7528\u300c\u65b0\u589e\u300d\u6309\u94ae\u7684\u5185\u5bb9\u95f4\u8ddd\uff08\u56fe\u6807 +12\u3001\u6587\u5b57 +36\uff09\u91cd\u6392\u3002
+        # \u6ce8\u610f\uff1a\u56fe\u6807 FRAME \u91cc\u7684 VECTOR \u4e5f\u662f\u7edd\u5bf9\u5750\u6807\uff0c\u5fc5\u987b\u4e00\u8d77\u5e73\u79fb\uff0c
+        # \u5426\u5219\u8def\u5f84\u4f1a\u62c9\u51fa\u4e00\u6761\u622a\u5230\u6309\u94ae\u5916\u7684\u7ebf\u3002
+        icon = next((c for c in import_btn.get("children", []) or []
+                     if c.get("type") == "FRAME"), None)
+        label = find(import_btn, "\u6309\u94ae\u6587\u5b57")
+        base_x = float(target["x"])
+        base_y = float(target["y"])
+        bh = float(target["height"])
+        if icon is not None:
+            ib = box(icon)
+            dst = base_x + 12.0
+            shift(icon, dst - float(ib.get("x", dst)), 0)
+            ib = box(icon)
+            ib["y"] = base_y + (bh - float(ib.get("height", 16))) / 2
+        if label is not None:
+            lb = box(label)
+            lb["x"] = base_x + 36.0
+            lb["y"] = base_y + (bh - float(lb.get("height", 14))) / 2
+            lb["width"] = 28.0
+        header["children"].append(import_btn)
+
+
+def build_mobile_generate_key(source: dict) -> dict:
+    """生成不带 TAB 的「生成主密钥」画板。
+
+    需求把移动端的生成与导入拆成两个独立界面，各自不该再带
+    「生成主密钥 / 从文件导入」这组切换标签——页面标题已经说明了
+    这是哪一步，留着标签只会让人以为还能切回去。
+    """
+    board = copy.deepcopy(source)
+    board["id"] = "sk-mobile-generate-key"
+    board["name"] = "\u79fb\u52a8\u7aef \u00b7 \u751f\u6210\u4e3b\u5bc6\u94a5"
+
+    content = find(board, "\u9875\u9762\u5185\u5bb9")
+    if content is None:
+        return board
+    drop(board, "\u6dfb\u52a0\u65b9\u5f0f")
+
+    x = float(box(content).get("x", 0)) + 20
+    w = float(box(content).get("width", 390)) - 40
+    top = 268.0
+
+    title = text_node("\u6807\u9898", "\u751f\u6210\u4e3b\u5bc6\u94a5", x, top - 56.0, 20, INK, width=w)
+    subtitle = text_node("\u8bf4\u660e", "\u5728\u672c\u673a\u751f\u6210\u4e00\u628a\u968f\u673a RSA-2048 \u4e3b\u5bc6\u94a5\u3002",
+                         x, top, 13, MUTED, width=w)
+    fields = [
+        _mobile_pwd(x, top + 35.0, w, "\u4e3b\u5bc6\u94a5\u540d\u79f0\uff08\u53ef\u9009\uff09", "\u53ef\u4ee5\u7559\u7a7a",
+                    "\u540d\u79f0\u4ec5\u7528\u4e8e\u8fa8\u8bc6\uff0c\u4e0d\u53c2\u4e0e\u52a0\u5bc6\u3002"),
+        _mobile_pwd(x, top + 132.0, w, "\u4e3b\u5bc6\u94a5\u5bc6\u7801", "\u2022" * 11, None),
+        _mobile_pwd(x, top + 229.0, w, "\u786e\u8ba4\u4e3b\u5bc6\u94a5\u5bc6\u7801", "\u2022" * 11, None),
+    ]
+    warning = _mobile_notice(x, top + 326.0, w,
+        "\u8bf7\u59a5\u5584\u8bb0\u4f4f\u4e3b\u5bc6\u94a5\u5bc6\u7801",
+        "\u5bc6\u7801\u4e22\u5931\u65e0\u6cd5\u89e3\u5bc6\uff0c\u5bc6\u5323\u65e0\u6cd5\u4e3a\u4f60\u91cd\u7f6e\u5bc6\u7801\u3002")
+    action = _mobile_button(x, top + 402.0, w, "\u751f\u6210\u4e3b\u5bc6\u94a5", ACCENT, WHITE, 168)
+
+    content["children"] = [title, subtitle] + fields + [warning, action]
+    cb = box(content)
+    cb["height"] = 268.0 + 402.0 + 44.0 - float(cb.get("y", 0))
+    _shrink_board(board)
+    return board
+
+
+def _shrink_board(board: dict) -> None:
+    """画板高度按内容收紧，并让底部固定块贴住新底边。"""
+    content = find(board, "\u9875\u9762\u5185\u5bb9")
+    if content is None:
+        return
+    cb = box(content)
+    bottom = float(cb.get("y", 0)) + float(cb.get("height", 0))
+    reflow_mobile(board, bottom + 16.0 + 72.0, ("\u7cfb\u7edf\u624b\u52bf\u533a\u57df", "\u5e95\u90e8\u5bfc\u822a"))
+    bb = box(board)
+    nav = find(board, "\u9875\u9762\u5bfc\u822a")
+    top = float(box(nav).get("y", 0)) if nav is not None else float(bb.get("y", 0))
+    bb["height"] = float(bb.get("y", 0)) + 844.0 - float(bb.get("y", 0))
+
+
+def _mobile_pwd(x: float, y: float, w: float, label: str, value: str, hint: str | None) -> dict:
+    children = [
+        text_node("\u5b57\u6bb5\u6807\u7b7e", label, x, y, 13, INK, width=w),
+        {
+            "id": f"sk-m-{label}", "name": "\u8f93\u5165\u533a\u57df", "type": "FRAME",
+            "fills": _solid(WHITE), "cornerRadius": 8.0, "strokes": _solid(BORDER),
+            "absoluteBoundingBox": {"x": x, "y": y + 29, "width": w, "height": 46},
+            "children": [text_node("\u63cf\u8fb9\u6587\u5b57", value, x + 14, y + 42, 14, MUTED)],
+        },
+    ]
+    height = 75.0
+    if hint:
+        children.append(text_node("\u5b57\u6bb5\u8f85\u52a9", hint, x, y + 60, 12, MUTED, width=w))
+        height = 97.0
+    return {
+        "id": f"sk-mf-{label}", "name": "\u8868\u5355\u5b57\u6bb5", "type": "FRAME",
+        "fills": [], "absoluteBoundingBox": {"x": x, "y": y, "width": w, "height": height},
+        "children": children,
+    }
+
+
+def _mobile_notice(x: float, y: float, w: float, title: str, body: str) -> dict:
+    return {
+        "id": f"sk-n-{title}", "name": "\u5b89\u5168\u63d0\u793a", "type": "FRAME",
+        "fills": _solid({"r": 1.0, "g": 0.969, "b": 0.89, "a": 1.0}),
+        "cornerRadius": 8.0,
+        "absoluteBoundingBox": {"x": x, "y": y, "width": w, "height": 68.0},
+        "children": [
+            text_node("\u63d0\u793a\u5185\u5bb9", title, x + 14, y + 12, 13, INK, width=w - 28),
+            text_node("\u63d0\u793a\u5185\u5bb9", body, x + 14, y + 34, 12, MUTED, width=w - 28),
+        ],
+    }
+
+
+def _mobile_button(x: float, y: float, w: float, label: str,
+                   fill: dict, text_color: dict, width: int) -> dict:
+    return {
+        "id": f"sk-b-{label}", "name": "\u64cd\u4f5c\u6309\u94ae", "type": "FRAME",
+        "fills": _solid(fill), "cornerRadius": 8.0,
+        "absoluteBoundingBox": {"x": x + (w - width) / 2, "y": y, "width": width, "height": 44},
+        "children": [text_node("\u6309\u94ae\u6587\u5b57", label, x + (w - width) / 2 + 24, y + 13, 14, text_color)],
+    }
+
+
+
+# ---------------------------------------------------------------------------
+# 状态图标与钥匙选择器（v2 新增）
+# ---------------------------------------------------------------------------
+# 找到 / 缺失两种状态的语义色。取自 UI 设计规范里的强调色与危险色。
+OK_COLOR = {"r": 0.0784313753247261, "g": 0.47058823704719543, "b": 0.4274509847164154, "a": 1.0}
+ALERT_COLOR = {"r": 0.6980392336845398, "g": 0.27843138575553894, "b": 0.27843138575553894, "a": 1.0}
+WARN_COLOR = {"r": 0.7098039215686275, "g": 0.5137254901960784, "b": 0.09411764705882353, "a": 1.0}
+
+_ICON_LIBRARY: dict[str, dict] = {}
+_ICON_NAMES = ("circle-check", "circle-alert", "chevron-down", "key-round", "eye-off")
+
+
+def load_icon_library(canvas: dict) -> None:
+    """从原始画布收集可复用图标，供各画板 clone。
+
+    图标路径由 Figma 的 vectorNetwork 表达。自行拼 path 会与整套图标的
+    线宽、圆角、留白都不一致，因此一律深拷贝原节点，只改 id、位置与描边色。
+    """
+    found: dict[str, dict] = {}
+
+    def visit(node: dict) -> None:
+        name = node.get("name")
+        if name in _ICON_NAMES and name not in found and node.get("children"):
+            found[name] = node
+        for child in node.get("children", []) or []:
+            visit(child)
+
+    for child in canvas.get("children", []) or []:
+        visit(child)
+    _ICON_LIBRARY.update(found)
+
+
+def recolor_icon(node: dict, color: dict) -> None:
+    """改写图标子树里所有描边色。"""
+    for child in walk_all(node):
+        if child.get("type") == "VECTOR":
+            child["strokes"] = _solid(color)
+
+
+def clone_icon(name: str, x: float, y: float, color: dict | None = None) -> dict | None:
+    """把图标库里的某个图标克隆到指定坐标。"""
+    source = _ICON_LIBRARY.get(name)
+    if source is None:
+        return None
+    node = copy.deepcopy(source)
+    node["id"] = f"sk-ic-{name}-{x:.0f}-{y:.0f}"
+    node["name"] = name
+    shift(node, x - float(box(node).get("x", x)), y - float(box(node).get("y", y)))
+    if color is not None:
+        recolor_icon(node, color)
+    return node
+
+
+def set_icon_status(block: dict, found: bool) -> None:
+    """把「状态标签」换成找到 / 缺失图标。
+
+    08 与 18 的匹配结果区块原本用「备选」文字标签表达密钥类型，
+    但需求已删掉「备选」二字，真正要表达的是
+    「这台机器上找没找到这把主密钥」，因此标签位改成绿勾 / 红叉。
+
+    画板里带圆角的节点会被渲染器套上 clipPath；克隆出来的图标 FRAME
+    必须清掉圆角，否则整条路径会被 18x18 的裁剪框裁没——而 XML 校验
+    与文字数门禁都发现不了，属于静默失败。
+    """
+    anchor = next((c for c in walk_all(block)
+                   if c.get("name") == "状态标签"), None)
+    if anchor is None:
+        return
+    holder = find_parent(block, anchor)
+    if holder is None:
+        return
+
+    ab = box(anchor)
+    icon = clone_icon("circle-check" if found else "circle-alert",
+                      float(ab.get("x", 0)),
+                      float(ab.get("y", 0)) + (float(ab.get("height", 21)) - 18) / 2,
+                      OK_COLOR if found else ALERT_COLOR)
+    if icon is None:
+        return
+    icon["id"] = "sk-status-" + ("ok" if found else "alert")
+    icon["cornerRadius"] = 0
+    for child in walk_all(icon):
+        child["cornerRadius"] = 0
+    holder["children"] = [icon if c is anchor else c for c in holder["children"]]
+
+
+def build_key_selector(x: float, y: float, w: float, label: str,
+                       name: str, mkid: str, tag: str | None) -> dict:
+    """构造解锁页的「主密钥选择」区块。
+
+    需求由「输入默认主密钥密码解锁」改为「选择一把主密钥解锁」，
+    原来那行只读文字（名称 + ID）不够用，改成与 07 新增机密信息同款的
+    下拉选择块：标签行 + 当前选中行（钥匙图标 / 名称 / ID / 状态标签 / 展开箭头）。
+    """
+    sel_y = y + 29.0
+    sel_h = 65.0
+    pad = 12.0
+    gap = 8.0
+    icon_w = 20.0
+    chev_w = 16.0
+    tag_w = 46.0
+
+    row = rect_node("选中行", x, sel_y, w, sel_h, WHITE, 8.0, stroke=BORDER)
+    row["layoutMode"] = "HORIZONTAL"
+    row["primaryAxisSizingMode"] = "FIXED"
+    row["counterAxisSizingMode"] = "CENTER"
+    row["itemSpacing"] = gap
+    row["paddingLeft"] = pad
+    row["paddingRight"] = pad
+    row["children"] = []
+
+    key_icon = clone_icon("key-round", x + pad, sel_y + (sel_h - 18) / 2, MUTED)
+    if key_icon is not None:
+        key_icon["cornerRadius"] = 0
+        for child in walk_all(key_icon):
+            child["cornerRadius"] = 0
+        row["children"].append(key_icon)
+        icon_w = 26.0
+
+    text_x = x + pad + icon_w + gap
+    text_w = w - pad - icon_w - gap - chev_w - gap
+    name_node = text_node("主密钥名称", name, text_x, sel_y + 14.0, 14.0, INK, width=text_w)
+    name_node["style"] = dict(name_node.get("style") or {})
+    name_node["style"]["fontSize"] = 14.0
+    name_node["absoluteBoundingBox"]["width"] = text_w
+    name_node["absoluteBoundingBox"]["height"] = 20.0
+    id_node = text_node("主密钥 ID", mkid, text_x, sel_y + 37.0, 12.0, MUTED, width=text_w)
+    row["children"].append(name_node)
+    row["children"].append(id_node)
+
+    right_x = x + w - pad
+    if tag:
+        tag_box = rect_node("状态标签", right_x - tag_w, sel_y + (sel_h - 21) / 2,
+                            tag_w, 21.0, SURFACE, 6.0)
+        tag_text = text_node("状态", tag, right_x - tag_w + 9.0,
+                             sel_y + (sel_h - 21) / 2 + 4.0, 11.0, ACCENT, width=tag_w - 18)
+        tag_box["children"] = [tag_text]
+        row["children"].append(tag_box)
+        right_x -= tag_w + gap
+
+    chev = clone_icon("chevron-down", right_x - chev_w, sel_y + (sel_h - 16) / 2, MUTED)
+    if chev is not None:
+        chev["cornerRadius"] = 0
+        for child in walk_all(chev):
+            child["cornerRadius"] = 0
+        row["children"].append(chev)
+
+    block = rect_node("主密钥选择", x, y, w, sel_y + sel_h - y, None, 0.0)
+    block["layoutMode"] = "VERTICAL"
+    block["itemSpacing"] = 8.0
+    block["fills"] = []
+    label_node = text_node("字段标签", label, x, y, 13.0, MUTED, width=w)
+    block["children"] = [label_node, row]
+    return block
+
+
+def replace_child(parent: dict, old: dict, new: dict) -> None:
+    """用 new 替换 parent 的子节点 old。"""
+    for index, child in enumerate(parent.get("children", []) or []):
+        if child is old:
+            parent["children"][index] = new
+            return
+
+
+# 桌面端双栏工作区里，子节点右边缘距父级右边缘不足这个数即视为右对齐元素。
+RIGHT_EDGE_SLACK = 24.0
+
+
+def _h_align(node: dict) -> str:
+    """返回节点的水平对齐方式（MIN / CENTER / MAX）。
+
+    auto-layout 的两个对齐属性是按「主轴 / 交叉轴」命名的，与方向无关：
+    HORIZONTAL 布局的主轴是水平，VERTICAL 布局的主轴是竖直。
+    直接拿 counterAxisAlignItems 当水平对齐用，会把竖排容器里
+    「整体水平居中」的子节点误判成左对齐。
+    """
+    align = (node.get("counterAxisAlignItems") if node.get("layoutMode") == "VERTICAL"
+             else node.get("primaryAxisAlignItems")) or "MIN"
+    return align
+
+
+def _widen(node: dict, delta: float) -> None:
+    """把一个容器子树从旧宽撑到新宽。
+
+    Figma 用 auto-layout 表达「撑满」「居中」「贴右」，渲染器只读绝对坐标，
+    所以这些都得在这里按轴补算出来：
+
+    - 居中：子节点宽度不变，x 重算到父箱中心；
+    - 贴右：子节点右边缘重新对齐父箱右边缘；
+    - 左对齐：FILL 子节点跟着变长；原本贴父箱右边缘的元素
+      （eye-off、右侧状态标签）额外右移 delta，否则卡片变宽后它们会停在中间。
+
+    判定「贴右」必须用**改宽前**的父箱右边缘：调用方已把本层宽度改大，
+    拿新宽度去比会把所有子节点都判成「没贴右」而漏掉位移。
+
+    递归时只有「自己也变宽了」的子节点才继续下传 delta，
+    否则它的宽度未变，再传就是无意义的坐标漂移。
+    """
+    parent = box(node)
+    parent_left = float(parent.get("x", 0))
+    parent_width = float(parent.get("width", 0))
+    parent_right = parent_left + parent_width
+    align = _h_align(node)
+
+    for child in node.get("children", []) or []:
+        cb = box(child)
+        if not cb:
+            continue
+        child_w = float(cb.get("width", 0))
+        fills = (child.get("layoutSizingHorizontal") == "FILL"
+                 or float(child.get("layoutGrow") or 0) > 0)
+        child_right = float(cb.get("x", 0)) + child_w
+
+        if align == "CENTER":
+            cb["x"] = parent_left + parent_width / 2 - child_w / 2
+        elif align == "MAX":
+            cb["x"] = parent_right - child_w
+        elif fills:
+            cb["width"] = child_w + delta
+        elif child_right >= parent_right - delta - RIGHT_EDGE_SLACK:
+            shift(child, delta, 0)
+
+        _widen(child, delta if (fills and align == "MIN") else 0.0)
+
+
+def widen_workspace(root: dict, area_name: str, pad: float = 24.0) -> None:
+    """删掉双栏工作区的右栏，并把主卡片拉到通栏。
+
+    桌面端双栏固定是「主卡片 580 + gap 24 + 右栏 324」，总宽 928。
+    删掉右栏后主卡片必须补上这 348，否则页面右侧会空掉一大块。
+
+    主卡片永远是工作区的第一个子节点，右栏在其后——所以按位置删除，
+    不能按 name：03 生成主密钥的两个栏都叫「内容卡片」。
+    """
+    area = find(root, area_name)
+    if area is None:
+        return
+    children = area.get("children", []) or []
+    if len(children) < 2:
+        return
+
+    area["children"] = children[:1]
+    card = children[0]
+    area_w = float(box(area).get("width", 0))
+    card_w = float(box(card).get("width", 0))
+    if area_w <= card_w:
+        return
+
+    box(card)["width"] = area_w
+    card["layoutSizingHorizontal"] = "FILL"
+    _widen(card, area_w - card_w)
+
+
+# ---------------------------------------------------------------------------
 # 布局重排：移动端画板没有 auto-layout 兜底，删块 / 插块后必须显式重算
 # ---------------------------------------------------------------------------
 def place(parent: dict, child: dict, x: float | None = None,
@@ -1605,57 +2042,9 @@ def patch_mobile_common(root: dict) -> None:
     rewrite_beixuan(root)
 
 
-def patch_mobile_nav(root: dict, active: str) -> None:
-    """移动端底部导航重排为主密钥 / 机密信息 / 安全设置三项。"""
-    nav = find(root, "底部导航")
-    if nav is None:
-        return
-    items = [c for c in (nav.get("children", []) or [])
-             if c.get("name") == "导航项"]
-    if not items:
-        return
-
-    source = items[0]
-    rebuilt = []
-    for index, (icon, label) in enumerate(
-            (("key-round", "主密钥"), ("files", "机密信息"), ("settings-2", "安全设置"))):
-        node = copy.deepcopy(source)
-        node["id"] = f"sk-mnav-{index}"
-        node["layoutAlign"] = "STRETCH" if index == 0 else "INHERIT"
-        node["layoutGrow"] = 1.0 if index == 0 else 0.0
-        sb = box(source)
-        nb = box(node)
-        nb["x"] = float(sb.get("x", 0)) + index * float(sb.get("width", 0))
-        nb["width"] = float(sb.get("width", 0))
-        inner = f"{icon}"
-        for sub in walk_all(node):
-            if sub.get("name") == inner:
-                inner_node = sub
-        icon_frame = next((c for c in node.get("children", []) or []
-                           if c.get("name") == inner), None)
-        if icon_frame is None:
-            replacement = clone_icon(icon, float(box(node).get("x", 0)) + 12.0,
-                                    float(box(node).get("y", 0)) + 13.0, MUTED)
-            if replacement is not None:
-                replacement["cornerRadius"] = 0
-                for sub in walk_all(replacement):
-                    sub["cornerRadius"] = 0
-                replace_child(node, node["children"][0], replacement)
-        name_node = next((c for c in node.get("children", []) or []
-                          if c.get("name") == "导航名称"), None)
-        if name_node is not None:
-            set_text(name_node, label)
-        if active == label:
-            node["name"] = "导航项-激活"
-        rebuilt.append(node)
-
-    nav["children"] = rebuilt
-
-
 def patch_mobile_unlock(root: dict) -> None:
     """10 移动端解锁：改为可选主密钥解锁。"""
     patch_mobile_common(root)
-    patch_mobile_nav(root, "主密钥")
 
     for node in walk_all(root):
         if node.get("type") != "TEXT":
@@ -1679,47 +2068,124 @@ def patch_mobile_unlock(root: dict) -> None:
 
 
 def patch_mobile_master_keys(root: dict) -> None:
-    """11 移动端主密钥管理：拆分生成/导入按钮，容量提示下移。"""
+    """11 移动端主密钥管理。
+
+    三处调整：
+    - 卡片内的「导出备份」「导出」是同一操作，统一成「导出主密钥」；
+    - 底部「生成 / 导入主密钥」单按钮拆成两枚，移到容量行上方；
+    - 「容量已满…」提示改文案并放到两枚按钮下方。
+    """
     patch_mobile_common(root)
-    patch_mobile_nav(root, "主密钥")
-    _rebuild_mobile_key_actions(root, find(root, "页面内容"))
+
+    for holder_name in ("密钥操作",):
+        for holder in [n for n in walk_all(root) if n.get("name") == holder_name]:
+            _unify_export_buttons(holder)
+
+    content = find(root, "页面内容")
+    if content is not None:
+        _split_create_import_buttons(root, content)
 
 
-def _rebuild_mobile_key_actions(root: dict, content: dict) -> None:
-    """把「生成 / 导入主密钥」单按钮拆成两枚并移到容量行上方。"""
-    if content is None:
-        return
+def _unify_export_buttons(holder: dict) -> None:
+    """把同一卡片里的导出按钮文案统一成「导出主密钥」。
+
+    第一张卡里叫「导出备份」（因为并列的另一个是「删除」），
+    第二张卡里叫「导出」。两者都是导出这把主密钥，文案统一即可。
+    """
+    buttons = [c for c in (holder.get("children", []) or [])
+               if c.get("name") == "操作按钮"]
+    for button in buttons:
+        label = find(button, "按钮文字")
+        if label is None:
+            continue
+        if label.get("characters") in ("导出备份", "导出"):
+            set_text(label, "导出主密钥")
+            lb = box(label)
+            style = label.get("style") or {}
+            size = float(style.get("fontSize", 13))
+            lb["width"] = len("导出主密钥") * size
+            bb = box(button)
+            bb["width"] = max(float(bb.get("width", 0)), lb["width"] + 24.0)
+            lb["x"] = float(bb.get("x", 0)) + (float(bb.get("width", 0))
+                                               - float(lb.get("width", 0))) / 2
+            for icon in button.get("children", []) or []:
+                if icon.get("type") == "FRAME" and find(icon, "Vector") is not None:
+                    ib = box(icon)
+                    ib["x"] = float(lb.get("x", 0)) - 26.0
+    # 后面的按钮跟着右移
+    for index in range(1, len(buttons)):
+        prev = box(buttons[index - 1])
+        cur = box(buttons[index])
+        gap = float(box(holder).get("x", 0)) + float(box(holder).get("width", 0)) \
+            - (float(prev.get("x", 0)) + float(prev.get("width", 0)))
+        shift(buttons[index], float(prev.get("x", 0)) + float(prev.get("width", 0))
+              + gap - float(cur.get("x", 0)), 0)
+
+
+def _split_create_import_buttons(root: dict, content: dict) -> None:
+    """把「生成 / 导入主密钥」拆成两枚按钮并上移到容量行下方。"""
     children = content.get("children", []) or []
-    combined = next((c for c in children
-                     if "生成" in (c.get("name") or "") and "导入" in (c.get("name") or "")), None)
+    combined = next((c for c in children if c.get("name") == "操作按钮"), None)
     capacity = next((c for c in children if c.get("name") == "容量状态"), None)
+    tip = next((c for c in children if c.get("name") == "安全提示"), None)
     if combined is None or capacity is None:
         return
 
     cb = box(capacity)
-    inner = cb["x"] + 24.0
-    inner_w = float(cb.get("width", 0)) - 48.0
+    inner_x = float(cb.get("x", 0)) + 20.0
+    inner_w = float(cb.get("width", 0)) - 40.0
     gap = 8.0
     btn_w = (inner_w - gap) / 2
-    btn_y = float(cb.get("y", 0)) - 44.0
+    btn_h = 40.0
 
     buttons = []
-    for index, label in enumerate(("生成主密钥", "导入主密钥")):
-        node = rect_node(f"{label}按钮", inner + index * (btn_w + gap), btn_y,
-                         btn_w, 36.0, WHITE, 8.0, stroke=BORDER)
-        node["layoutMode"] = "HORIZONTAL"
-        node["primaryAxisAlignItems"] = "CENTER"
-        node["counterAxisAlignItems"] = "CENTER"
-        node["children"] = [text_node("按钮文字", label, 0.0, 0.0, 13.0, ACCENT, width=0.0)]
-        buttons.append(node)
+    for index, (icon_name, label) in enumerate(
+            (("plus", "生成主密钥"), ("file-input", "导入主密钥"))):
+        button = rect_node("操作按钮", inner_x + index * (btn_w + gap),
+                           float(cb.get("y", 0)) + 28.0, btn_w, btn_h,
+                           WHITE, 8.0, stroke=BORDER)
+        button["layoutMode"] = "HORIZONTAL"
+        button["primaryAxisAlignItems"] = "CENTER"
+        button["counterAxisAlignItems"] = "CENTER"
+        size = 13.0
+        text_w = len(label) * size
+        text_x = inner_x + index * (btn_w + gap) + (btn_w - text_w - 18.0 - 6.0) / 2
+        text = text_node("按钮文字", label, text_x,
+                         float(cb.get("y", 0)) + 28.0 + (btn_h - 17.0) / 2,
+                         size, ACCENT, width=text_w)
+        children_nodes = []
+        icon = clone_icon(icon_name, text_x + text_w + 6.0,
+                          float(cb.get("y", 0)) + 28.0 + (btn_h - 18.0) / 2, ACCENT)
+        if icon is not None:
+            icon["cornerRadius"] = 0
+            for sub in walk_all(icon):
+                sub["cornerRadius"] = 0
+            align_icon_vector(icon)
+            children_nodes.append(icon)
+        children_nodes.append(text)
+        button["children"] = children_nodes
+        buttons.append(button)
 
-    capacity["children"] = buttons + [c for c in capacity.get("children", []) or []]
     content["children"] = [c for c in children if c is not combined]
+    insert_at = content["children"].index(capacity) + 1
+    content["children"][insert_at:insert_at] = buttons
 
-    note = next((n for n in walk_all(capacity)
-                 if n.get("type") == "TEXT" and "容量" in n.get("characters", "")), None)
-    if note is not None:
-        set_text(note, "主密钥数量已满，先导出并删除一把主密钥，才能新增。")
+    if tip is not None:
+        note = next((n for n in walk_all(tip)
+                     if n.get("type") == "TEXT" and n.get("characters")), None)
+        if note is not None:
+            set_text(note, "主密钥数量已满，先导出并删除一把主密钥，才能新增。")
+            nb = box(note)
+            nb["width"] = float(box(tip).get("width", 350)) - 52.0
+        tb = box(tip)
+        buttons_bottom = max(float(box(b).get("y", 0)) + float(box(b).get("height", 0))
+                            for b in buttons)
+        shift(tip, 0, buttons_bottom + 16.0 - float(tb.get("y", 0)))
+
+    bottom = max(float(box(c).get("y", 0)) + float(box(c).get("height", 0))
+                 for c in content.get("children", []) or [])
+    grow_to_fit(content, pad=16.0)
+    reflow_mobile(root, bottom + 16.0 + 72.0, ("系统手势区域", "底部导航"))
 
 
 def strip_tabs(root: dict) -> float:
@@ -1757,7 +2223,6 @@ def freed_of(holder: dict, y: float) -> float:
 def patch_mobile_generate_key(root: dict) -> None:
     """12 移动端生成主密钥：去 TAB，按钮改「生成主密钥」。"""
     patch_mobile_common(root)
-    patch_mobile_nav(root, "主密钥")
     strip_tabs(root)
     set_button_label(root, "生成操作", "生成并保存", "生成主密钥", min_width=132.0)
 
@@ -1765,7 +2230,6 @@ def patch_mobile_generate_key(root: dict) -> None:
 def patch_mobile_import_key(root: dict) -> None:
     """13 移动端导入主密钥：去 TAB，按钮改「导入主密钥」。"""
     patch_mobile_common(root)
-    patch_mobile_nav(root, "主密钥")
     strip_tabs(root)
     set_button_label(root, "导入操作", "导入为备选主密钥", "导入主密钥", min_width=132.0)
 
@@ -1773,7 +2237,6 @@ def patch_mobile_import_key(root: dict) -> None:
 def patch_mobile_detail(root: dict, found: bool) -> None:
     """15 / 16 移动端机密信息详情：区块重排 + 主密钥状态图标。"""
     patch_mobile_common(root)
-    patch_mobile_nav(root, "机密信息")
     _relayout_detail(root, found)
 
 
@@ -1836,7 +2299,6 @@ def _append_warn(key_block: dict) -> None:
 def patch_mobile_secret_add(root: dict) -> None:
     """17 移动端新增机密信息：删开发提示，按钮改「保存」。"""
     patch_mobile_common(root)
-    patch_mobile_nav(root, "机密信息")
     drop(root, "安全提示")
     drop_text(root, "默认选用当前默认主密钥加密保存，不需要重复选择。")
     set_button_label(root, "保存操作", "加密并保存", "保存", min_width=96.0)
@@ -1845,7 +2307,6 @@ def patch_mobile_secret_add(root: dict) -> None:
 def patch_mobile_secret_import(root: dict) -> None:
     """18 移动端导入机密信息：标题改「主密钥」、绿勾、按钮改「导入」。"""
     patch_mobile_common(root)
-    patch_mobile_nav(root, "机密信息")
 
     block = find(root, "已找到的本机主密钥") or find(root, "主密钥区块")
     if block is not None:
@@ -1860,7 +2321,6 @@ def patch_mobile_secret_import(root: dict) -> None:
 def patch_mobile_export_delete(root: dict) -> None:
     """19 移动端导出与删除：导出区独立密码框，按钮简化。"""
     patch_mobile_common(root)
-    patch_mobile_nav(root, "机密信息")
     _insert_mobile_export_password(root)
     set_button_label(root, "导出操作", "导出加密文件", "导出", min_width=96.0)
     set_button_label(root, "删除操作", "验证并删除", "删除", min_width=96.0)
@@ -1904,7 +2364,6 @@ def _insert_mobile_export_password(root: dict) -> None:
 def patch_mobile_security(root: dict) -> None:
     """20 移动端安全设置：删底部说明卡片。"""
     patch_mobile_common(root)
-    patch_mobile_nav(root, "安全设置")
     drop(root, "内容卡片")
     drop(root, "安全提示")
 
