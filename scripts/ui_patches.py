@@ -1188,13 +1188,35 @@ def prune(node: dict, name: str) -> bool:
     return removed
 
 
+def align_icon_vector(icon: dict) -> None:
+    """把图标 FRAME 内的 Vector 拉回 FRAME 的局部原点。
+
+    Figma 导出的图标里，Vector 的 absoluteBoundingBox 有时是素材里
+    遗留的旧坐标，与外层 FRAME 不同步（例如 file-output 的 Vector 比
+    FRAME 偏左 37px）。渲染器按 Vector 自己的绝对坐标绘制，
+    于是图标会跑到按钮文字上。图标 path 是 0..18 的局部坐标，
+    把 Vector 的原点挪到 FRAME 左上角即可对齐。
+    """
+    fb = box(icon)
+    fx, fy = float(fb.get("x", 0)), float(fb.get("y", 0))
+    fw, fh = float(fb.get("width", 0)), float(fb.get("height", 0))
+    for vector in walk_all(icon):
+        if vector.get("type") != "VECTOR":
+            continue
+        vb = box(vector)
+        shift(vector, fx - float(vb.get("x", fx)), fy - float(vb.get("y", fy)))
+
+
 def set_button_label(root: dict, container: str, old: str, new: str,
                      min_width: float | None = None) -> bool:
-    """改按钮文案；必要时加宽按钮并让文字重新居中。
+    """改按钮文案；必要时加宽按钮并把「图标 + 文字」整体重新居中。
 
     按钮宽度在设计稿里是 HUG（跟随文字），但 absoluteBoundingBox 是定值。
-    文案变长后必须手动加宽，否则文字会溢出按钮边框。
-    同行的后续按钮要一并右移，原间距才不变。
+    文案变长后必须手动加宽，否则文字会溢出边框。
+
+    加宽后不能只把文字挪半个差值：带图标的主按钮（如「导出主密钥」）里，
+    图标与文字是一组，只挪文字会让两者叠在一起。这里按
+    「图标宽 + 间距 + 新文字宽」算出内容总宽，再整体居中到新按钮里。
     """
     holder = find(root, container)
     if holder is None:
@@ -1208,38 +1230,53 @@ def set_button_label(root: dict, container: str, old: str, new: str,
         return False
 
     label = find(target, "按钮文字")
+    if label is None:
+        return False
+
     tb = box(target)
-    style = (label or {}).get("style") or {}
+    style = label.get("style") or {}
     size = float(style.get("fontSize", 13))
     text_w = len(new) * size
 
-    if min_width is not None and float(tb.get("width", 0)) < min_width:
-        extra = min_width - float(tb.get("width", 0))
-        tb["width"] = min_width
-        if label is not None:
-            lb = box(label)
-            lb["x"] = float(lb.get("x", 0)) + extra / 2
-            lb["width"] = text_w
-        # 按钮内若有图标（如 file-output），与文字一起右移半个加宽量，
-        # 否则加宽后文字居中、图标还留在原处，两者会叠在一起。
-        for icon in target.get("children", []) or []:
-            if icon.get("type") == "FRAME":
-                shift(icon, extra / 2, 0)
-        index = holder["children"].index(target)
-        for sibling in holder["children"][index + 1:]:
-            shift(sibling, extra, 0)
-        hb = box(holder)
-        hb["width"] = float(hb.get("width", 0)) + extra
-    elif label is not None:
-        lb = box(label)
-        # 按钮宽度不变时，把文字在原框内重新居中：
-        # 旧文字左对齐贴框内边距，改短后要往中间挪才不会偏左。
-        old_w = len(old) * size
-        lb["x"] = float(lb.get("x", 0)) + (old_w - text_w) / 2
-        lb["width"] = text_w
+    icon = next((c for c in target.get("children", []) or []
+                 if c.get("type") == "FRAME" and find(c, "Vector") is not None), None)
+    icon_w = float(box(icon).get("width", 0)) if icon else 0.0
+    gap = 10.0 if icon else 0.0
+    pad = 20.0
 
-    if label is not None:
-        set_text(label, new)
+    content_w = icon_w + gap + text_w
+    new_w = max(float(tb.get("width", 0)),
+                min_width or 0.0,
+                content_w + pad)
+
+    old_left = float(tb.get("x", 0))
+    extra = new_w - float(tb.get("width", 0))
+    tb["width"] = new_w
+
+    # 同行后续按钮一并右移，间距才不变
+    index = holder["children"].index(target)
+    for sibling in holder["children"][index + 1:]:
+        shift(sibling, extra, 0)
+
+    # 内容整体居中
+    # 内容整体居中：图标在最左，文字紧随其后，两者之间留 gap。
+    content_x = old_left + (new_w - content_w) / 2
+    button_y = float(tb.get("y", 0))
+    button_h = float(tb.get("height", 44))
+    if icon is not None:
+        ib = box(icon)
+        ib["x"] = content_x
+        ib["y"] = button_y + (button_h - float(ib.get("height", 18))) / 2
+        align_icon_vector(icon)
+    lb = box(label)
+    lb["x"] = content_x + icon_w + gap
+    lb["width"] = text_w
+    lb["y"] = button_y + (button_h - float(lb.get("height", 17))) / 2
+
+    hb = box(holder)
+    hb["width"] = float(hb.get("width", 0)) + extra
+
+    set_text(label, new)
     return True
 
 
@@ -1302,8 +1339,53 @@ def patch_unlock_picker(root: dict) -> None:
 
 
 def patch_master_key_page(root: dict) -> None:
-    """02 主密钥管理与详情：「导出备份」改为「导出主密钥」。"""
+    """02 主密钥管理与详情：「导出备份」改为「导出主密钥」。
+
+    详情卡的说明文字（33 字）在 476 宽的框里放不下，会被 clipsContent
+    裁掉尾巴。这里把两栏宽度按 380 + 24 + 524 重新分配成 420 + 24 + 484，
+    让最长的一行说明能完整显示。
+    """
     patch_desktop_common(root, "主密钥管理")
+
+    area = find(root, "主密钥工作区")
+    if area is None:
+        return
+    children = area.get("children", []) or []
+    listing = next((c for c in children if c.get("name") == "主密钥列表"), None)
+    # 「内容卡片」这名字在工作区里只有右栏那一个（列表内部的卡片嵌在
+    # 主密钥列表里，不是工作区的直属子节点），按直属子节点取即可。
+    detail = next((c for c in children if c.get("name") == "内容卡片"), None)
+    if listing is None or detail is None:
+        return
+
+    area_w = float(box(area).get("width", 0))
+    # 详情卡要能放下 33 字的最长说明（约 430px）再加内边距，故给到 520。
+    detail_w = 520.0
+    list_w = area_w - detail_w - 24.0
+
+    lb, db = box(listing), box(detail)
+    shift(detail, float(lb.get("x", 0)) + list_w + 24.0 - float(db.get("x", 0)), 0)
+    lb["width"] = list_w
+    db["width"] = detail_w
+    _widen(listing, list_w - 380.0)
+    _widen(detail, detail_w - 524.0)
+    # 「详情操作」本身没有 auto-layout，_widen 不会把宽度传下去，
+    # 这里手动对齐到卡片内边距，保证按钮不会溢出。
+    actions = find(detail, "详情操作")
+    if actions is not None:
+        ab = box(actions)
+        ab["x"] = float(db.get("x", 0)) + 24.0
+        ab["width"] = detail_w - 48.0
+
+    # 这句 33 字说明在 472 宽内放不下（会被 clipsContent 裁掉尾巴），
+    # 删掉「密码丢失将无法解密」——安全设置页已有同样的提醒。
+    for node in walk_all(detail):
+        if node.get("type") == "TEXT" and node.get("characters", "").startswith(
+                "随机生成的主密钥，由主密钥密码派生的 KEK"):
+            set_text(node, "随机生成的主密钥，由主密钥密码派生的 KEK 加密后保存在本地。")
+
+    # 按钮文案最后再改：详情卡加宽会挪动「详情操作」的位置，
+    # 先改文案再挪位置会让图标与文字的相对关系错位。
     set_button_label(root, "详情操作", "导出备份", "导出主密钥", min_width=132.0)
 
 

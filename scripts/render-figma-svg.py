@@ -460,7 +460,9 @@ def export_png(svg_path: Path, scale: int = 2) -> Path | None:
 def main() -> int:
     parser = argparse.ArgumentParser(description="把 Figma JSON 渲染为 SVG 设计图")
     parser.add_argument("nodes", nargs="*", help="只渲染指定节点 ID（默认全部）")
-    parser.add_argument("--png", action="store_true", help="额外导出 2 倍 PNG")
+    parser.add_argument("--png", action="store_true", help="额外导出 PNG 预览")
+    parser.add_argument("--boards", nargs="*", default=[],
+                        help="只渲染指定画板编号，如 --boards 04 05")
     parser.add_argument("--no-patch", action="store_true", help="跳过设计修改，直接渲染 Figma 原始树")
     args = parser.parse_args()
 
@@ -469,7 +471,15 @@ def main() -> int:
     ui_patches.load_icon_library(canvas)
 
     boards = BOARDS
-    if args.nodes:
+    if args.boards:
+        # 按画板编号（01 / 14 …）筛选。04 与 05 共用同一个 Figma 源节点，
+        # 只按节点 ID 筛选会一次画出两张，无法单独重渲其中一张。
+        wanted = {b if b.startswith("#") else f"#{b}" for b in args.boards}
+        picked = [b for b in boards if f"#{b[0]}" in wanted]
+        if not picked:
+            sys.exit(f"未找到画板：{sorted(wanted)}")
+        boards = picked
+    elif args.nodes:
         wanted = set(args.nodes)
         boards = [b for b in boards if b[2] in wanted]
         if not boards:
