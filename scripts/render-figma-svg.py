@@ -380,6 +380,53 @@ def render_board(node: dict) -> tuple[str, float, float]:
 # --------------------------------------------------------------------------
 # 自检
 # --------------------------------------------------------------------------
+def check_overflow(svg: str, name: str) -> str | None:
+    """硬门禁：任何绘制元素的横向范围都不得越出 viewBox。
+
+    补丁改尺寸后若没让 auto-layout 重算，元素会被推到画板外——
+    表现是文字飞出画布、按钮叠在标题上。
+
+    只检查 **rect 与 path**：文字宽度依赖字体度量，用「字符数 × 字号」
+    估算会把所有中文标题都误判成溢出（中文全宽、字距还有 letterSpacing），
+    门禁一旦误报就等于没有门禁。
+    """
+    try:
+        root = ET.fromstring(svg)
+    except ET.ParseError:
+        return None
+    parts = (root.get("viewBox") or "").split()
+    if len(parts) != 4:
+        return None
+    width = float(parts[2])
+    bad: list[str] = []
+    for element in root.iter():
+        tag = element.tag.split("}")[-1]
+        if tag not in ("rect", "path", "image", "use"):
+            continue
+        try:
+            x = float(element.get("x", "0"))
+            w = float(element.get("width", "0"))
+        except ValueError:
+            continue
+        if tag == "rect" and element.get("width") in (None, ""):
+            continue
+        if tag == "path":
+            # path 用 transform 里的 translate 定位，宽度由 d 决定，
+            # 交给上层渲染器保证，这里只查 translate 后的起点
+            transform = element.get("transform") or ""
+            match = re.search(r"translate\(\s*(-?[\d.]+)[ ,]", transform)
+            if match and abs(float(match.group(1))) > width + 1:
+                bad.append(f"path@x={float(match.group(1)):.0f}")
+            continue
+        if x < -1 or x + w > width + 1:
+            bad.append(f"{tag}@x={x:.0f}..{x + w:.0f}")
+        if len(bad) >= 4:
+            break
+    if not bad:
+        return None
+    return f"[{name}] 元素越出画板（viewBox 宽 {width:.0f}）：" + "; ".join(bad)
+
+
 def validate(svg: str, expected_text: int, name: str) -> None:
     """硬门禁：XML 必须合法，文字节点数必须与 JSON 一致。"""
     try:
@@ -395,6 +442,9 @@ def validate(svg: str, expected_text: int, name: str) -> None:
     bad = re.search(r'<rect[^>]*?/>\s+(?:stroke|opacity|filter)=', svg)
     if bad:
         sys.exit(f"[{name}] 存在畸形 XML：{bad.group(0)[:60]}")
+    overflow = check_overflow(svg, name)
+    if overflow:
+        sys.exit(overflow)
 
 
 # --------------------------------------------------------------------------
