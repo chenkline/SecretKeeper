@@ -35,6 +35,9 @@ def _solid(color: dict) -> list[dict]:
 # ---------------------------------------------------------------------------
 def find(node: dict, name: str) -> dict | None:
     """\u6309\u540d\u79f0\u6df1\u5ea6\u9996\u5148\u67e5\u627e\u8282\u70b9\u3002"""
+    # None \u5b50\u8282\u70b9\u662f\u6784\u9020\u753b\u677f\u65f6\u7559\u4e0b\u7684\u7a7a\u69fd\uff0c\u904d\u5386\u65f6\u8df3\u8fc7\u3002
+    if node is None:
+        return None
     if node.get("name") == name:
         return node
     for child in node.get("children", []) or []:
@@ -46,6 +49,8 @@ def find(node: dict, name: str) -> dict | None:
 
 def walk_all(node: dict):
     """\u9012\u5f52\u904d\u5386\u6240\u6709\u8282\u70b9\u3002"""
+    if node is None:
+        return
     yield node
     for child in node.get("children", []) or []:
         yield from walk_all(child)
@@ -53,6 +58,8 @@ def walk_all(node: dict):
 
 def find_parent(node: dict, target: dict) -> dict | None:
     """\u627e\u5230 target \u7684\u7236\u8282\u70b9\u3002"""
+    if node is None:
+        return None
     for child in node.get("children", []) or []:
         if child.get("id") == target.get("id"):
             return node
@@ -63,7 +70,7 @@ def find_parent(node: dict, target: dict) -> dict | None:
 
 
 def box(node: dict) -> dict:
-    return node.setdefault("absoluteBoundingBox", {})
+    return node.setdefault("absoluteBoundingBox", {}) if node else {}
 
 
 def shift(node: dict, dx: float, dy: float) -> None:
@@ -1182,9 +1189,10 @@ def set_button_label(root: dict, container: str, old: str, new: str,
         hb["width"] = float(hb.get("width", 0)) + extra
     elif label is not None:
         lb = box(label)
+        # 按钮宽度不变时，把文字在原框内重新居中：
+        # 旧文字左对齐贴框内边距，改短后要往中间挪才不会偏左。
         old_w = len(old) * size
-        if text_w > old_w:
-            lb["x"] = float(lb.get("x", 0)) - (text_w - old_w) / 2
+        lb["x"] = float(lb.get("x", 0)) + (old_w - text_w) / 2
         lb["width"] = text_w
 
     if label is not None:
@@ -1215,18 +1223,26 @@ def patch_desktop_common(root: dict) -> None:
 
 
 def patch_unlock_picker(root: dict) -> None:
-    """01 解锁与锁定：默认主密钥改为可选主密钥。"""
-    patch_desktop_common(root)
+    """01 解锁与锁定：默认主密钥改为可选主密钥。
 
-    title = find(root, "标题")
-    if title is not None:
-        set_text(title, "解锁本机密匣")
+    顺带删掉页脚的「基础版 / v0.0.1 / 文件备份」与锁定说明——
+    版本号在安全设置页已经能查到，锁定说明讲的是隐藏明文与密钥
+    轮换这些实现细节，不该出现在用户面前。
+    """
+    patch_desktop_common(root)
+    patch_unlock_lock_note(root)
+    for node in walk_all(root):
+        if node.get("type") != "TEXT":
+            continue
+        if node.get("name") == "版本信息":
+            set_text(node, "v0.0.1")
+
     for node in walk_all(root):
         if node.get("type") != "TEXT":
             continue
         chars = node.get("characters", "")
-        if chars == "输入默认主密钥密码，解锁本机的密匣":
-            set_text(node, "选择主密钥，输入主密钥密码解锁")
+        if chars == "输入默认主密钥密码，解锁本机的密匣。":
+            set_text(node, "选择主密钥，输入主密钥密码解锁。")
         elif chars == "默认主密钥密码":
             set_text(node, "主密钥密码")
 
@@ -1296,34 +1312,104 @@ def _move_export_tip(root: dict) -> None:
     grow_to_fit(find(area, "内容卡片") or actions, pad=24.0)
 
 
-def _align_pwd_fields(root: dict) -> None:
-    """把 04 的密码框改成与 05 一致的样式。
+def _make_pwd_field(x: float, y: float, w: float, label: str, hint: str) -> dict:
+    """构造一个与 05 导出页完全同款的密码字段。
 
-    04 的密码框原先是手搭的：宽度按 580 算（扣掉卡片内边距应为 532）、
-    缺 eye-off 图标、输入内容与边框贴边。05 是正规 auto-layout 结构，
-    直接复用它的字段节点最省事，也不会引入手工拼坐标的偏差。
+    04 原来的密码框是手搭的：输入区没有描边、没有 eye-off 图标、
+    输入内容贴着边框，跟界面上其它密码框不是一个样式。这里直接按
+    05 的结构（标签 / 带描边的输入区 / 掩码 + eye-off / 辅助说明）重建，
+    保证两个页面的密码框看起来是同一套控件。
     """
-    area = find(root, "导入工作区")
-    if area is None:
-        return
-    donor_area = find(root, "导出工作区")
-    if donor_area is None:
+    label_h = 21.0
+    input_h = 46.0
+    hint_h = 19.0
+    total = label_h + 10.0 + input_h + 8.0 + hint_h
+
+    field = rect_node("表单字段", x, y, w, total, None, 0.0)
+    field["layoutMode"] = "VERTICAL"
+    field["itemSpacing"] = 10.0
+    field["children"] = [
+        text_node("字段标签", label, x, y, 13.0, INK, width=w),
+    ]
+
+    input_box = rect_node("输入区域", x, y + label_h + 10.0, w, input_h,
+                          WHITE, 8.0, stroke=BORDER)
+    input_box["layoutMode"] = "HORIZONTAL"
+    input_box["counterAxisAlignItems"] = "CENTER"
+    input_box["paddingLeft"] = 14.0
+    input_box["paddingRight"] = 14.0
+    inner_w = w - 14.0 * 2
+    masked = text_node("输入内容", "\u2022" * 11, x + 14.0, y + label_h + 22.0,
+                       15.0, INK, width=inner_w - 26.0)
+    eye = clone_icon("eye-off", x + w - 14.0 - 18.0, y + label_h + 24.0, MUTED)
+    children = [masked]
+    if eye is not None:
+        eye["cornerRadius"] = 0
+        for sub in walk_all(eye):
+            sub["cornerRadius"] = 0
+        children.append(eye)
+    input_box["children"] = children
+
+    hint_y = y + label_h + 10.0 + input_h + 8.0
+    field["children"].append(input_box)
+    field["children"].append(text_node("字段提示", hint, x, hint_y, 12.0, MUTED, width=w))
+    return field
+
+
+def _align_pwd_fields(root: dict) -> None:
+    """把 04 重排为：文件选择 -> 两个密码框 -> 操作按钮，并通栏。
+
+    build_import_master_key 生成的子节点沿用 05 窄栏（580）的坐标，
+    通栏后 x 与宽度都要重算；纵向则统一用一个游标排下去，
+    避免「按钮压住最后一个字段」这类重叠。
+    """
+    card = find(find(root, "导入工作区"), "内容卡片")
+    if card is None:
         return
 
-    fields = [c for c in (area.get("children", []) or [])
+    card_x = float(box(card).get("x", 0)) + 24.0
+    card_w = float(box(card).get("width", 0)) - 48.0
+    slot = next((c for c in (card.get("children", []) or [])
+                 if c.get("name") == "文件选择"), None)
+    fields = [c for c in (card.get("children", []) or [])
               if c.get("name") == "表单字段"]
-    donors = [c for c in (donor_area.get("children", []) or [])
-              if c.get("name") == "表单字段"]
-    if not fields or len(donors) < len(fields):
+    actions = next((c for c in (card.get("children", []) or [])
+                    if c.get("name") == "导入操作"), None)
+    if slot is None or len(fields) != 2 or actions is None:
         return
 
-    card = area["children"][0]
-    card_w = float(box(card).get("width", 0))
-    for field, donor in zip(fields, donors[1:] if len(donors) > len(fields) else donors):
-        replacement = copy.deepcopy(donor)
-        place(card, replacement, x=float(box(card).get("x", 0)) + 24.0)
-        _widen(replacement, card_w - 24.0 * 2 - float(box(replacement).get("width", 0)))
-        replace_child(card, field, replacement)
+    top = float(box(card).get("y", 0)) + 24.0
+    cursor = top
+
+    # 「文件选择」是手搭的绝对定位块，没有 auto-layout，_widen 对它无效，
+    # 宽度与右侧按钮要自己算。
+    sb = box(slot)
+    shift(slot, card_x - float(sb.get("x", 0)), cursor - float(sb.get("y", 0)))
+    sb["width"] = card_w
+    pick = next((c for c in slot.get("children", []) or []
+                 if c.get("name") == "操作按钮"), None)
+    if pick is not None:
+        # 只加宽文件信息文本，按钮是 HUG 宽度，不能跟着撑开。
+        for text_node in slot.get("children", []) or []:
+            if text_node.get("type") == "TEXT":
+                box(text_node)["width"] = card_w - 200.0
+        pb = box(pick)
+        shift(pick, card_x + card_w - float(pb.get("x", 0)) - float(pb.get("width", 0)), 0)
+    cursor += float(sb.get("height", 0)) + 24.0
+
+    specs = (("文件保护密码", "导出时为这份备份设定的密码。"),
+             ("新的主密钥密码", "为本机保存的主密钥新设密码。"))
+    for target, (label, hint) in zip(fields, specs):
+        field = _make_pwd_field(card_x, cursor, card_w, label, hint)
+        replace_child(card, target, field)
+        cursor += float(box(field).get("height", 0)) + 20.0
+
+    ab = box(actions)
+    shift(actions, card_x - float(ab.get("x", 0)), cursor - float(ab.get("y", 0)))
+    ab["width"] = card_w
+    cursor += float(ab.get("height", 0)) + 24.0
+
+    grow_to_fit(card, pad=0.0, min_h=cursor - float(box(card).get("y", 0)))
 
 
 def patch_secret_add_page(root: dict) -> None:
@@ -1671,34 +1757,38 @@ def patch_mobile_security(root: dict) -> None:
 # \u5206\u53d1
 # ---------------------------------------------------------------------------
 # \u6bcf\u5f20\u753b\u677f\u9700\u8981\u7684\u4fee\u6539\uff1a\u952e\u662f\u753b\u677f\u7684\u89d2\u8272\uff08\u54ea\u4e2a\u9875\u9762\u6b63\u5728\u88ab\u67e5\u770b\uff09\u3002
+# 每张画板需要的修改：键是画板编号（哪张页面正在被查看）。
+#
+# 必须按编号而不是节点 ID——04 导入主密钥与 05 导出主密钥在 Figma 里
+# 共用同一个源节点 3:27603，两者要的 patch 完全不同。
 _PATCHES: dict[str, list[Callable[[dict], None]]] = {
     # \u684c\u9762\u7aef
-    "3:26936": [patch_unlock_picker],                              # 01 \u89e3\u9501\u4e0e\u9501\u5b9a
-    "3:27258": [patch_master_key_page],                             # 02 \u4e3b\u5bc6\u94a5\u7ba1\u7406
-    "3:27385": [patch_generate_page],                               # 03 \u751f\u6210\u4e3b\u5bc6\u94a5
-    "3:27603": [patch_export_page],                                 # 05 \u5bfc\u51fa\u4e3b\u5bc6\u94a5
-    "3:26990": [patch_secret_page],                                 # 06 \u673a\u5bc6\u4fe1\u606f\u7ba1\u7406
-    "3:27146": [patch_secret_add_page],                             # 07 \u65b0\u589e\u673a\u5bc6\u4fe1\u606f
-    "3:27493": [patch_secret_import_page],                          # 08 \u5bfc\u5165\u673a\u5bc6\u4fe1\u606f
-    "3:27713": [patch_security_page],                                # 09 \u5b89\u5168\u8bbe\u7f6e
+    "01": [patch_unlock_picker],
+    "02": [patch_master_key_page],
+    "03": [patch_generate_page],
+    "04": [patch_import_page],
+    "05": [patch_export_page],
+    "06": [patch_secret_page],
+    "07": [patch_secret_add_page],
+    "08": [patch_secret_import_page],
+    "09": [patch_security_page],
     # \u79fb\u52a8\u7aef
-    "3:27821": [patch_mobile_unlock],                               # 10 \u89e3\u9501
-    "3:28135": [patch_mobile_master_keys],                          # 11 \u4e3b\u5bc6\u94a5\u7ba1\u7406
-    "3:27863": [patch_mobile_secret_list],
-    "3:27971": [lambda r: patch_mobile_detail(r, True)],            # 15 \u8be6\u60c5
-    "3:28025": [lambda r: patch_mobile_detail(r, False)],           # 16 \u7f3a\u5931\u4e3b\u5bc6\u94a5\u8be6\u60c5
-    "3:28077": [patch_mobile_secret_add],                           # 17 \u65b0\u589e\u673a\u5bc6\u4fe1\u606f
-    "3:28252": [patch_mobile_secret_import],                        # 18 \u5bfc\u5165\u673a\u5bc6\u4fe1\u606f
-    "3:28300": [patch_mobile_export_delete],                        # 19 \u5bfc\u51fa\u4e0e\u5220\u9664
-    "3:28359": [patch_mobile_security],                             # 20 \u5b89\u5168\u8bbe\u7f6e
+    "10": [patch_mobile_unlock],
+    "11": [patch_mobile_master_keys],
+    "14": [patch_mobile_secret_list],
+    "15": [lambda r: patch_mobile_detail(r, True)],
+    "16": [lambda r: patch_mobile_detail(r, False)],
+    "17": [patch_mobile_secret_add],
+    "18": [patch_mobile_secret_import],
+    "19": [patch_mobile_export_delete],
+    "20": [patch_mobile_security],
 }
 
 _DERIVED = {
     # \u5bfc\u5165\u4e3b\u5bc6\u94a5\u753b\u677f\u4ee5\u300c\u5bfc\u51fa\u4e3b\u5bc6\u94a5\u300d\u4e3a\u5143\u67c4
-    "04": ("3:27603", build_import_master_key),
+    "04": build_import_master_key,
     # \u79fb\u52a8\u7aef\u300c\u751f\u6210\u4e3b\u5bc6\u94a5\u300d\u4e0d\u5e26 TAB\uff0c\u5355\u72ec\u6784\u5efa
-    "12": ("3:28205", build_mobile_generate_key),
-    "13": ("3:28205", None),
+    "12": build_mobile_generate_key,
 }
 
 
@@ -1721,9 +1811,7 @@ def build_board(canvas: dict, number: str, node_id: str, apply_patches: bool = T
 
     node = copy.deepcopy(find_top(canvas, node_id))
     if number in _DERIVED:
-        builder = _DERIVED[number][1]
-        if builder is not None:
-            node = builder(node)
-    for patch in _PATCHES.get(node_id, []):
+        node = _DERIVED[number](node)
+    for patch in _PATCHES.get(number, []):
         patch(node)
     return node

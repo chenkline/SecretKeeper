@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="390" height="868" viewBox="0 0 390 868">
 <title>移动端 · 生成主密钥</title>
-<defs><clipPath id="clip-skmobilegeneratekeyx1167"><rect x="0" y="0" width="390" height="844" rx="24"/></clipPath><clipPath id="clip-skmx1186"><rect x="20" y="-2272" width="350" height="46" rx="8"/></clipPath><clipPath id="clip-skmx1191"><rect x="20" y="-2175" width="350" height="46" rx="8"/></clipPath><clipPath id="clip-skmx1195"><rect x="20" y="-2078" width="350" height="46" rx="8"/></clipPath><clipPath id="clip-sknx1197"><rect x="20" y="-2010" width="350" height="68" rx="8"/></clipPath><clipPath id="clip-skbx1200"><rect x="111" y="-1934" width="168" height="44" rx="8"/></clipPath><clipPath id="clip-328250x1203"><rect x="139" y="830" width="112" height="4" rx="100"/></clipPath></defs>
+<defs><clipPath id="clip-skmobilegeneratekeyx1150"><rect x="0" y="0" width="390" height="844" rx="24"/></clipPath><clipPath id="clip-skmx1169"><rect x="20" y="-2272" width="350" height="46" rx="8"/></clipPath><clipPath id="clip-skmx1174"><rect x="20" y="-2175" width="350" height="46" rx="8"/></clipPath><clipPath id="clip-skmx1178"><rect x="20" y="-2078" width="350" height="46" rx="8"/></clipPath><clipPath id="clip-sknx1180"><rect x="20" y="-2010" width="350" height="68" rx="8"/></clipPath><clipPath id="clip-skbx1183"><rect x="111" y="-1934" width="168" height="44" rx="8"/></clipPath><clipPath id="clip-328250x1186"><rect x="139" y="830" width="112" height="4" rx="100"/></clipPath></defs>
 <rect width="390" height="868" fill="#FFFFFF"/>
-<g clip-path="url(#clip-skmobilegeneratekeyx1167)"><rect x="0" y="0" width="390" height="844" rx="24" fill="#F3F5F6" stroke="#DFE5E7" stroke-width="1"/>
+<g clip-path="url(#clip-skmobilegeneratekeyx1150)"><rect x="0" y="0" width="390" height="844" rx="24" fill="#F3F5F6" stroke="#DFE5E7" stroke-width="1"/>
 <rect x="0" y="0" width="390" height="44" rx="0" fill="none"/>
 <text font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="700" fill="#1D2C31" text-anchor="start" x="24" y="26.94">9:41</text>
 <rect x="301" y="10.5" width="65" height="23" rx="0" fill="none"/>
@@ -22,22 +22,22 @@
 <text font-family="Noto Sans SC, sans-serif" font-size="13" font-weight="400" fill="#718087" text-anchor="start" x="20" y="-2321.44">在本机生成一把随机 RSA-2048 主密钥。</text>
 <rect x="20" y="-2301" width="350" height="97" rx="0" fill="none"/>
 <text font-family="Noto Sans SC, sans-serif" font-size="13" font-weight="400" fill="#1D2C31" text-anchor="start" x="20" y="-2286.44">主密钥名称（可选）</text>
-<g clip-path="url(#clip-skmx1186)"><rect x="20" y="-2272" width="350" height="46" rx="8" fill="#FFFFFF"/>
+<g clip-path="url(#clip-skmx1169)"><rect x="20" y="-2272" width="350" height="46" rx="8" fill="#FFFFFF"/>
 <text font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="400" fill="#718087" text-anchor="start" x="34" y="-2243.32">可以留空</text></g>
 <text font-family="Noto Sans SC, sans-serif" font-size="12" font-weight="400" fill="#718087" text-anchor="start" x="20" y="-2227.56">名称仅用于辨识，不参与加密。</text>
 <rect x="20" y="-2204" width="350" height="75" rx="0" fill="none"/>
 <text font-family="Noto Sans SC, sans-serif" font-size="13" font-weight="400" fill="#1D2C31" text-anchor="start" x="20" y="-2189.44">主密钥密码</text>
-<g clip-path="url(#clip-skmx1191)"><rect x="20" y="-2175" width="350" height="46" rx="8" fill="#FFFFFF"/>
+<g clip-path="url(#clip-skmx1174)"><rect x="20" y="-2175" width="350" height="46" rx="8" fill="#FFFFFF"/>
 <text font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="400" fill="#718087" text-anchor="start" x="34" y="-2146.32">•••••••••••</text></g>
 <rect x="20" y="-2107" width="350" height="75" rx="0" fill="none"/>
 <text font-family="Noto Sans SC, sans-serif" font-size="13" font-weight="400" fill="#1D2C31" text-anchor="start" x="20" y="-2092.44">确认主密钥密码</text>
-<g clip-path="url(#clip-skmx1195)"><rect x="20" y="-2078" width="350" height="46" rx="8" fill="#FFFFFF"/>
+<g clip-path="url(#clip-skmx1178)"><rect x="20" y="-2078" width="350" height="46" rx="8" fill="#FFFFFF"/>
 <text font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="400" fill="#718087" text-anchor="start" x="34" y="-2049.32">•••••••••••</text></g>
-<g clip-path="url(#clip-sknx1197)"><rect x="20" y="-2010" width="350" height="68" rx="8" fill="#FFF7E3"/>
+<g clip-path="url(#clip-sknx1180)"><rect x="20" y="-2010" width="350" height="68" rx="8" fill="#FFF7E3"/>
 <text font-family="Noto Sans SC, sans-serif" font-size="13" font-weight="400" fill="#1D2C31" text-anchor="start" x="34" y="-1983.44">请妥善记住主密钥密码</text>
 <text font-family="Noto Sans SC, sans-serif" font-size="12" font-weight="400" fill="#718087" text-anchor="start" x="34" y="-1962.56">密码丢失无法解密，密匣无法为你重置密码。</text></g>
-<g clip-path="url(#clip-skbx1200)"><rect x="111" y="-1934" width="168" height="44" rx="8" fill="#14786E"/>
+<g clip-path="url(#clip-skbx1183)"><rect x="111" y="-1934" width="168" height="44" rx="8" fill="#14786E"/>
 <text font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="400" fill="#FFFFFF" text-anchor="start" x="135" y="-1905.32">生成主密钥</text></g>
 <rect x="0" y="-1828" width="390" height="26" rx="0" fill="#FFFFFF"/>
-<g clip-path="url(#clip-328250x1203)"><rect x="139" y="830" width="112" height="4" rx="100" fill="#1D2C31"/></g></g>
+<g clip-path="url(#clip-328250x1186)"><rect x="139" y="830" width="112" height="4" rx="100" fill="#1D2C31"/></g></g>
 </svg>
