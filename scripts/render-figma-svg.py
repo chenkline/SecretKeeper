@@ -52,14 +52,15 @@ DESKTOP = [
 ]
 
 MOBILE = [
+    # 编号按操作流重排（解锁 → 主密钥 → 机密信息 → 安全设置）
     ("10", "移动端_解锁", "3:27821"),
-    ("11", "移动端_机密信息列表", "3:27863"),
-    ("12", "移动端_机密信息详情", "3:27971"),
-    ("13", "移动端_缺失主密钥详情", "3:28025"),
-    ("14", "移动端_新增机密信息", "3:28077"),
-    ("15", "移动端_主密钥管理", "3:28135"),
-    ("16", "移动端_生成主密钥", "3:28205"),
-    ("17", "移动端_导入主密钥", "3:28205"),
+    ("11", "移动端_主密钥管理", "3:28135"),
+    ("12", "移动端_生成主密钥", "3:28205"),
+    ("13", "移动端_导入主密钥", "3:28205"),
+    ("14", "移动端_机密信息列表", "3:27863"),
+    ("15", "移动端_机密信息详情", "3:27971"),
+    ("16", "移动端_缺失主密钥详情", "3:28025"),
+    ("17", "移动端_新增机密信息", "3:28077"),
     ("18", "移动端_导入机密信息", "3:28252"),
     ("19", "移动端_导出与备份删除确认", "3:28300"),
     ("20", "移动端_安全设置", "3:28359"),
@@ -440,7 +441,9 @@ def export_png(svg_path: Path, scale: int = 2) -> Path | None:
             chrome, "--headless=new", "--disable-gpu", "--no-first-run",
             f'--user-data-dir={tmp / "profile"}',  # 每次必须独占，否则会命中缓存
             f"--screenshot={png_path}",
-            f"--window-size={w * scale},{h * scale}",
+            # 窗口宽度按设计坐标给。Chrome headless 默认页面宽 800px，
+            # 若传图片尺寸而不传页面宽，SVG 左侧会留出空白，截图就像只画了左半屏。
+            f"--window-size={w + 40},{h + 40}",
             "--hide-scrollbars", "--force-device-scale-factor=1",
             str(html_path),
         ],
@@ -462,7 +465,8 @@ def main() -> int:
     args = parser.parse_args()
 
     canvas = load_canvas()
-    originals = {c["id"]: c for c in canvas.get("children", []) if c.get("id")}
+    # 图标素材库先从原始树里收集：后面部分 patch 需要克隆这些矩形。
+    ui_patches.load_icon_library(canvas)
 
     boards = BOARDS
     if args.nodes:
@@ -472,6 +476,14 @@ def main() -> int:
             sys.exit(f"未找到节点：{wanted}")
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
+    # 画板编号重排后会留下旧编号的文件。只在全量渲染时清理，
+    # 指定节点重绘单张时不能把其他画板一并删掉。
+    if not args.nodes:
+        wanted_names = {f"{n}-{f}.svg" for n, f, _ in boards}
+        for stale in OUT_DIR.glob("*.svg"):
+            if stale.name not in wanted_names:
+                stale.unlink()
+                print(f"× 删除旧例 {stale.name}")
     failures: list[str] = []
 
     for number, filename, node_id in boards:
