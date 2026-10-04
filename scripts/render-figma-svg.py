@@ -536,14 +536,15 @@ def main() -> int:
             sys.exit(f"未找到节点：{wanted}")
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    # 画板编号重排后会留下旧编号的文件。只在全量渲染时清理，
-    # 指定节点重绘单张时不能把其他画板一并删掉。
-    if not args.nodes:
-        wanted_names = {f"{n}-{f}.svg" for n, f, _ in boards}
-        for stale in OUT_DIR.glob("*.svg"):
-            if stale.name not in wanted_names:
-                stale.unlink()
-                print(f"× 删除旧例 {stale.name}")
+    # 画板编号重排后会留下旧编号的文件。清理条件是「既不在本次渲染范围、
+    # 也不在完整编号表里」——用 --boards 重绘单张时，其余画板必须原样保留。
+    full_names = {f"{n}-{f}.svg" for n, f, _ in BOARDS}
+    wanted_names = {f"{n}-{f}.svg" for n, f, _ in boards}
+    for stale in OUT_DIR.glob("*.svg"):
+        if stale.name in wanted_names or stale.name in full_names:
+            continue
+        stale.unlink()
+        print(f"× 删除旧例 {stale.name}")
     failures: list[str] = []
 
     for number, filename, node_id in boards:
