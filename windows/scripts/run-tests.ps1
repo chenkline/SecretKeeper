@@ -15,6 +15,8 @@
 param(
     [ValidateSet("x64", "arm64")]
     [string]$Architecture = "x64",
+    [ValidateSet("Debug", "Release")]
+    [string]$Configuration = "Release",
     [string]$Root = "."
 )
 
@@ -24,7 +26,7 @@ Set-Location (Join-Path $PSScriptRoot "..\..")
 try { chcp 65001 > $null } catch { }
 $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
-$buildDir = "windows\build\$Architecture"
+$buildDir = "build\windows\$Architecture\$Configuration"
 
 # 五个自检程序及其调用方式，顺序与依赖方向一致（每层只测本层及之下）。
 #

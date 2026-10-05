@@ -199,15 +199,15 @@ jobs:
       - name: 配置
         shell: pwsh
         run: |
-          cmake -S . -B build/windows -A x64
+          cmake -S . -B build/windows/x64 -A x64
       - name: 构建
         shell: pwsh
         run: |
-          cmake --build build/windows --config Release --parallel
+          cmake --build build/windows/x64 --config Release --parallel
       - name: 校验产物无第三方 DLL 依赖
         shell: pwsh
         run: |
-          $exe = "build/windows/Release/SecretKeeper.exe"
+          $exe = "build/windows/x64/Release/SecretKeeper.exe"
           if (-not (Test-Path $exe)) {
             Write-Host "::error::未产出 SecretKeeper.exe"; exit 1
           }
@@ -236,7 +236,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-ui-build
-          path: build/windows/Release/SecretKeeper.exe
+          path: build/windows/x64/Release/SecretKeeper.exe
           if-no-files-found: warn
 
   # ---------- Linux ----------
@@ -265,13 +265,13 @@ jobs:
             libxcursor-dev libxrender-dev libfontconfig1-dev libfreetype6-dev \
             libgl1-mesa-dev libglu1-mesa-dev
       - name: 配置
-        run: cmake -S . -B build/linux -G Ninja -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build/linux/x64 -G Ninja -DCMAKE_BUILD_TYPE=Release
       - name: 构建并测试
         run: |
-          cmake --build build/linux --parallel
-          ctest --test-dir build/linux --output-on-failure
+          cmake --build build/linux/x64 --parallel
+          ctest --test-dir build/linux/x64 --output-on-failure
       - name: 生成跨平台一致性探针
-        run: ./build/linux/sk_crypto_conformance | tee conformance-linux.txt
+        run: ./build/linux/x64/Release/sk_crypto_conformance | tee conformance-linux.txt
       - name: 上传一致性 transcript
         if: always()
         uses: actions/upload-artifact@v4
@@ -300,13 +300,13 @@ jobs:
         # 与 Linux job 对齐使用 Ninja。macOS runner 上 CMake 默认落到 Makefile
         # 生成器，Apple Silicon 只有 3 核，FLTK 的三百多个源文件被串行编译，
         # 整个 job 要 16 分钟；换 Ninja 后与 Linux 一样两分钟内完成。
-        run: cmake -S . -B build/macos -G Ninja -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build/macos/arm64 -G Ninja -DCMAKE_BUILD_TYPE=Release
       - name: 构建并测试
         run: |
-          cmake --build build/macos --parallel
-          ctest --test-dir build/macos --output-on-failure
+          cmake --build build/macos/arm64 --parallel
+          ctest --test-dir build/macos/arm64 --output-on-failure
       - name: 生成跨平台一致性探针
-        run: ./build/macos/sk_crypto_conformance | tee conformance-macos.txt
+        run: ./build/macos/arm64/Release/sk_crypto_conformance | tee conformance-macos.txt
       - name: 上传一致性 transcript
         if: always()
         uses: actions/upload-artifact@v4

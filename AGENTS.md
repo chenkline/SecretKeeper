@@ -49,11 +49,54 @@ Secret/
 │   ├── mbedtls/                       # mbedTLS 3.6.7
 │   ├── sqlite/                        # SQLite amalgamation
 │   └── fltk/                          # FLTK 1.4.5
-├── build/                             # 构建输出（windows/ linux/ macos/）
+├── build/                             # 构建输出（见第 2.1 节的分层结构）
 ├── android/                           # Kotlin / Jetpack Compose
 ├── ios/                               # Swift / SwiftUI
 └── .github/workflows/                 # GitHub Actions CI
 ```
+
+---
+
+## 2.1 构建产物目录（链接）
+
+统一为 `build/{platform}/{arch}/{Debug,Release}`，vendor 内置组件再下沉一层 `module`：
+
+```
+build/windows/x64/Release/            # 产物：exe 与本项目各层静态库
+build/windows/x64/Release/vendor/argon2/
+build/windows/x64/Release/vendor/mbedtls/
+build/windows/x64/Release/vendor/fltk/
+build/windows/x64/Release/vendor/sqlite/
+build/linux/x64/Debug/   build/linux/x64/Release/
+build/linux/aarch64/Debug/   build/linux/aarch64/Release/
+build/macos/arm64/Release/
+```
+
+配置命令：
+
+```
+# Windows（MSVC 多配置生成器，配置名由 CMake 自动追加）
+cmake -S . -B build/windows/x64 -A x64
+cmake --build build/windows/x64 --config Release
+ctest --test-dir build/windows/x64 -C Release
+
+# Linux / macOS（Ninja 单配置，配置名已写在目录里）
+cmake -S . -B build/linux/x64 -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build/linux/x64 --parallel
+ctest --test-dir build/linux/x64
+```
+
+两种生成器的区别：MSVC 是多配置，`ARCHIVE/RUNTIME_OUTPUT_DIRECTORY` 之后由 CMake 自动追加
+`Debug`/`Release`，所以只给到 `{arch}`；Ninja 是单配置，**必须自己带上**
+`CMAKE_BUILD_TYPE`，否则 Debug 与 Release 的产物会互相覆盖。
+
+**`build/` 下不得出现平级的临时目录**。旧版本曾在根平进出
+`windows/`、`linux/`、`macos/`、`aarch64/`、`asan/` 等十几个平级目录，与上述规则冲突，已清理。
+
+**运行时目录与文件名必须纯 ASCII 英文**。应用写入磁盘的所有路径与文件名（
+`%APPDATA%/SecretKeeper`、`keys/`、`secrets/`、`secret.db`、`*.smk`、`*.ssc`）均为 ASCII；
+**中文只能出现在界面文案与注释中**。非 ASCII 路径在 Windows 上会触发
+`ERROR_NO_UNICODE_TRANSLATION`（1113），供应商链与测试脚本的临时目录同样必须用 ASCII 名。
 
 ---
 
@@ -379,7 +422,7 @@ GitHub `windows-2022` runner 的 CNG **均不提供** RSA/ECDH/ECDSA/DH/DSA：
 | 一致性比对 | — | `scripts/compare-conformance.py` | 20 行 | 0 差异 | — |
 
 合计 **284 项自检 + 91 项向量 + 57 项探针**。五个测试目标与第 8.2 节的四层一一对应，
-依赖方向与生产代码一致。由 CMake 的 CTest 驱动（`ctest --test-dir build/<平台> -C Release`）。
+依赖方向与生产代码一致。由 CMake 的 CTest 驱动（`ctest --test-dir build/<平台>/<arch> -C Release`）。
 注意 crypto 与 serialize 两层要读仓库里的 `test-vectors/`，**必须传入仓库根路径**，
 否则读不到向量而失败。
 

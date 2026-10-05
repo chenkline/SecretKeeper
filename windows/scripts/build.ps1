@@ -35,8 +35,9 @@ Set-Location (Join-Path $PSScriptRoot "..\..")
 try { chcp 65001 > $null } catch { }
 $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
-# 中间产物按架构隔离，避免 x64 与 arm64 的同名 .obj 互相覆盖。
-$buildDir = "windows\build\$Architecture"
+# 产物目录与 CMake 保持一致：build/{platform}/{arch}/{config}。
+# 中间产物按架构与配置隔离，避免 x64/arm64、Debug/Release 的同名 .obj 互相覆盖。
+$buildDir = "build\windows\$Architecture\$Configuration"
 $objDir = Join-Path $buildDir "obj"
 New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
 New-Item -ItemType Directory -Force -Path $objDir | Out-Null
