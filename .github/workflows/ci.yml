@@ -23,7 +23,8 @@ jobs:
         run: pip install "argon2-cffi>=23.1" "cryptography>=42"
       - name: 校验向量自洽性
         run: python scripts/verify-vectors.py
-run: python scripts/check-layering.py
+      - name: 分层依赖门禁
+        run: python scripts/check-layering.py
       # 注意：不能用「重新生成后 git diff」检测向量是否被改动。
       # gen-vectors.py 中 GCM nonce 与 RSA-OAEP 种子均为随机，每次生成必然不同，
       # diff 永远失败。向量一旦提交即视为基准，任何变更必须人工评审后显式重新生成。
@@ -42,7 +43,8 @@ run: python scripts/check-layering.py
         run: pip install "argon2-cffi>=23.1" "cryptography>=42"
       - name: 校验黄金向量
         run: python scripts/verify-vectors.py
-run: python scripts/check-layering.py
+      - name: 分层依赖门禁
+        run: python scripts/check-layering.py
       - name: 定位 MSVC 环境
         shell: pwsh
         run: |
@@ -237,7 +239,8 @@ run: python scripts/check-layering.py
         run: pip install "argon2-cffi>=23.1" "cryptography>=42"
       - name: 校验黄金向量
         run: python scripts/verify-vectors.py
-run: python scripts/check-layering.py
+      - name: 分层依赖门禁
+        run: python scripts/check-layering.py
       # FLTK 在 X11 下需要这组头文件；libdecor/libdecor 会自动探测，缺失即跳过。
       - name: 安装构建依赖
         run: |
@@ -267,7 +270,8 @@ run: python scripts/check-layering.py
         run: pip install "argon2-cffi>=23.1" "cryptography>=42"
       - name: 校验黄金向量
         run: python scripts/verify-vectors.py
-run: python scripts/check-layering.py
+      - name: 分层依赖门禁
+        run: python scripts/check-layering.py
       - name: 配置
         run: cmake -S . -B build/macos -DCMAKE_BUILD_TYPE=Release
       - name: 构建并测试
@@ -288,7 +292,8 @@ run: python scripts/check-layering.py
         run: pip install "argon2-cffi>=23.1" "cryptography>=42"
       - name: 校验黄金向量
         run: python scripts/verify-vectors.py
-run: python scripts/check-layering.py
+      - name: 分层依赖门禁
+        run: python scripts/check-layering.py
       # 尚未创建 android 工程时不装 SDK —— 装 SDK 要下载数 GB 且需要接受
       # 许可协议，既慢又容易因许可步骤失败而让整个 job 变红，
       # 而此时根本没有东西需要构建。
@@ -330,7 +335,8 @@ run: python scripts/check-layering.py
         run: pip install "argon2-cffi>=23.1" "cryptography>=42"
       - name: 校验黄金向量
         run: python scripts/verify-vectors.py
-run: python scripts/check-layering.py
+      - name: 分层依赖门禁
+        run: python scripts/check-layering.py
       - name: 构建并测试（未签名）
         run: |
           if [ -d ios ]; then
