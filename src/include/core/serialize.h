@@ -1,6 +1,6 @@
 #pragma once
 
-// 机密心 - 容器格式读写
+// 机密心 - 序列化层：字节流 <-> 内存对象
 //
 // 实现 docs/03-data/数据格式与存储设计.md 定义的字节级格式。
 // 本文件是格式规范的唯一代码化表达，任何与文档不一致之处以文档为准。
@@ -18,14 +18,21 @@
 #include <string>
 #include <vector>
 
-#include "crypto.h"
 
-namespace secretkeeper::container {
+namespace secretkeeper::serialize {
 
-using crypto::Id;
-using crypto::Nonce;
-using crypto::Salt;
-using crypto::Tag;
+// 序列化层自带这些字节别名与长度，不依赖 crypto 层：
+// 本层只认字节宽度，不关心这些字节由谁生成、用于什么密码学用途。
+// 数值必须与 docs/03-data 的格式规范、与 crypto 层的同名常量一致。
+inline constexpr std::size_t kIdLength = 16;
+inline constexpr std::size_t kSaltLength = 16;
+inline constexpr std::size_t kNonceLength = 12;
+inline constexpr std::size_t kTagLength = 16;
+
+using Id = std::array<std::uint8_t, kIdLength>;
+using Salt = std::array<std::uint8_t, kSaltLength>;
+using Nonce = std::array<std::uint8_t, kNonceLength>;
+using Tag = std::array<std::uint8_t, kTagLength>;
 
 // ---- 格式常量 ----
 inline constexpr std::array<std::uint8_t, 4> kMasterKeyMagic = {'S', 'M', 'K', '1'};
@@ -110,4 +117,4 @@ std::optional<MasterKeyFile> parse_master_key(std::span<const std::uint8_t> byte
 std::optional<SecretFile> parse_secret(std::span<const std::uint8_t> bytes,
                                        ParseError* error);
 
-}  // namespace secretkeeper::container
+}  // namespace secretkeeper::serialize

@@ -1,4 +1,4 @@
-#include "hex.h"
+#include "core/store.h"
 
 namespace secretkeeper::store {
 namespace {
@@ -42,7 +42,7 @@ std::string bytes_to_hex(std::span<const std::uint8_t> bytes) {
 bool id_from_hex(std::string_view hex, Id* out) {
   if (hex.size() != kHexCharsPerId) return false;
   Id tmp{};
-  for (std::size_t i = 0; i < crypto::kIdLength; ++i) {
+  for (std::size_t i = 0; i < serialize::kIdLength; ++i) {
     const int hi = nibble(hex[i * 2]);
     const int lo = nibble(hex[i * 2 + 1]);
     if (hi < 0 || lo < 0) return false;

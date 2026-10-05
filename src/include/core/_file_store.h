@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-#include "hex.h"
+#include "core/_hex.h"
 
 namespace secretkeeper::store {
 

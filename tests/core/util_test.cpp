@@ -7,10 +7,10 @@
 #include <cstdio>
 #include <string>
 
-#include "backoff.h"
-#include "error.h"
-#include "kek_cache.h"
-#include "text.h"
+#include "core/backoff.h"
+#include "core/_error.h"
+#include "core/kek_cache.h"
+#include "core/_text.h"
 
 namespace core = secretkeeper::core;
 namespace text = secretkeeper::text;
@@ -193,39 +193,39 @@ void test_error_messages() {
   std::printf("Error messages and classification\n");
 
   // Requirement: every password failure shows the same wording.
-  check(core::message(core::Error::kPasswordWrong) == "\xe4\xb8\xbb\xe5\xaf\x86\xe9\x92\xa5\xe5\xaf\x86\xe7\xa0\x81\xe9\x94\x99\xe8\xaf\xaf",
+  check(service::message(service::Error::kPasswordWrong) == "\xe4\xb8\xbb\xe5\xaf\x86\xe9\x92\xa5\xe5\xaf\x86\xe7\xa0\x81\xe9\x94\x99\xe8\xaf\xaf",
         "password error wording matches requirement");
 
   // Only password errors feed the backoff counter.
-  check(core::is_password_error(core::Error::kPasswordWrong), "password error counts toward backoff");
-  check(!core::is_password_error(core::Error::kImportBadFormat), "bad format does not count");
-  check(!core::is_password_error(core::Error::kMasterKeyNotFound), "not-found does not count");
-  check(!core::is_password_error(core::Error::kImportMasterKeyMissing),
+  check(core::is_password_error(service::Error::kPasswordWrong), "password error counts toward backoff");
+  check(!core::is_password_error(service::Error::kImportBadFormat), "bad format does not count");
+  check(!core::is_password_error(service::Error::kMasterKeyNotFound), "not-found does not count");
+  check(!core::is_password_error(service::Error::kImportMasterKeyMissing),
         "missing master key does not count");
-  check(!core::is_password_error(core::Error::kIoError), "io error does not count");
+  check(!core::is_password_error(service::Error::kIoError), "io error does not count");
 
   // Every non-ok error must have a non-empty message; the UI shows it verbatim.
   const core::Error all[] = {
-      core::Error::kPasswordWrong,     core::Error::kRateLimited,
-      core::Error::kMasterKeyQuotaExceeded, core::Error::kMasterKeyIsDefault,
-      core::Error::kMasterKeyNotFound, core::Error::kCannotDeleteDefault,
-      core::Error::kSecretQuotaExceeded, core::Error::kSecretTooLong,
-      core::Error::kSecretNotFound,    core::Error::kEmptySecret,
-      core::Error::kImportBadFormat,   core::Error::kImportVersionTooHigh,
-      core::Error::kImportMasterKeyMissing, core::Error::kImportDecryptFailed,
-      core::Error::kImportSaveFailed,  core::Error::kImportConflict,
-      core::Error::kIoError,           core::Error::kCryptoUnsupported,
-      core::Error::kInternal,
+      service::Error::kPasswordWrong,     service::Error::kRateLimited,
+      service::Error::kMasterKeyQuotaExceeded, service::Error::kMasterKeyIsDefault,
+      service::Error::kMasterKeyNotFound, service::Error::kCannotDeleteDefault,
+      service::Error::kSecretQuotaExceeded, service::Error::kSecretTooLong,
+      service::Error::kSecretNotFound,    service::Error::kEmptySecret,
+      service::Error::kImportBadFormat,   service::Error::kImportVersionTooHigh,
+      service::Error::kImportMasterKeyMissing, service::Error::kImportDecryptFailed,
+      service::Error::kImportSaveFailed,  service::Error::kImportConflict,
+      service::Error::kIoError,           service::Error::kCryptoUnsupported,
+      service::Error::kInternal,
   };
   for (core::Error e : all) {
-    check(!core::message(e).empty(), "every error carries a message");
+    check(!service::message(e).empty(), "every error carries a message");
   }
-  check(core::message(core::Error::kOk).empty(), "ok has no message");
+  check(service::message(service::Error::kOk).empty(), "ok has no message");
 
   // Wording must be distinct where the requirement distinguishes outcomes.
-  check(core::message(core::Error::kImportBadFormat) != core::message(core::Error::kImportVersionTooHigh),
+  check(service::message(service::Error::kImportBadFormat) != service::message(service::Error::kImportVersionTooHigh),
         "bad format and version-too-high are worded differently");
-  check(core::message(core::Error::kImportMasterKeyMissing) != core::message(core::Error::kImportDecryptFailed),
+  check(service::message(service::Error::kImportMasterKeyMissing) != service::message(service::Error::kImportDecryptFailed),
         "missing master key and decrypt failure are worded differently");
 }
 

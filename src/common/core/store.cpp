@@ -1,4 +1,4 @@
-#include "index_db.h"
+#include "core/store.h"
 
 #include <sqlite3.h>
 
@@ -77,8 +77,6 @@ const char* to_string(StoreError e) {
   switch (e) {
     case StoreError::kOk: return "ok";
     case StoreError::kNotFound: return "not_found";
-    case StoreError::kQuotaExceededMasterKeys: return "quota_master_keys";
-    case StoreError::kQuotaExceededSecrets: return "quota_secrets";
     case StoreError::kInvalidArgument: return "invalid_argument";
     case StoreError::kBusy: return "busy";
     case StoreError::kIoError: return "io_error";
@@ -194,13 +192,9 @@ StoreError IndexDb::upsert_master_key(const MasterKeyRow& row) {
   if (handle_ == nullptr) return StoreError::kInternal;
   if (!is_hex32(row.master_key_id) || row.file_path.empty()) return StoreError::kInvalidArgument;
 
-  // 限额只在新增时生效；更新既有记录不得触发。
-  const bool is_new = !find_master_key(row.master_key_id).has_value();
-  if (is_new && master_key_count() >= kMaxMasterKeys) {
-    return StoreError::kQuotaExceededMasterKeys;
-  }
-
-  if (!is_new && row.created_at == 0) {
+  // 限额不在本层判定（见 store.h）：调用方 service 必须先检查。
+  // 更新既有记录时保留原 created_at（新增时 row.created_at 由 service 填当前时间）。
+  if (row.created_at == 0) {
     const std::optional<MasterKeyRow> old = find_master_key(row.master_key_id);
     if (old) {
       return upsert_master_key([&] {
@@ -289,10 +283,6 @@ StoreError IndexDb::upsert_secret(const SecretRow& row) {
   if (!is_hex32(row.secret_id) || !is_hex32(row.master_key_id) || row.file_path.empty()) {
     return StoreError::kInvalidArgument;
   }
-  if (!find_secret(row.secret_id).has_value() && secret_count() >= kMaxSecrets) {
-    return StoreError::kQuotaExceededSecrets;
-  }
-
   if (row.created_at == 0) {
     if (const std::optional<SecretRow> old = find_secret(row.secret_id)) {
       SecretRow merged = row;
@@ -515,4 +505,112 @@ StoreError IndexDb::set_meta(std::string_view key, std::string_view value) {
   return StoreError::kOk;
 }
 
+// ===========================================================================
+// MasterKeyStore / SecretStore
+//
+// 把 serialize（格式）与 FileStore / IndexDb（落盘）粘合起来。
+// 这一层是 store 层内部实现，service 只见到内存对象。
+// ===========================================================================
+
+namespace {
+
+// 由记录 ID 推出索引行所需的相对路径。
+bool save_common(FileStore& files, const std::string& rel,
+                 const std::vector<std::uint8_t>& bytes, std::string* io_err) {
+  return files.write_atomic(rel, bytes, io_err);
+}
+
+}  // namespace
+
+SaveError MasterKeyStore::save(const serialize::MasterKeyFile& file, const std::string& name,
+                               bool make_default) {
+  const std::string hex_id = bytes_to_hex(std::span<const std::uint8_t>(file.master_key_id));
+  if (hex_id.size() != kHexCharsPerId) return SaveError::kInvalidArgument;
+
+  const std::string rel = FileStore::master_key_rel_path(hex_id);
+
+  // 先落文件再登记索引：索引指向的文件必须已经存在。
+  // 反过来的话，进程在两步之间崩溃会留下指向空文件的索引行。
+  std::string io_err;
+  if (!save_common(files_, rel, serialize::serialize(file), &io_err)) {
+    return SaveError::kIoError;
+  }
+
+  MasterKeyRow row;
+  row.master_key_id = hex_id;
+  row.name = name;
+  row.file_path = rel;
+  row.mk_alg = file.mk_alg;
+  row.is_default = make_default;
+
+  const StoreError se = db_.upsert_master_key(row);
+  if (se != StoreError::kOk) {
+    // 登记失败则撤掉刚写的文件，不留孤儿。
+    std::string ignored;
+    files_.remove(rel, &ignored);
+    return SaveError::kInternal;
+  }
+  return SaveError::kOk;
+}
+
+SaveError MasterKeyStore::load(std::string_view master_key_id_hex,
+                               serialize::MasterKeyFile* out) const {
+  const std::optional<MasterKeyRow> row = db_.find_master_key(master_key_id_hex);
+  if (!row) return SaveError::kNotFound;
+
+  std::vector<std::uint8_t> bytes;
+  std::string io_err;
+  if (!files_.read(row->file_path, &bytes, &io_err)) return SaveError::kIoError;
+
+  serialize::ParseError perr = serialize::ParseError::kOk;
+  auto parsed = serialize::parse_master_key(bytes, &perr);
+  if (!parsed) return SaveError::kParseError;
+
+  *out = std::move(*parsed);
+  return SaveError::kOk;
+}
+
+SaveError SecretStore::save(const serialize::SecretFile& file) {
+  const std::string hex_id = bytes_to_hex(std::span<const std::uint8_t>(file.secret_id));
+  if (hex_id.size() != kHexCharsPerId) return SaveError::kInvalidArgument;
+
+  const std::string rel = FileStore::secret_rel_path(hex_id);
+  std::string io_err;
+  if (!save_common(files_, rel, serialize::serialize(file), &io_err)) {
+    return SaveError::kIoError;
+  }
+
+  SecretRow row;
+  row.secret_id = hex_id;
+  row.master_key_id = bytes_to_hex(std::span<const std::uint8_t>(file.master_key_id));
+  row.title = file.title;
+  row.file_path = rel;
+
+  const StoreError se = db_.upsert_secret(row);
+  if (se != StoreError::kOk) {
+    std::string ignored;
+    files_.remove(rel, &ignored);
+    return SaveError::kInternal;
+  }
+  return SaveError::kOk;
+}
+
+SaveError SecretStore::load(std::string_view secret_id_hex,
+                             serialize::SecretFile* out) const {
+  const std::optional<SecretRow> row = db_.find_secret(secret_id_hex);
+  if (!row) return SaveError::kNotFound;
+
+  std::vector<std::uint8_t> bytes;
+  std::string io_err;
+  if (!files_.read(row->file_path, &bytes, &io_err)) return SaveError::kIoError;
+
+  serialize::ParseError perr = serialize::ParseError::kOk;
+  auto parsed = serialize::parse_secret(bytes, &perr);
+  if (!parsed) return SaveError::kParseError;
+
+  *out = std::move(*parsed);
+  return SaveError::kOk;
+}
+
 }  // namespace secretkeeper::store
+

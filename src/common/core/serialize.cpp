@@ -3,11 +3,11 @@
 // 全部整数一律大端序；变长字段一律 uint32 长度前缀 + 载荷。
 // 解析器对任何畸形输入都返回明确错误码，不做"尽力猜测"。
 
-#include "container.h"
+#include "core/serialize.h"
 
 #include <cstring>
 
-namespace secretkeeper::container {
+namespace secretkeeper::serialize {
 namespace {
 
 // 顺序读取游标：任何越界读取都直接判定失败，绝不返回部分结果。
@@ -331,7 +331,7 @@ std::optional<MasterKeyFile> parse_master_key(std::span<const std::uint8_t> byte
     return st == Reader::TlvStatus::kOk;
   };
 
-  if (!read_tlv_exact(f.master_key_id.data(), crypto::kIdLength)) {
+  if (!read_tlv_exact(f.master_key_id.data(), kIdLength)) {
     return std::nullopt;
   }
   if (!read_tlv(name_bytes)) return std::nullopt;
@@ -342,7 +342,7 @@ std::optional<MasterKeyFile> parse_master_key(std::span<const std::uint8_t> byte
 
   // 直接读进 std::array。不要用中间 vector 承接固定长度字段：
   // 空 vector 的 data() 为 nullptr，会让写入越界。
-  if (!read_tlv_exact(f.salt.data(), crypto::kSaltLength)) {
+  if (!read_tlv_exact(f.salt.data(), kSaltLength)) {
     return std::nullopt;
   }
 
@@ -355,8 +355,8 @@ std::optional<MasterKeyFile> parse_master_key(std::span<const std::uint8_t> byte
   if (f.pub_key_enc_alg != kEncAlgAesGcm) {
     return fail(ParseError::kUnknownAlgorithm);
   }
-  if (!read_tlv_exact(f.pub_key_nonce.data(), crypto::kNonceLength) ||
-      !read_tlv_exact(f.pub_key_tag.data(), crypto::kTagLength) ||
+  if (!read_tlv_exact(f.pub_key_nonce.data(), kNonceLength) ||
+      !read_tlv_exact(f.pub_key_tag.data(), kTagLength) ||
       !read_tlv(f.pub_key_cipher)) {
     return std::nullopt;
   }
@@ -365,8 +365,8 @@ std::optional<MasterKeyFile> parse_master_key(std::span<const std::uint8_t> byte
   if (f.priv_key_enc_alg != kEncAlgAesGcm) {
     return fail(ParseError::kUnknownAlgorithm);
   }
-  if (!read_tlv_exact(f.priv_key_nonce.data(), crypto::kNonceLength) ||
-      !read_tlv_exact(f.priv_key_tag.data(), crypto::kTagLength) ||
+  if (!read_tlv_exact(f.priv_key_nonce.data(), kNonceLength) ||
+      !read_tlv_exact(f.priv_key_tag.data(), kTagLength) ||
       !read_tlv(f.priv_key_cipher)) {
     return std::nullopt;
   }
@@ -433,8 +433,8 @@ std::optional<SecretFile> parse_secret(std::span<const std::uint8_t> bytes,
 
 
 
-  if (!read_tlv_exact(f.secret_id.data(), crypto::kIdLength) ||
-      !read_tlv_exact(f.master_key_id.data(), crypto::kIdLength)) {
+  if (!read_tlv_exact(f.secret_id.data(), kIdLength) ||
+      !read_tlv_exact(f.master_key_id.data(), kIdLength)) {
     return std::nullopt;
   }
   if (!read_tlv(title_bytes)) return std::nullopt;
@@ -444,8 +444,8 @@ std::optional<SecretFile> parse_secret(std::span<const std::uint8_t> bytes,
   f.title.assign(title_bytes.begin(), title_bytes.end());
 
   if (!read_tlv(f.wrapped_dk) ||
-      !read_tlv_exact(f.data_nonce.data(), crypto::kNonceLength) ||
-      !read_tlv_exact(f.data_tag.data(), crypto::kTagLength) ||
+      !read_tlv_exact(f.data_nonce.data(), kNonceLength) ||
+      !read_tlv_exact(f.data_tag.data(), kTagLength) ||
       !read_tlv(f.data_cipher)) {
     return std::nullopt;
   }
@@ -454,4 +454,4 @@ std::optional<SecretFile> parse_secret(std::span<const std::uint8_t> bytes,
   return f;
 }
 
-}  // namespace secretkeeper::container
+}  // namespace secretkeeper::serialize

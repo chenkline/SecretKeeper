@@ -11,10 +11,8 @@
 #include <string>
 #include <vector>
 
-#include "container.h"
-#include "crypto.h"
+#include "core/crypto.h"
 
-namespace container = secretkeeper::container;
 
 namespace {
 
@@ -288,127 +286,6 @@ int main(int argc, char** argv) {
         std::span<const std::uint8_t>(shortwrap.data(), shortwrap.size() - 1));
     check(!bad_len.has_value(), "short wrapped key rejected");
   }
-
-  // ---------------------------------------------------- 容器格式往返
-  std::printf("Container roundtrip (SMK1 / SSC1)\n");
-  {
-    const std::string text = read_file(vec + "container-roundtrip.json");
-    check(!text.empty(), "container-roundtrip.json readable");
-
-    // --- 主密钥文件 ---
-    const std::string mk_hex = json_string(text, "fileHex");
-    check(!mk_hex.empty(), "has master key fileHex");
-    const auto mk_bytes = from_hex(mk_hex);
-    check(mk_bytes.size() > container::kHeaderSize, "master key file size sane");
-
-    container::ParseError err = container::ParseError::kOk;
-    const auto mk = container::parse_master_key(mk_bytes, &err);
-    check(mk.has_value(), std::string("master key file parsed: ") +
-                                container::to_string(err));
-    if (mk) {
-      check(mk->mk_alg == 1, "mkAlg == 1 (RSA-2048)");
-      check(to_hex(mk->master_key_id.data(), secretkeeper::crypto::kIdLength) ==
-                json_string(text, "masterKeyIdHex"),
-            "masterKeyId matches vector");
-      // 名称是 UTF-8 中文，与格式向量比对时按字节比较，
-      // 避免测试自身受控制台代码页影响。
-      static const unsigned char kWantName[] = {
-          0xE6, 0x88, 0x91, 0xE7, 0x9A, 0x84, 0xE4, 0xB8, 0xBB,
-          0xE5, 0xAF, 0x86, 0xE9, 0x92, 0xA5};
-      check(mk->name.size() == sizeof(kWantName) &&
-                std::memcmp(mk->name.data(), kWantName, sizeof(kWantName)) == 0,
-            "name matches vector");
-      check(to_hex(mk->salt.data(), secretkeeper::crypto::kSaltLength) ==
-                json_string(text, "saltHex"),
-            "salt matches vector");
-      check(mk->kdf_mem == 10240 && mk->kdf_iter == 3 && mk->kdf_par == 1,
-            "KDF params match vector");
-      check(to_hex(mk->pub_key_nonce.data(), secretkeeper::crypto::kNonceLength) ==
-                json_string(text, "pubKeyNonceHex"),
-            "pubKeyNonce matches vector");
-      check(to_hex(mk->priv_key_nonce.data(), secretkeeper::crypto::kNonceLength) ==
-                json_string(text, "privKeyNonceHex"),
-            "privKeyNonce matches vector");
-      check(mk->pub_key_nonce != mk->priv_key_nonce,
-            "pub/priv nonces differ (reuse leaks keys)");
-      // 往返必须逐字节一致
-      const auto again = container::serialize(*mk);
-      check(again.size() == mk_bytes.size() &&
-                std::memcmp(again.data(), mk_bytes.data(), again.size()) == 0,
-            "master key roundtrip is byte-identical");
-    }
-
-    // --- 机密信息文件 ---
-    const std::size_t sec_pos = text.find("secretFile");
-    const std::string sec_hex = json_string(text, "fileHex", sec_pos);
-    check(!sec_hex.empty(), "has secret fileHex");
-    const auto sec_bytes = from_hex(sec_hex);
-    container::ParseError serr = container::ParseError::kOk;
-    const auto sf = container::parse_secret(sec_bytes, &serr);
-    check(sf.has_value(), std::string("secret file parsed: ") +
-                                container::to_string(serr));
-    if (sf) {
-      check(to_hex(sf->secret_id.data(), secretkeeper::crypto::kIdLength) ==
-                json_string(text, "secretIdHex", sec_pos),
-            "secretId matches vector");
-      check(to_hex(sf->master_key_id.data(), secretkeeper::crypto::kIdLength) ==
-                json_string(text, "masterKeyIdHex", sec_pos),
-            "masterKeyId matches vector");
-      static const unsigned char kWantTitle[] = {
-          0xE6, 0xA0, 0x87, 0xE9, 0xA2, 0x98};
-      check(sf->title.size() == sizeof(kWantTitle) &&
-                std::memcmp(sf->title.data(), kWantTitle, sizeof(kWantTitle)) == 0,
-            "title matches vector");
-      check(sf->wrapped_dk.size() == secretkeeper::crypto::kRsaModulusBytes,
-            "wrappedDk length == 256");
-      check(to_hex(sf->data_nonce.data(), secretkeeper::crypto::kNonceLength) ==
-                json_string(text, "dataNonceHex", sec_pos),
-            "dataNonce matches vector");
-      const auto again = container::serialize(*sf);
-      check(again.size() == sec_bytes.size() &&
-                std::memcmp(again.data(), sec_bytes.data(), again.size()) == 0,
-            "secret roundtrip is byte-identical");
-    }
-  }
-
-  // ---------------------------------------------------- 负例：畸形输入
-  std::printf("Container negative cases\n");
-  {
-    const std::string text = read_file(vec + "negative-cases.json");
-    check(!text.empty(), "negative-cases.json readable");
-    int n = 0;
-    std::size_t pos = 0;
-    for (int guard = 0; guard < 64; ++guard) {
-      const std::string name = json_string(text, "name", pos);
-      if (name.empty()) break;
-      const std::string input_hex = json_string(text, "inputHex", pos);
-      const std::string expect = json_string(text, "expectedError", pos);
-      // 越界跳转：确保 pos 前进
-      const std::size_t after = text.find("expectedError", pos);
-      if (after == std::string::npos) break;
-      pos = after + 13;
-      ++n;
-      if (input_hex.empty()) continue;  // GCM 类向量没有容器输入
-
-      const auto bytes = from_hex(input_hex);
-      container::ParseError e1 = container::ParseError::kOk;
-      container::ParseError e2 = container::ParseError::kOk;
-      const auto as_master = container::parse_master_key(bytes, &e1);
-      const auto as_secret = container::parse_secret(bytes, &e2);
-      check(!as_master.has_value() || !as_secret.has_value(),
-            name + ": must be rejected");
-      // 只要有一条路径报出期望的错误类别即算通过
-      const bool matched =
-          (!as_master && std::string(container::to_string(e1)) == expect) ||
-          (!as_secret && std::string(container::to_string(e2)) == expect);
-      check(matched, name + ": error category should be " + expect + " (got " +
-                        container::to_string(e1) + " / " +
-                        container::to_string(e2) + ")");
-    }
-    check(n >= 10, "negative case count >= 10");
-    std::printf("  %d vectors\n", n);
-  }
-
   std::printf("\n%d checks, %d failures\n", g_checks, g_failures);
   return g_failures == 0 ? 0 : 1;
 }

@@ -10,11 +10,8 @@
 #include <string>
 #include <vector>
 
-#include "file_store.h"
-#include "hex.h"
-#include "index_db.h"
+#include "core/store.h"
 
-namespace crypto = secretkeeper::crypto;
 namespace store = secretkeeper::store;
 
 namespace {
@@ -57,7 +54,7 @@ void test_hex() {
   std::printf("Hex ID conversion\n");
 
   const std::string hex = "00112233445566778899aabbccddeeff";
-  crypto::Id id{};
+  store::Id id{};
   check(store::id_from_hex(hex, &id), "id_from_hex accepts 32 lowercase hex chars");
   check(id[0] == 0x00 && id[15] == 0xff, "id bytes match hex");
   std::string back;
@@ -65,7 +62,7 @@ void test_hex() {
   check(back == hex, "hex roundtrip is lossless");
 
   // 拒绝非法输入：长度、大写、非十六进制。
-  crypto::Id tmp{};
+  store::Id tmp{};
   check(!store::id_from_hex("00112233", &tmp), "reject short hex");
   check(!store::id_from_hex(hex + "00", &tmp), "reject long hex");
   check(!store::id_from_hex("00112233445566778899AABBCCDDEEFF", &tmp),
@@ -109,12 +106,16 @@ void test_index_db(const std::filesystem::path& dir) {
   mk2.is_default = false;
   check(db.upsert_master_key(mk2) == store::StoreError::kOk, "insert master key 2");
 
+  // 限额判定已上移到 service 层：本层对第三把主密钥照收不误。
   store::MasterKeyRow mk3 = mk;
   mk3.master_key_id = make_id(7);
   mk3.file_path = store::FileStore::master_key_rel_path(mk3.master_key_id);
-  check(db.upsert_master_key(mk3) == store::StoreError::kQuotaExceededMasterKeys,
-        "third master key rejected by quota");
-  check(db.master_key_count() == 2, "master key count stays at 2");
+  check(db.upsert_master_key(mk3) == store::StoreError::kOk,
+        "third master key accepted at store layer");
+  check(db.master_key_count() == 3, "master key count is 3");
+  check(db.delete_master_key(mk3.master_key_id) == store::StoreError::kOk,
+        "remove third master key again");
+  check(db.master_key_count() == 2, "master key count back to 2");
 
   // 更新既有记录不得触发限额。
   store::MasterKeyRow updated = mk;
@@ -161,20 +162,22 @@ void test_index_db(const std::filesystem::path& dir) {
   s16.secret_id = secret_id_at(16);
   s16.master_key_id = mk.master_key_id;
   s16.file_path = store::FileStore::secret_rel_path(s16.secret_id);
-  check(db.upsert_secret(s16) == store::StoreError::kQuotaExceededSecrets,
-        "16th secret rejected by quota");
+  // 限额判定已上移到 service 层：本层对第 16 条照收不误。
+  check(db.upsert_secret(s16) == store::StoreError::kOk,
+        "16th secret accepted at store layer");
+  check(db.secret_count() == 16, "secret count is 16");
 
   // 悬空引用合法：secrets.master_key_id 不建外键。
-  // 先腾出一个配额位，塞一条挂在 mk2 下的机密信息。
+  // 先腾出一个位置，塞一条挂在 mk2 下的机密信息。
   check(db.delete_secret(secret_id_at(1)) == store::StoreError::kOk, "free one secret slot");
-  check(db.secret_count() == 14, "one slot freed");
+  check(db.secret_count() == 15, "one slot freed");
   store::SecretRow owned_by_mk2;
   owned_by_mk2.secret_id = secret_id_at(30);
   owned_by_mk2.master_key_id = mk2.master_key_id;
   owned_by_mk2.file_path = store::FileStore::secret_rel_path(owned_by_mk2.secret_id);
   check(db.upsert_secret(owned_by_mk2) == store::StoreError::kOk,
         "insert secret owned by mk2");
-  check(db.secret_count() == 15, "back to 15 secrets");
+  check(db.secret_count() == 16, "back to 16 secrets");
 
   std::size_t dangling = 0;
   for (const auto& s : db.list_secrets()) {

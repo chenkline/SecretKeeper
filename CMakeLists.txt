@@ -222,21 +222,36 @@ set(FLTK_MSVC_RUNTIME_DLL OFF CACHE BOOL "" FORCE)
 add_subdirectory(vendor/fltk)
 
 # ---------------------------------------------------------------- 共享核心库
+# core 四层：crypto / serialize 互不依赖，store 只依赖 serialize，
+# service 依赖三者并作为 core 的唯一对外门面。
+add_library(sk_crypto STATIC src/common/core/crypto.cpp)
+target_include_directories(sk_crypto PUBLIC src/include)
+target_link_libraries(sk_crypto PUBLIC sk_mbedtls sk_argon2)
+if(SK_PLATFORM_WINDOWS)
+  # entropy_poll.c 通过 BCryptGenRandom 取平台熵。
+  target_link_libraries(sk_crypto PUBLIC bcrypt)
+endif()
+
+add_library(sk_serialize STATIC src/common/core/serialize.cpp)
+target_include_directories(sk_serialize PUBLIC src/include)
+
+add_library(sk_store STATIC
+  src/common/core/store.cpp
+  src/common/core/_file_store.cpp
+  src/common/core/_hex.cpp
+)
+target_include_directories(sk_store PUBLIC src/include)
+target_link_libraries(sk_store PUBLIC sk_serialize sk_sqlite)
+
 add_library(sk_core STATIC
-  src/common/container.cpp
-  src/common/crypto.cpp
-  src/common/hex.cpp
-  src/common/index_db.cpp
-  src/common/file_store.cpp
-  src/common/error.cpp
-  src/common/backoff.cpp
-  src/common/kek_cache.cpp
-  src/common/text.cpp
-  src/common/master_key_service.cpp
-  src/common/secret_service.cpp
+  src/common/core/service.cpp
+  src/common/core/_error.cpp
+  src/common/core/backoff.cpp
+  src/common/core/kek_cache.cpp
+  src/common/core/_text.cpp
 )
 target_include_directories(sk_core PUBLIC src/include)
-target_link_libraries(sk_core PUBLIC sk_mbedtls sk_argon2 sk_sqlite)
+target_link_libraries(sk_core PUBLIC sk_store sk_crypto sk_mbedtls sk_argon2 sk_sqlite)
 if(SK_PLATFORM_WINDOWS)
   # entropy_poll.c 通过 BCryptGenRandom 取平台熵。
   target_link_libraries(sk_core PUBLIC bcrypt)
@@ -274,21 +289,30 @@ enable_testing()
 
 # crypto / store 两层要读仓库里的 test-vectors/，因此必须传入仓库根路径；
 # core / service 两层的用例自包含，不需要参数。
-add_executable(sk_crypto_test tests/crypto_test.cpp)
-target_link_libraries(sk_crypto_test PRIVATE sk_core)
+# crypto 与 serialize 两层要读仓库里的 test-vectors/，因此必须传入仓库根路径；
+# store / service / ui 三层的用例自包含，不需要参数。
+# 每个测试目标只链接它所在层及其下层已验证的库，与生产代码的依赖方向一致。
+add_executable(sk_crypto_test tests/core/crypto_test.cpp)
+target_link_libraries(sk_crypto_test PRIVATE sk_crypto)
 add_test(NAME crypto COMMAND sk_crypto_test "${CMAKE_SOURCE_DIR}")
 
-add_executable(sk_store_test tests/store_test.cpp)
-target_link_libraries(sk_store_test PRIVATE sk_core)
-add_test(NAME store COMMAND sk_store_test "${CMAKE_SOURCE_DIR}")
+add_executable(sk_serialize_test tests/core/serialize_test.cpp)
+target_link_libraries(sk_serialize_test PRIVATE sk_serialize)
+add_test(NAME serialize COMMAND sk_serialize_test "${CMAKE_SOURCE_DIR}")
 
-add_executable(sk_core_test tests/core_test.cpp)
-target_link_libraries(sk_core_test PRIVATE sk_core)
-add_test(NAME core COMMAND sk_core_test)
+add_executable(sk_store_test tests/core/store_test.cpp)
+target_link_libraries(sk_store_test PRIVATE sk_store sk_sqlite)
+add_test(NAME store COMMAND sk_store_test)
 
-add_executable(sk_service_test tests/service_test.cpp)
+add_executable(sk_service_test tests/core/service_test.cpp)
 target_link_libraries(sk_service_test PRIVATE sk_core)
 add_test(NAME service COMMAND sk_service_test)
+
+# UI 层的纯逻辑（列表投影、黄色问号判定、文案映射）不依赖 FLTK 事件循环。
+add_executable(sk_ui_test tests/ui/view_model_test.cpp src/app/view_model.cpp)
+target_link_libraries(sk_ui_test PRIVATE sk_core)
+target_include_directories(sk_ui_test PRIVATE src/app)
+add_test(NAME ui COMMAND sk_ui_test)
 
 message(STATUS "SecretKeeper 平台: Windows=${SK_PLATFORM_WINDOWS} Linux=${SK_PLATFORM_LINUX} macOS=${SK_PLATFORM_MACOS}")
 message(STATUS "Argon2 实现: ${SK_ARGON2_IMPL}")

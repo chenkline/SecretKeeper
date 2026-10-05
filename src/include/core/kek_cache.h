@@ -21,7 +21,7 @@
 #include <span>
 #include <vector>
 
-#include "crypto.h"
+#include "core/crypto.h"
 
 namespace secretkeeper::core {
 

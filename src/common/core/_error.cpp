@@ -1,6 +1,6 @@
-#include "error.h"
+#include "core/_error.h"
 
-namespace secretkeeper::core {
+namespace secretkeeper::service {
 
 std::string_view message(Error e) {
   switch (e) {
@@ -9,6 +9,12 @@ std::string_view message(Error e) {
 
     case Error::kPasswordWrong:
       return "主密钥密码错误";
+
+    case Error::kNeedsPassword:
+      return "请输入该主密钥密码";
+
+    case Error::kLocked:
+      return "请先解锁";
 
     case Error::kRateLimited:
       // 剩余秒数由 UI 自行附加，这里只给前缀。
@@ -72,4 +78,4 @@ bool is_password_error(Error e) {
   return e == Error::kPasswordWrong;
 }
 
-}  // namespace secretkeeper::core
+}  // namespace secretkeeper::service

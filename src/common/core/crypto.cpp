@@ -9,7 +9,7 @@
 // is pure software and behaves identically on every host, which also lets the
 // CI runners exercise the RSA paths for real.
 
-#include "crypto.h"
+#include "core/crypto.h"
 
 #include <mbedtls/build_info.h>
 #include <mbedtls/ctr_drbg.h>

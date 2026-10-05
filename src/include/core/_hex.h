@@ -12,7 +12,7 @@
 #include <string_view>
 #include <vector>
 
-#include "crypto.h"
+#include "core/crypto.h"
 
 namespace secretkeeper::store {
 
