@@ -48,7 +48,12 @@ Windows 端五目标自检均已通过，**RSA 路径真实执行、0 跳过**�
 | UI 纯逻辑 | 29 |
 | 黄金向量（`scripts/verify-vectors.py`） | 91 |
 
-合计 **284 项自检 + 91 项向量**。`scripts/check-layering.py` 静态断言分层方向不被回潮。
+合计 **284 项自检 + 91 项向量 + 57 项一致性探针**。
+
+`scripts/check-layering.py` 静态断言分层方向不被回潮；
+`scripts/compare-conformance.py` 逐行比对各平台跑同一份密码学代码产出的
+transcript，证明相同输入在任何平台都得到相同字节 —— 这是向量校验做不到的，
+因为向量校验用的是另一套独立实现。
 
 ## 文档
 

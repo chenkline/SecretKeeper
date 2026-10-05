@@ -334,7 +334,7 @@ GitHub `windows-2022` runner 的 CNG **均不提供** RSA/ECDH/ECDSA/DH/DSA：
 
 ### 9.5 mbedTLS 3.6 API 坑位（已实测踩过，勿重犯）
 
-这 12 条每一条都曾导致**静默错误**——编译通过、测试通过或直接跳过，只有换库前后对照
+这 14 条每一条都曾导致**静默错误**——编译通过、测试通过或直接跳过，只有换库前后对照
 才暴露出来。换用 mbedTLS 或升级其版本时，逐条对照。
 
 | # | 坑 | 正确写法 |
@@ -351,6 +351,8 @@ GitHub `windows-2022` runner 的 CNG **均不提供** RSA/ECDH/ECDSA/DH/DSA：
 | 10 | `mbedtls_rsa_gen_key` 是 **5 参无 seed** | `(ctx, f_rng, p_rng, nbits, exponent)`；生成后 `hash_id` 留 `MBEDTLS_MD_NONE`，**必须**显式 `mbedtls_rsa_set_padding(&rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256)`，否则得到一把无法封装任何东西的密钥 |
 | 11 | GCM 错误宏无 `_DATA` 后缀 | 是 `MBEDTLS_ERR_GCM_BAD_INPUT` |
 | 12 | OAEP 是 PSA 风格签名 | 封装 `(ctx, f_rng, p_rng, label, label_len, ilen, input, output)`；解封 `(ctx, f_rng, p_rng, label, label_len, olen, input, output, output_max_len)`。空 label（`nullptr, 0`）即标准 OAEP，与 `test-vectors/rsa-oaep.json` 的 `label: null` 一致；MGF1 与 OAEP 哈希均为 SHA-256。解析后校验 `mbedtls_pk_get_type(&pk) == MBEDTLS_PK_RSA` 再显式 `set_padding`，不依赖 DER 里恢复的哈希值 |
+| 13 | `mbedtls_ctr_drbg_seed` 前必须 `mbedtls_ctr_drbg_free` | 对 live context 反复 seed 会泄漏内部 AES-CTR 状态，并把 entropy 累加器留在不一致状态，下次调用返回 `MBEDTLS_ERR_CTR_DRBG_ENTROPY_SOURCE_FAILED (-0x0038)` |
+| 14 | 单次 `mbedtls_ctr_drbg_random` 有上限 | 超过 `MBEDTLS_CTR_DRBG_MAX_REQUEST`（裁剪后 1024）返回 `MBEDTLS_ERR_CTR_DRBG_REQUEST_TOO_BIG (-0x0036)`。调用方合法地要几 KB，必须**分块**，不能靠「失败就 reseed 再重试」——重试同样超限 |
 
 **两个被 CNG 掩盖的真实 bug**（不是 mbedTLS 的坑，但同样值得记）：
 
@@ -373,8 +375,10 @@ GitHub `windows-2022` runner 的 CNG **均不提供** RSA/ECDH/ECDSA/DH/DSA：
 | UI 纯逻辑 | `sk_ui_test` | `tests/ui/view_model_test.cpp` | 29 | 0 | 0 |
 | 黄金向量 | — | `scripts/verify-vectors.py` | 91 | 0 | — |
 | 分层门禁 | — | `scripts/check-layering.py` | — | 0 违规 | — |
+| 跨端一致性探针 | `sk_crypto_conformance` | `tests/core/crypto_conformance.cpp` | 57 | 0 | — |
+| 一致性比对 | — | `scripts/compare-conformance.py` | 20 行 | 0 差异 | — |
 
-合计 **284 项自检 + 91 项向量**。五个测试目标与第 8.2 节的四层一一对应，
+合计 **284 项自检 + 91 项向量 + 57 项探针**。五个测试目标与第 8.2 节的四层一一对应，
 依赖方向与生产代码一致。由 CMake 的 CTest 驱动（`ctest --test-dir build/<平台> -C Release`）。
 注意 crypto 与 serialize 两层要读仓库里的 `test-vectors/`，**必须传入仓库根路径**，
 否则读不到向量而失败。
@@ -392,6 +396,7 @@ GitHub `windows-2022` runner 的 CNG **均不提供** RSA/ECDH/ECDSA/DH/DSA：
 | Linux (C++/FLTK) | 同一份 core 四层 + CTest | 通过 |
 | macOS (C++/FLTK) | 同一份 core 四层 + CTest（Apple Silicon） | 通过 |
 | 向量校验 | 91 项黄金向量 + 分层门禁（六个 job 均执行） | 通过 |
+| 跨平台一致性比对 | Windows/Linux/macOS 三份 transcript 逐行比对 | 通过 |
 | Android / iOS | 工程尚未创建，CI 探测后跳过 | 通过 |
 
 **本地可用 WSL 验证 Linux 与 ARM64**：本机装有 Ubuntu 24.04（WSL2）。
@@ -411,6 +416,29 @@ wsl -d Ubuntu -- bash -lc "cd /mnt/d/src/github/Secret && \
 但五个自检目标不需要界面，能独立验证 crypto / serialize / store / service。
 
 **"跳过 0" 是硬要求。** 任何一层出现 `skipped != 0` 都是构建缺陷，不是环境限制。
+
+### 9.8 三种验证的区别（不要混为一谈）
+
+| 手段 | 证明什么 | 不能证明什么 |
+|---|---|---|
+| `verify-vectors.py` | 向量本身自洽（用独立 Python 实现能重算出同样的值） | 各平台 C++ 实现是否真的对齐了向量 |
+| 五个自检目标 | 每层在本平台上功能正确 | 跨平台是否一致 |
+| 一致性探针 + 比对 | **相同输入在各平台产出相同字节** | — |
+
+前两个都无法回答「macOS 上算出来的和 Windows 上一样吗」。只有第三个能，
+因为它跑的是**实际交付的代码**并逐行比对 transcript。
+
+探针只比较**确定性**输出：
+
+- `derive_kek`：固定 (口令, 盐) → 固定 KEK，必须逐字节相同。
+- `aes_gcm_encrypt`：固定 (密钥, nonce, AAD, 明文) → 固定密文与 tag。
+  GCM 在密钥与 nonce 固定时没有随机性；nonce 由调用方给定，不从 DRBG 取。
+- `rsa_oaep_encrypt` **不可比**（OAEP 每次抽随机种子），改测解密方向与尺寸上限：
+  密文恒为 256 字节、两次加密必不同、错私钥必失败、超长明文必拒。
+- `random_bytes` / `generate_id` / `generate_rsa2048` 按设计不可比，
+  只查形状与分布（两次必不同、位平衡落在 50%±5%，能抓住恒定源）。
+
+新增密码学代码后，除了跑向量，还必须跑一次探针并比对。
 
 ---
 
