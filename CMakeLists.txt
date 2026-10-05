@@ -264,15 +264,25 @@ option(SK_BUILD_APP "构建图形界面可执行程序" ON)
 if(SK_BUILD_APP)
   # 界面逻辑（src/app）三端完全共享；只有 platform.cpp 逐端不同，
   # 因为数据目录与文件对话框必须用各自的系统 API。
+  # 桌面三端共享同一份界面代码，只有 platform.cpp 逐端不同。
+  # src/app 下按职责分文件：theme 是视觉常量与绘制助手，widgets 是自绘控件，
+  # pages 是九个页面，app.cpp 只负责页面路由与事件循环。
+  set(SK_APP_SOURCES
+    src/app/app.cpp
+    src/app/theme.cpp
+    src/app/widgets.cpp
+    src/app/pages.cpp
+    src/app/view_model.cpp
+  )
   if(SK_PLATFORM_WINDOWS)
     set(SK_PLATFORM_DIR windows)
-    add_executable(SecretKeeper WIN32 src/app/app.cpp src/app/view_model.cpp src/windows/platform.cpp)
+    add_executable(SecretKeeper WIN32 ${SK_APP_SOURCES} src/windows/platform.cpp)
   elseif(SK_PLATFORM_MACOS)
     set(SK_PLATFORM_DIR macos)
-    add_executable(SecretKeeper src/app/app.cpp src/app/view_model.cpp src/macos/platform.cpp)
+    add_executable(SecretKeeper ${SK_APP_SOURCES} src/macos/platform.cpp)
   else()
     set(SK_PLATFORM_DIR linux)
-    add_executable(SecretKeeper src/app/app.cpp src/app/view_model.cpp src/linux/platform.cpp)
+    add_executable(SecretKeeper ${SK_APP_SOURCES} src/linux/platform.cpp)
   endif()
 
   # app.cpp include 的是 "platform.h"，故平台目录必须排在共享头文件之前。
