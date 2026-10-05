@@ -6,7 +6,7 @@
 
 | 顺序 | 文档 | 内容 |
 |---|---|---|
-| 0 | [需求原文](机密信息加密应用需求功能设计.txt) | 产品需求，已按技术决策修订 |
+| 0 | [需求原文](机密信息加密应用需求功能设计.txt) | 产品需求 |
 | 1 | [总体技术设计](01-architecture/总体技术设计.md) | 系统分层、技术选型、模块划分 |
 | 2 | [仓库结构与工程组织](01-architecture/仓库结构与工程组织.md) | monorepo 布局与各平台工程 |
 | 3 | [密码学与密钥派生设计](02-crypto/密码学与密钥派生设计.md) | 密钥层级、Argon2id、mbedTLS 实现要点、内存安全 |
@@ -19,15 +19,13 @@
 
 ## UI 设计图（`docs/ui/`）
 
-界面设计稿。**设计源是仓库内的 Figma JSON，不再依赖 Figma 在线编辑**：
-`scripts/render-figma-svg.py` 直接把 JSON 渲染为 SVG，`scripts/ui_patches.py`
-以程序方式改写设计树（菜单重构、入口归位、新增画板、插入字段）。
-改设计只需改这两个脚本并重新生成，无需回到 Figma。
+界面设计成品。设计源是仓库内的 `docs/ui/.figma-export/Page_1_0-1.json`，
+由 `scripts/render-figma-svg.py` 渲染为 SVG。视觉规则见 `ui/UI设计规范.md`。
 
 | 文件 | 内容 |
 |---|---|
 | [index.html](ui/index.html) | 预览页，21 张画板，按操作先后顺序编号 |
-| [UI设计规范](ui/UI设计规范.md) | 从 Figma JSON 提取的色彩 / 字号 / 间距 / 圆角 / 全部文案 |
+| [UI设计规范](ui/UI设计规范.md) | 色彩 / 字号 / 间距 / 圆角 / 布局 / 渲染约定 |
 | `svg/` | 21 张画板单体（01–21） |
 | `.figma-export/` | Figma REST API 原始数据，渲染源，需入库 |
 

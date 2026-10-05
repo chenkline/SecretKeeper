@@ -29,7 +29,7 @@
  .tag { font-size:11px; padding:2px 9px; border-radius:100px; font-family:"Noto Sans SC",sans-serif;
         background:#E8F4F0; color:#14786D; white-space:nowrap; }
 </style></head><body><header>
- <h1>SecretKeeper UI 设计图</h1> <div class="sub">  设计源：仓库内 <code>docs/ui/.figma-export/Page_1_0-1.json</code>（Figma REST API 原始数据），  由 <code>scripts/render-figma-svg.py</code> 直接渲染为 SVG，不依赖 Figma 在线图片。<br>  编号依据操作先后顺序（从上到下）给出。<br>  修改要点已由 <code>scripts/ui_patches.py</code> 直接写入设计树，不需要在 Figma 中编辑。 </div> <ol>  <li>解锁与锁定</li>  <li>主密钥管理：主密钥管理与详情 → 生成 → 导入 → 导出</li>  <li>机密信息管理：列表 → 新增 → 导入与密码验证</li>  <li>安全设置</li>  <li>移动端同流程的 11 张画板</li>  <li>安全状态与错误反馈说明板</li> </ol> <div class="list">
+ <h1>SecretKeeper UI 设计图</h1> <div class="sub">  设计源：<code>docs/ui/.figma-export/Page_1_0-1.json</code>，由 <code>scripts/render-figma-svg.py</code> 渲染为 SVG。<br>  编号依据操作先后顺序（从上到下）给出。视觉规则见 <code>docs/ui/UI设计规范.md</code>。 </div> <ol>  <li>解锁与锁定</li>  <li>主密钥管理：主密钥管理与详情 → 生成 → 导入 → 导出</li>  <li>机密信息管理：列表 → 新增 → 导入与密码验证</li>  <li>安全设置</li>  <li>移动端同流程的 11 张画板</li>  <li>安全状态与错误反馈说明板</li> </ol> <div class="list">
 <a href="#01">01 解锁与锁定</a>
 <a href="#02">02 主密钥管理与详情</a>
 <a href="#03">03 生成主密钥</a>
@@ -52,7 +52,7 @@
 <a href="#20">20 安全设置</a>
 <a href="#21">21 安全状态与错误反馈说明板</a>
 </div></header>
-<section id="01"><h2>01 · 桌面端 · 解锁与锁定</h2><p class="desc">启动后的锁定态与解锁流程：输入默认主密钥密码，错误时按指定秒数退避。</p></section>
+<section id="01"><h2>01 · 桌面端 · 解锁与锁定</h2><p class="desc">启动后的锁定态与解锁流程：选择一把主密钥，输入主密钥密码解锁；错误时按指定秒数退避。</p></section>
 <div class="m">
 <div class="card">
  <div class="name">01-桌面端_解锁与锁定.svg</div>
@@ -61,7 +61,7 @@
 </a>
 </div>
 </div>
-<section id="02"><h2>02 · 桌面端 · 主密钥管理与详情</h2><p class="desc">主密钥列表与详情：默认 / 备选标识、切换、删除；「导入主密钥」与「导冨备份」入口均在此页。</p></section>
+<section id="02"><h2>02 · 桌面端 · 主密钥管理与详情</h2><p class="desc">主密钥列表与详情：默认标识、切换、删除；「导入主密钥」与「导冨备份」入口均在此页。</p></section>
 <div class="m">
 <div class="card">
  <div class="name">02-桌面端_主密钥管理与详情.svg</div>
@@ -79,7 +79,7 @@
 </a>
 </div>
 </div>
-<section id="04"><h2>04 · 桌面端 · 导入主密钥</h2><p class="desc">从之前导出的备份文件恢复主密钥：选文件 → 文件保护密码 → 新的主密钥密码 → 导入为备选主密钥。</p></section>
+<section id="04"><h2>04 · 桌面端 · 导入主密钥</h2><p class="desc">从之前导出的备份文件恢复主密钥：选文件 → 文件保护密码 → 新的主密钥密码 → 导入为主密钥。</p></section>
 <div class="m">
 <div class="card">
  <div class="name">04-桌面端_导入主密钥.svg</div>

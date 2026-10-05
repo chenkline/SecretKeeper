@@ -18,7 +18,7 @@
 
 ## 2. 仓库结构
 
-单仓库多工程（monorepo），每个平台一个**独立原生工程**，不共享 UI 代码。
+单仓库多工程（monorepo）。桌面三端共用一套 C++ 业务与界面代码，移动两端各自原生实现。
 
 ```
 Secret/
@@ -32,7 +32,8 @@ Secret/
 │   ├── 04-requirements/
 │   ├── 05-development/
 │   ├── 06-roadmap/
-│   └── 07-testing/
+│   ├── 07-testing/
+│   └── ui/                            # 界面设计图与规范
 ├── src/                               # 桌面三端共享代码
 │   ├── include/                       # 跨端共享头文件
 │   ├── common/                        # 跨端共享实现（四层）
@@ -380,3 +381,5 @@ wsl -d Ubuntu -- bash -lc "cd /mnt/d/src/github/Secret && \
 | [开发环境与CI方案](docs/05-development/开发环境与CI方案.md) | 环境安装清单与 CI 设计 |
 | [版本规划与扩展预留](docs/06-roadmap/版本规划与扩展预留.md) | v1.0.0 二维码/License 预留 |
 | [测试与验收方案](docs/07-testing/测试与验收方案.md) | 测试向量与验收标准 |
+| [UI 设计图](docs/ui/index.html) | 21 张画板预览（桌面 9 / 移动 11 / 说明板 1） |
+| [UI 设计规范](docs/ui/UI设计规范.md) | 色彩 / 字号 / 间距 / 圆角 / 布局 / 渲染约定 |
