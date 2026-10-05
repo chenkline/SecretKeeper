@@ -566,9 +566,12 @@ Error Service::add_secret(std::string_view title, std::string_view plaintext,
   const crypto::Id new_secret_id = crypto::generate_id();
 
   // 3.2 step 5: wrap the data key with the master key PUBLIC key.
+  // Signature order is (public_der, data_key). Both are span<const uint8_t>,
+  // so a swapped call still compiles on every toolchain -- keep the order
+  // visible and check it in review.
   const auto wrapped = crypto::rsa_oaep_encrypt(
       std::span<const std::uint8_t>(pub_plain.data(), pub_plain.size()),
-      std::span<const std::uint8_t>(dk));
+      std::span<const std::uint8_t>(dk.data(), dk.size()));
   if (!wrapped) return Error::kInternal;
 
   crypto::Nonce nonce{};
