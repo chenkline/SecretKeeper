@@ -72,6 +72,8 @@ std::string_view message(Error e) {
   return "未知错误";
 }
 
+const char* const kMaskedPlaintext = "******";
+
 bool is_password_error(Error e) {
   // 只有「用户输入的密码/保护密码不对」才计入退避。
   // 文件损坏、格式非法属于数据问题，不该让用户干等。

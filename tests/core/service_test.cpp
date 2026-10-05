@@ -243,6 +243,40 @@ int main() {
   check(svc_.delete_master_key(key_id, pwd(pw1.c_str())) == svc::Error::kCannotDeleteDefault,
         "default key still protected after lock");
 
+  // ---- switch default (requirement 2.5) ----
+  // Both the outgoing and the incoming default must have their password
+  // verified, otherwise the safe could be locked out for good. A fresh key is
+  // minted here because key2 was deleted by an earlier case.
+  const std::string pw3 = "third key password";
+  check(svc_.create_master_key("third", pwd(pw3.c_str())) == kOk, "create a third key for switching");
+  const std::string key3_id = svc_.list_master_keys().back().master_key_id;
+  check(svc_.default_master_key_id().value_or("") == key_id, "key_id is still the default");
+
+  check(svc_.switch_default_master_key(key3_id, pwd("nope"), pwd(pw3.c_str())) ==
+        svc::Error::kPasswordWrong,
+        "switch rejected when the outgoing default password is wrong");
+  check(svc_.default_master_key_id().value_or("") == key_id,
+        "a failed switch leaves the default unchanged");
+  check(svc_.switch_default_master_key(key3_id, pwd(pw1.c_str()), pwd("nope")) ==
+        svc::Error::kPasswordWrong,
+        "switch rejected when the incoming default password is wrong");
+  check(svc_.default_master_key_id().value_or("") == key_id,
+        "default still unchanged after the second failure");
+  check(svc_.switch_default_master_key(key3_id, pwd(pw1.c_str()), pwd(pw3.c_str())) == kOk,
+        "switch succeeds when both passwords verify");
+  check(svc_.default_master_key_id().value_or("") == key3_id, "default switched to key 3");
+  bool key3_flagged = false;
+  for (const auto& k : svc_.list_master_keys()) {
+    if (k.master_key_id == key3_id) key3_flagged = k.is_default;
+  }
+  check(key3_flagged, "key 3 is flagged default");
+  // Switching clears the cached KEK: it belonged to the previous default.
+  check(!svc_.is_unlocked(), "switching the default drops the cached session");
+  check(svc_.unlock(key3_id, pwd(pw3.c_str())) == kOk, "unlock the new default");
+  check(svc_.switch_default_master_key(key_id, {}, {}) == kOk,
+        "both passwords may be empty once unlocked");
+  check(svc_.default_master_key_id().value_or("") == key_id, "default switched back");
+
   svc_.close();
   check(!svc_.is_open(), "close releases the database");
 

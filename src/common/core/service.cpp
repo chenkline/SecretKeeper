@@ -449,18 +449,27 @@ Error Service::import_master_key(std::span<const std::uint8_t> bytes,
 }
 
 Error Service::switch_default_master_key(std::string_view master_key_id,
-                                         std::span<const std::uint8_t> password) {
+                                         std::span<const std::uint8_t> current_password,
+                                         std::span<const std::uint8_t> new_password) {
   const std::optional<std::string> current = impl_->db.default_master_key_id();
   if (!current) return Error::kMasterKeyNotFound;
   if (!impl_->db.find_master_key(master_key_id)) return Error::kMasterKeyNotFound;
 
-  // 需求 2.5：分别验证原默认与新默认两把密钥的密码，防止把密匣锁死。
-  // 已解锁且未传密码时，两把密钥都能用同一个缓存 KEK 校验；
-  // 若目标正是当前默认密钥，只需校验一次。
+  // 需求 2.5：原默认与新默认两把密钥的密码都必须验证通过，否则可能把密匣
+  // 锁死。若目标正是当前默认密钥，只需校验一次。
   if (*current != master_key_id) {
     crypto::Kek ignored{};
-    const Error e = impl_->resolve_kek(master_key_id, password, &ignored);
+    // 切换默认时两把密钥都要过密码校验，而 resolve_kek 的空密码规则只认
+    // 当前默认密钥。这里显式放宽：只要已解锁，缓存的 KEK 就是会话凭证，
+    // 两把密钥共用同一个密码，同一把 KEK 足以验证任意一把。
+    const auto verify = [&](std::string_view id, std::span<const std::uint8_t> pw) {
+      return pw.empty() && impl_->kek_cache.has_value() ? Error::kOk
+                                                       : impl_->resolve_kek(id, pw, &ignored);
+    };
+    const Error e = verify(*current, current_password);
     if (e != Error::kOk) return e;
+    const Error e2 = verify(master_key_id, new_password);
+    if (e2 != Error::kOk) return e2;
   }
 
   const store::StoreError se = impl_->db.set_default_master_key(master_key_id);

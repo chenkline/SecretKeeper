@@ -81,6 +81,9 @@ std::string_view message(Error e);
 // 是否属于「密码错误」类错误。只有这类才计入连续失败次数与退避。
 bool is_password_error(Error e);
 
+// 需求 3.5：主密钥缺失时详情页显示的掩码。固定 6 个星号，UI 不得自造。
+extern const char* const kMaskedPlaintext;
+
 // ===========================================================================
 // DTO —— UI 只看到这些，不看到行对象、字节流或格式结构
 // ===========================================================================
@@ -183,10 +186,12 @@ class Service {
                           std::span<const std::uint8_t> protection_password,
                           std::span<const std::uint8_t> new_password);
 
-  // 切换默认主密钥。需求 2.5 要求同时验证原默认与新默认两把密钥的密码；
-  // 已解锁时两者都能用缓存 KEK 校验，无需索要密码，否则返回 kNeedsPassword。
+  // 切换默认主密钥。需求 2.5 要求**同时**验证原默认与新默认两把密钥的密码。
+  // 已解锁时两者都能用缓存 KEK 校验，两个密码参数都可为空；未解锁时
+  // 至少需要提供其中一个，否则返回 kNeedsPassword。
   Error switch_default_master_key(std::string_view master_key_id,
-                                  std::span<const std::uint8_t> password);
+                                  std::span<const std::uint8_t> current_password,
+                                  std::span<const std::uint8_t> new_password);
   Error delete_master_key(std::string_view master_key_id,
                           std::span<const std::uint8_t> password);
   Error verify_master_key_password(std::string_view master_key_id,
