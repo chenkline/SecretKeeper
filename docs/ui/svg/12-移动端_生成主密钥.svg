@@ -16,7 +16,7 @@
 <rect x="0" y="44" width="390" height="64" rx="0" fill="none"/>
 <rect x="20" y="65" width="22" height="22" rx="0" fill="none"/>
 <path d="M5.14645 11.3536C5.34171 11.5488 5.65829 11.5488 5.85355 11.3536C6.04882 11.1583 6.04882 10.8417 5.85355 10.6464L5.5 11L5.14645 11.3536ZM0 5.5L-0.353553 5.14645L-0.707107 5.5L-0.353553 5.85355L0 5.5ZM5.85355 0.353553C6.04882 0.158291 6.04882 -0.158291 5.85355 -0.353553C5.65829 -0.548816 5.34171 -0.548816 5.14645 -0.353553L5.5 0L5.85355 0.353553ZM5.5 11L5.85355 10.6464L0.353553 5.14645L0 5.5L-0.353553 5.85355L5.14645 11.3536L5.5 11ZM0 5.5L0.353553 5.85355L5.85355 0.353553L5.5 0L5.14645 -0.353553L-0.353553 5.14645L0 5.5Z" transform="translate(20,65)" fill="none" stroke="#1D2C31" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
-<text font-family="Noto Sans SC, sans-serif" font-size="20" font-weight="400" fill="#1D2C31" text-anchor="start" x="54" y="83.2">添加主密钥</text>
+<text font-family="Noto Sans SC, sans-serif" font-size="20" font-weight="400" fill="#1D2C31" text-anchor="start" x="54" y="83.2">生成主密钥</text>
 <rect x="0" y="108" width="390" height="597" rx="0" fill="none"/>
 <text font-family="Noto Sans SC, sans-serif" font-size="20" font-weight="400" fill="#1D2C31" text-anchor="start" x="20" y="138.4">生成主密钥</text>
 <text font-family="Noto Sans SC, sans-serif" font-size="13" font-weight="400" fill="#718087" text-anchor="start" x="20" y="174.56">在本机生成一把随机 RSA-2048 主密钥。</text>

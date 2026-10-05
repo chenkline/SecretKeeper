@@ -103,7 +103,7 @@
 <text font-family="Noto Sans SC, sans-serif" font-size="11" font-weight="400" fill="#718087" text-anchor="start" x="150" y="672.06">个人主密钥</text>
 <rect x="342" y="650" width="14" height="14" rx="0" fill="none"/>
 <path d="M-0.353553 6.64645C-0.548816 6.84171 -0.548816 7.15829 -0.353553 7.35355C-0.158291 7.54882 0.158291 7.54882 0.353553 7.35355L0 7L-0.353553 6.64645ZM3.5 3.5L3.85355 3.85355L4.20711 3.5L3.85355 3.14645L3.5 3.5ZM0.353553 -0.353553C0.158291 -0.548816 -0.158291 -0.548816 -0.353553 -0.353553C-0.548816 -0.158291 -0.548816 0.158291 -0.353553 0.353553L0 0L0.353553 -0.353553ZM0 7L0.353553 7.35355L3.85355 3.85355L3.5 3.5L3.14645 3.14645L-0.353553 6.64645L0 7ZM3.5 3.5L3.85355 3.14645L0.353553 -0.353553L0 0L-0.353553 0.353553L3.14645 3.85355L3.5 3.5Z" transform="translate(347.25,653.5)" fill="none" stroke="#9CA9AE" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></g>
-<text font-family="Noto Sans SC, sans-serif" font-size="11" font-weight="400" fill="#718087" text-anchor="start" x="20" y="714.08">黄色 ? 紧跟 ID 表示密钥缺失；空名称不代表缺失。空标题与空名称保持留白。</text>
+<text font-family="Noto Sans SC, sans-serif" font-size="11" font-weight="400" fill="#718087" text-anchor="start"><tspan x="20" y="714.08">黄色 ? 紧跟 ID 表示密钥缺失；空名称不代表缺失。空标题与空名称保</tspan><tspan x="20" y="731.68">持留白。</tspan></text>
 <rect x="0" y="806" width="390" height="80" rx="0" fill="#FFFFFF" stroke="#DFE5E7" stroke-width="1"/>
 <rect x="20" y="825.5" width="90" height="41" rx="0" fill="none"/>
 <rect x="54" y="825.5" width="22" height="22" rx="0" fill="none"/>

@@ -53,7 +53,7 @@
 <rect x="20" y="476" width="350" height="192" rx="0" fill="none"/>
 <text font-family="Noto Sans SC, sans-serif" font-size="13" font-weight="400" fill="#1D2C31" text-anchor="start" x="20" y="492.64">机密信息</text>
 <g clip-path="url(#clip-328119x1422)"><rect x="20" y="505" width="350" height="136" rx="8" fill="#FFFFFF" stroke="#DFE5E7" stroke-width="1"/>
-<text font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="400" fill="#1D2C31" text-anchor="start" x="34" y="535.48">虚构测试文本：海岬工作室备用门禁码 4826，仅用于界面演示。</text></g>
+<text font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="400" fill="#1D2C31" text-anchor="start"><tspan x="34" y="535.48">虚构测试文本：海岬工作室备用门禁码 4826，仅用</tspan><tspan x="34" y="558.58">于界面演示。</tspan></text></g>
 <rect x="20" y="649" width="350" height="19" rx="0" fill="none"/>
 <text font-family="Noto Sans SC, sans-serif" font-size="12" font-weight="400" fill="#718087" text-anchor="start" x="20" y="664.36">最多 150 字符</text>
 <text font-family="Noto Sans SC, sans-serif" font-size="12" font-weight="400" fill="#718087" text-anchor="start" x="326" y="660.52">31 / 150</text>

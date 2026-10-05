@@ -819,6 +819,11 @@ def build_mobile_generate_key(source: dict) -> dict:
     action = _mobile_button(x, cursor, w, "\u751f\u6210\u4e3b\u5bc6\u94a5", ACCENT, WHITE, 168)
 
     content["children"] = [title, subtitle] + fields + [warning, action]
+
+    # 导航栏标题也按画板自身命名：源画板是「添加主密钥」，
+    # 生成与导入已拆成两个独立界面，标题须各归各位。
+    set_page_title(board, "\u6dfb\u52a0\u4e3b\u5bc6\u94a5", "\u751f\u6210\u4e3b\u5bc6\u94a5")
+
     # 内容高度必须按最后一个子节点收紧：_shrink_board 靠 content 的底边
     # 推算底部固定块的位置，高度不对会把「系统手势区域」顶到负坐标。
     cb = box(content)
@@ -1329,6 +1334,28 @@ _BEIXUAN_REWRITES = (
 )
 
 
+def patch_spec_board(root: dict) -> None:
+    """21 说明板：把已过时的表述同步到当前文案口径。
+
+    说明板记录的是早期版本的设计，三处表述已与现在的界面不符：
+    - 「默认主密钥密码」→ 解锁改为选一把主密钥，密码框统一叫「主密钥密码」；
+    - 「导出备份」→ 按钮文案已改为「导出主密钥」；
+    - 页脚那句把隐藏明文、内存缓存、默认密码串在一起，同样过时。
+    """
+    for node in walk_all(root):
+        if node.get("type") != "TEXT":
+            continue
+        chars = node.get("characters", "")
+        new = chars.replace("原默认主密钥密码", "原主密钥密码")
+        new = new.replace("新默认主密钥密码", "新主密钥密码")
+        new = new.replace("导出备份", "导出主密钥")
+        new = new.replace("请先导出备份", "请先导出主密钥")
+        new = new.replace("隐藏全部明文，清空内存密钥缓存；解锁需默认主密钥密码。",
+                          "隐藏全部明文；解锁需主密钥密码。")
+        if new != chars:
+            set_text(node, new)
+
+
 def rewrite_beixuan(root: dict) -> None:
     """全局删掉「备选」二字。
 
@@ -1748,7 +1775,7 @@ def patch_import_page(root: dict) -> None:
     patch_desktop_common(root, "主密钥管理")
     widen_workspace(root, "导入工作区")
     _align_pwd_fields(root)
-    set_button_label(root, "导入操作", "导入为备选主密钥", "导入主密钥", min_width=132.0)
+    set_button_label(root, "导入操作", "导入为主密钥", "导入主密钥", min_width=132.0)
 
 
 def patch_export_page(root: dict) -> None:
@@ -2008,8 +2035,46 @@ def patch_security_page(root: dict) -> None:
 # 移动端逐板
 # ---------------------------------------------------------------------------
 def patch_mobile_common(root: dict) -> None:
-    """移动端画板共用：删「备选」。"""
+    """移动端画板共用：删「备选」，底部导航顺序改为「主密钥 / 机密信息 / 安全设置」。"""
     rewrite_beixuan(root)
+    reorder_mobile_tabbar(root)
+
+
+def reorder_mobile_tabbar(root: dict) -> None:
+    """把底部导航的第一、二项对调。
+
+    需求把移动端主菜单定为「主密钥 → 机密信息 → 安全设置」，
+    而设计源里第一项是「机密信息」。这里只在本画板内对调两个
+    `导航项` FRAME 的坐标与图标，不从任何其他画板复制节点。
+    """
+    bar = find(root, "底部导航")
+    if bar is None:
+        return
+    items = [c for c in (bar.get("children") or []) if c.get("name") == "导航项"]
+    if len(items) < 2:
+        return
+
+    first, second = items[0], items[1]
+    fb, sb = box(first), box(second)
+    if float(fb.get("x", 0)) >= float(sb.get("x", 0)):
+        return                      # 已经是「主密钥」在前
+
+    # 交换两个 FRAME 的横向位置，并各自换上对方的图标
+    first_icon = next((c for c in (first.get("children") or [])
+                       if c.get("name") not in ("导航名称",)), None)
+    second_icon = next((c for c in (second.get("children") or [])
+                        if c.get("name") not in ("导航名称",)), None)
+
+    dx = float(fb.get("x", 0)) - float(sb.get("x", 0))
+    shift(first, dx, 0.0)
+    shift(second, -dx, 0.0)
+
+    if first_icon is not None and second_icon is not None:
+        ib, jb = box(first_icon), box(second_icon)
+        shift(first_icon, float(jb.get("x", 0)) - float(ib.get("x", 0)), 0.0)
+        shift(second_icon, float(ib.get("x", 0)) - float(jb.get("x", 0)), 0.0)
+        replace_child(first, first_icon, second_icon)
+        replace_child(second, second_icon, first_icon)
 
 
 def patch_mobile_unlock(root: dict) -> None:
@@ -2116,7 +2181,7 @@ def _split_create_import_buttons(root: dict, content: dict) -> None:
     for index, (icon_name, label) in enumerate(
             (("plus", "生成主密钥"), ("file-input", "导入主密钥"))):
         button = rect_node("操作按钮", inner_x + index * (btn_w + gap),
-                           float(cb.get("y", 0)) + 28.0, btn_w, btn_h,
+                           float(cb.get("y", 0)) - btn_h - 16.0, btn_w, btn_h,
                            WHITE, 8.0, stroke=BORDER)
         button["layoutMode"] = "HORIZONTAL"
         button["primaryAxisAlignItems"] = "CENTER"
@@ -2125,11 +2190,12 @@ def _split_create_import_buttons(root: dict, content: dict) -> None:
         text_w = len(label) * size
         text_x = inner_x + index * (btn_w + gap) + (btn_w - text_w - 18.0 - 6.0) / 2
         text = text_node("按钮文字", label, text_x,
-                         float(cb.get("y", 0)) + 28.0 + (btn_h - 17.0) / 2,
+                         float(cb.get("y", 0)) - btn_h - 16.0 + (btn_h - 17.0) / 2,
                          size, ACCENT, width=text_w)
         children_nodes = []
         icon = clone_icon(icon_name, text_x + text_w + 6.0,
-                          float(cb.get("y", 0)) + 28.0 + (btn_h - 18.0) / 2, ACCENT)
+                          float(cb.get("y", 0)) - btn_h - 16.0 + (btn_h - 18.0) / 2,
+                          ACCENT)
         if icon is not None:
             icon["cornerRadius"] = 0
             for sub in walk_all(icon):
@@ -2143,7 +2209,7 @@ def _split_create_import_buttons(root: dict, content: dict) -> None:
     # 两枚按钮要并排，页面内容是竖排流，必须包一层横向容器；
     # 直接平铺进竖排流会被排成上下两行。
     row = rect_node("操作按钮组", float(cb.get("x", 0)),
-                    float(cb.get("y", 0)) + 28.0,
+                    float(cb.get("y", 0)) - btn_h - 16.0,
                     float(cb.get("width", 0)), btn_h, None, 0.0)
     row["layoutMode"] = "HORIZONTAL"
     row["primaryAxisSizingMode"] = "FIXED"
@@ -2151,14 +2217,15 @@ def _split_create_import_buttons(root: dict, content: dict) -> None:
     row["itemSpacing"] = gap
     row["fills"] = []
     row["children"] = []
-    row_y = float(cb.get("y", 0)) + 28.0
+    row_y = float(cb.get("y", 0)) - btn_h - 16.0
     for button in buttons:
-        button["layoutPositioning"] = "ABSOLUTE"
         box(button)["y"] = row_y
         row["children"].append(button)
 
     content["children"] = [c for c in children if c is not combined]
-    insert_at = content["children"].index(capacity) + 1
+    # 需求要求按钮在「本机保存的主密钥」信息行**上方**同行排列，
+    # 而不是容量行下方。容量提示再放在按钮下方。
+    insert_at = content["children"].index(capacity)
     content["children"][insert_at:insert_at] = [row]
 
     if tip is not None:
@@ -2168,10 +2235,10 @@ def _split_create_import_buttons(root: dict, content: dict) -> None:
             set_text(note, "主密钥数量已满，先导出并删除一把主密钥，才能新增。")
             nb = box(note)
             nb["width"] = float(box(tip).get("width", 350)) - 52.0
+        # 容量提示改放到两枚按钮下方（按钮在容量行上方）。
         tb = box(tip)
-        buttons_bottom = max(float(box(b).get("y", 0)) + float(box(b).get("height", 0))
-                            for b in buttons)
-        shift(tip, 0, buttons_bottom + 16.0 - float(tb.get("y", 0)))
+        want_y = float(cb.get("y", 0)) + float(cb.get("height", 0)) + 16.0
+        shift(tip, 0, want_y - float(tb.get("y", 0)))
 
     bottom = max(float(box(c).get("y", 0)) + float(box(c).get("height", 0))
                  for c in content.get("children", []) or [])
@@ -2211,18 +2278,31 @@ def freed_of(holder: dict, y: float) -> float:
     return 64.0
 
 
+def set_page_title(root: dict, old: str, new: str) -> None:
+    """把导航栏标题改成画板自身的名字。
+
+    标题节点名各画板不一致，按 characters 全树匹配，只改第一个命中。
+    """
+    for node in walk_all(root):
+        if node.get("type") == "TEXT" and node.get("characters") == old:
+            set_text(node, new)
+            return
+
+
 def patch_mobile_generate_key(root: dict) -> None:
-    """12 移动端生成主密钥：去 TAB，按钮改「生成主密钥」。"""
+    """12 移动端生成主密钥：去 TAB，改标题与按钮文案。"""
     patch_mobile_common(root)
     strip_tabs(root)
     set_button_label(root, "生成操作", "生成并保存", "生成主密钥", min_width=132.0)
+    set_page_title(root, "添加主密钥", "生成主密钥")
 
 
 def patch_mobile_import_key(root: dict) -> None:
     """13 移动端导入主密钥：去 TAB，按钮改「导入主密钥」。"""
     patch_mobile_common(root)
     strip_tabs(root)
-    set_button_label(root, None, "导入为备选主密钥", "导入主密钥", min_width=132.0)
+    set_button_label(root, None, "导入为主密钥", "导入主密钥", min_width=132.0)
+    set_page_title(root, "添加主密钥", "导入主密钥")
 
 
 def patch_mobile_detail(root: dict, found: bool) -> None:
@@ -2614,7 +2694,7 @@ _PATCHES: dict[str, list[Callable[[dict], None]]] = {
     "19": [patch_mobile_export_delete],
     "20": [patch_mobile_security],
     # 说明板
-    "21": [rewrite_beixuan],
+    "21": [rewrite_beixuan, patch_spec_board],
 }
 
 _DERIVED = {

@@ -189,6 +189,78 @@ def effects_to_filter(node: dict, uid: str) -> tuple[str | None, list[str]]:
 # --------------------------------------------------------------------------
 # 渲染
 # --------------------------------------------------------------------------
+# 行尾可悬挂的标点：中文排版允许这些标点压在版心之外，
+# 若按 1em 计会把行尾句号挤到下一行，出现孤字。
+_HANGABLE = "\uff0c\u3002\u3001\uff1b\uff1a\uff01\uff1f\u300d\u300f\uff09\u300b"
+
+
+def _char_advance(ch: str, size: float) -> float:
+    """单个字符的排版前进宽度。"""
+    code = ord(ch)
+    if code < 0x2E80:                              # ASCII / 拉丁 / 希腊 / 西里尔
+        return size * (0.30 if ch == " " else 0.58)
+    if (0x2E80 <= code <= 0x9FFF or 0xAC00 <= code <= 0xD7AF
+            or 0xF900 <= code <= 0xFAFF or 0xFF00 <= code <= 0xFF60
+            or 0x3000 <= code <= 0x303F):
+        return size                               # CJK 与全角标点按 1em
+    return size * 0.62
+
+
+def _text_width(text: str, size: float, letter_spacing: float) -> float:
+    """估算一行文本的渲染宽度，行尾可悬挂标点不计入。"""
+    total = 0.0
+    last = len(text) - 1
+    for index, ch in enumerate(text):
+        if index == last and ch in _HANGABLE:
+            break
+        total += _char_advance(ch, size) + letter_spacing
+    return total
+
+
+def wrap_text(chars: str, size: float, letter_spacing: float,
+               max_width: float, box_height: float = 0.0) -> list[str]:
+    """按外盒宽度重排文本，保留原文已有的换行。
+
+    Figma 导出的 `characters` 不含渲染期换行，`absoluteBoundingBox.width`
+    却是换行后的宽度。本地字体度量与 Figma 略有差异，直接单行输出会被容器
+    的 clipPath 裁掉尾巴，因此这里按外盒宽度重排。
+
+    只有整行确实放不下时才折行，避免把本该单行的短文本拆开。
+    `max_width <= 0` 表示外盒宽度未知（Figma 自动宽度文本），不做重排。
+
+    `box_height` 是 Figma 记录的外盒高度。若外盒只够一行，说明该文本在 Figma 里
+    本来就是单行（宽度按内容自适应），此时即便本地度量略宽也不折行——折了反而
+    会把 logo 副标题之类的短文本挤成两行。只有外盒高度已容得下多行（Figma 那边
+    确实换过行）才允许重排，用来兜住被 clipPath 裁掉的超宽行。
+    """
+    single_line = box_height > 0 and box_height <= size * 1.6
+
+    out: list[str] = []
+    for raw in chars.split("\n"):
+        if not raw or max_width <= 0 or _text_width(raw, size, letter_spacing) <= max_width + 1.0:
+            out.append(raw)
+            continue
+        if single_line:
+            out.append(raw)
+            continue
+        line = ""
+        line_w = 0.0
+        for ch in raw:
+            w = _char_advance(ch, size) + letter_spacing
+            # 下一个字符若可悬挂，则允许它越过右边界
+            hang = 0.0
+            if ch in _HANGABLE:
+                hang = w
+            if line and line_w + w - hang > max_width + 1.0:
+                out.append(line)
+                line, line_w = ch, w
+            else:
+                line += ch
+                line_w += w
+        out.append(line)
+    return out
+
+
 def render_text(node: dict, ox: float, oy: float) -> str:
     """文本节点。
 
@@ -226,7 +298,8 @@ def render_text(node: dict, ox: float, oy: float) -> str:
         attrs += f' opacity="{opacity:g}"'
 
     # 基线：Figma 的文字外盒是行高容器，基线约在 y + line_height * 0.8
-    lines = chars.split("\n")
+    box_h = float(box.get("height", 0))
+    lines = wrap_text(chars, size, letter_spacing, w, box_h)
     if len(lines) == 1:
         return f'<text {attrs} x="{tx:g}" y="{y + line_height * 0.8:g}">{html.escape(lines[0])}</text>'
 

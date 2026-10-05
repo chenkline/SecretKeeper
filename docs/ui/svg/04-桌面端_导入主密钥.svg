@@ -78,7 +78,7 @@
 <text font-family="Noto Sans SC, sans-serif" font-size="12" font-weight="400" fill="#718087" text-anchor="start" x="264" y="514.64">为本机保存的主密钥新设密码。</text>
 <rect x="264" y="541" width="880" height="44" rx="0" fill="none"/>
 <g clip-path="url(#clip-skimpgox368)"><rect x="264" y="545" width="168" height="44" rx="8" fill="#14786E"/>
-<text font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="400" fill="#FFFFFF" text-anchor="start" x="306" y="572.88">导入为主密钥</text></g>
+<text font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="400" fill="#FFFFFF" text-anchor="start" x="313" y="572.88">导入主密钥</text></g>
 <g clip-path="url(#clip-skimpcancelx370)"><rect x="444" y="545" width="106" height="44" rx="8" fill="#FFFFFF"/>
 <text font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="400" fill="#1D2C31" text-anchor="start" x="469" y="572.88">返回管理</text></g></g></g>
 </svg>
