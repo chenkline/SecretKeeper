@@ -54,6 +54,8 @@ class Button : public Fl_Button {
   // 侧栏菜单高亮：选中项用主色浅底与主色文字。
   void set_selected(bool on);
   bool selected() const { return selected_; }
+  // 设置文案（比 copy_label 安全：不接受可能无 NUL 结尾的字符串）。
+  void set_label(std::string_view text);
 
  protected:
   int handle(int event) override;
@@ -61,8 +63,10 @@ class Button : public Fl_Button {
   ButtonKind kind() const { return kind_; }
   bool is_enabled() const { return enabled_; }
   bool is_selected() const { return selected_; }
+  const std::string& label_text() const { return label_; }
 
  private:
+  std::string label_;
   ButtonKind kind_;
   bool enabled_ = true;
   bool selected_ = false;
@@ -76,12 +80,19 @@ class Pill : public Fl_Widget {
   void draw() override;
   // 设置页的可选项用它做点击目标。
   void set_active(bool on) { active_ = on; }
+  // 只切换可见性而不改动父 Group 的 children 链。
+  // Fl_Widget::show()/hide() 会修改 children 链，在页面尚未 end() 封口
+  // 或链正被遍历时调用会造成链表损坏（Release 下崩溃）。
+  // 这里用一个标志位代替，draw() 与 handle() 都先看标志位。
+  void set_shown(bool on) { shown_ = on; redraw(); }
+  bool shown() const { return shown_; }
 
  protected:
   int handle(int event) override;
 
  private:
   bool active_ = false;
+  bool shown_ = true;
   std::string text_;
   Fl_Color fg_;
   Fl_Color bg_;
@@ -97,8 +108,12 @@ class Notice : public Fl_Widget {
   void set_content(std::string_view title, std::string_view body);
   int preferred_height() const;
   void draw() override;
+  // 同 Pill：不改 children 链的可见性切换（见 Pill::set_shown 的说明）。
+  void set_shown(bool on) { shown_ = on; redraw(); }
+  bool shown() const { return shown_; }
 
  private:
+  bool shown_ = true;
   Tone tone_;
   std::string title_;
   std::string body_;

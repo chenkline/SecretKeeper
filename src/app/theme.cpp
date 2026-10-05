@@ -40,16 +40,16 @@ void stroke_rounded(int x, int y, int w, int h, int radius, Fl_Color c, int line
   fl_line_style(FL_SOLID, 0);
 }
 
-int pill_width(std::string_view text, int font_size) {
+int pill_width(const std::string& text, int font_size) {
   fl_font(font_for(kWeightMedium), font_size);
-  return static_cast<int>(fl_width(text.data())) + 2 * kGapMd + kGapSm;
+  return static_cast<int>(fl_width(text.c_str())) + 2 * kGapMd + kGapSm;
 }
 
-int draw_pill(int x, int y, int w, int h, std::string_view text, Fl_Color fg, Fl_Color bg) {
+int draw_pill(int x, int y, int w, int h, const std::string& text, Fl_Color fg, Fl_Color bg) {
   fill_rounded(x, y, w, h, h / 2, bg);
   fl_color(fg);
   fl_font(font_for(kWeightMedium), kFontTiny);
-  fl_draw(text.data(), x, y, w, h, FL_ALIGN_CENTER);
+  fl_draw(text.c_str(), x, y, w, h, FL_ALIGN_CENTER);
   return w;
 }
 

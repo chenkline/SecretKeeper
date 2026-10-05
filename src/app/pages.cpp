@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdio>
 #include <chrono>
 #include <cstdint>
 #include <cstring>
@@ -228,6 +229,7 @@ PageBase::PageBase(MainWindow* host, const char* title, const char* subtitle)
   subtitle_box_->labelfont(theme::font_for(theme::kWeightRegular));
   subtitle_box_->labelsize(theme::kFontBody);
   subtitle_box_->labelcolor(theme::kTextMuted);
+  end();
 }
 
 void PageBase::layout_header(const char* back_label) {
@@ -246,6 +248,7 @@ void PageBase::on_back() { host_->go_back(); }
 // 01 解锁与锁定
 // =====================================================================
 UnlockPage::UnlockPage(MainWindow* host) : Fl_Group(0, 0, kWinW, kWinH), host_(host) {
+  begin();
   box(FL_NO_BOX);
   color(theme::kContentBg);
 
@@ -308,6 +311,7 @@ UnlockPage::UnlockPage(MainWindow* host) : Fl_Group(0, 0, kWinW, kWinH), host_(h
   error_->labelfont(theme::font_for(theme::kWeightRegular));
   error_->labelsize(theme::kFontSmall);
   error_->labelcolor(theme::kTextMuted);
+  end();
 }
 
 void UnlockPage::draw() {
@@ -457,6 +461,7 @@ void UnlockPage::on_unlock() {
 // =====================================================================
 MasterKeysPage::MasterKeysPage(MainWindow* host)
     : PageBase(host, "主密钥管理", "主密钥用于加密信息；密码仅用于解开本机保存的主密钥。") {
+  begin();
   layout_header(nullptr);
 
   // 标题栏右侧两个入口。
@@ -579,6 +584,7 @@ MasterKeysPage::MasterKeysPage(MainWindow* host)
   tip3->align(FL_ALIGN_TOP | FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
   tip3->labelcolor(theme::kTextMuted);
   tip3->labelsize(theme::kFontSmall);
+  end();
 }
 
 void MasterKeysPage::draw() {
@@ -593,10 +599,10 @@ void MasterKeysPage::draw() {
     quota_notice_->set_content(
         "主密钥容量已满  2 / 2",
         "先导出并删除一把主密钥，才能生成或导入新的主密钥。");
-    quota_notice_->show();
+    quota_notice_->set_shown(true);
     quota_notice_->redraw();
   } else {
-    quota_notice_->hide();
+    quota_notice_->set_shown(false);
   }
 
   // 左列主密钥卡片
@@ -661,29 +667,20 @@ void MasterKeysPage::reload() {
     detail_id_->copy_label(item.master_key_id.c_str());
     detail_name_->copy_label(item.name.empty() ? "" : item.name.c_str());
     detail_count_->copy_label((std::to_string(item.secret_count) + " 条").c_str());
-    if (item.is_default) {
-      default_pill_->show();
-      switch_btn_->hide();
-      del_btn_->set_enabled(false);
-    } else {
-      default_pill_->hide();
-      switch_btn_->show();
-      del_btn_->set_enabled(true);
-    }
+    default_pill_->set_shown(item.is_default);
+    exp_btn_->set_enabled(true);
+    del_btn_->set_enabled(!item.is_default);
+    switch_btn_->set_enabled(!item.is_default);
   } else {
     detail_id_->copy_label("");
     detail_name_->copy_label("");
     detail_count_->copy_label("");
-    default_pill_->hide();
+    default_pill_->set_shown(false);
     exp_btn_->set_enabled(false);
     del_btn_->set_enabled(false);
     switch_btn_->set_enabled(false);
   }
-  if (selected_ >= 0 && selected_ < static_cast<int>(keys.size())) {
-    exp_btn_->set_enabled(true);
-    del_btn_->set_enabled(!keys[static_cast<std::size_t>(selected_)].is_default);
-    switch_btn_->set_enabled(!keys[static_cast<std::size_t>(selected_)].is_default);
-  }
+
   gen_btn_->set_enabled(host()->service().quota().master_keys < svc::kMaxMasterKeys);
   imp_btn_->set_enabled(host()->service().quota().master_keys < svc::kMaxMasterKeys);
   redraw();
@@ -764,6 +761,7 @@ void MasterKeysPage::on_switch_default() {
 // =====================================================================
 CreateKeyPage::CreateKeyPage(MainWindow* host)
     : PageBase(host, "生成主密钥", "为本机创建一把随机 RSA-2048 主密钥。") {
+  begin();
   layout_header("返回主密钥管理");
 
   const int cw = kWinW - theme::kSidebarWidth - theme::kContentPad * 3;
@@ -819,6 +817,7 @@ CreateKeyPage::CreateKeyPage(MainWindow* host)
   cancel->callback([](Fl_Widget*, void* d) {
     static_cast<PageBase*>(d)->on_back();
   }, this);
+  end();
 }
 
 void CreateKeyPage::reload() {
@@ -830,9 +829,9 @@ void CreateKeyPage::reload() {
          std::to_string(svc::kMaxMasterKeys) + " 把主密钥")
             .c_str(),
         "容量已满。先导出并删除一把主密钥，再继续生成。");
-    capacity_->show();
+    capacity_->set_shown(true);
   } else {
-    capacity_->hide();
+    capacity_->set_shown(false);
   }
   save_->set_enabled(!full);
   redraw();
@@ -878,6 +877,7 @@ void CreateKeyPage::on_save() {
 // =====================================================================
 ImportKeyPage::ImportKeyPage(MainWindow* host)
     : PageBase(host, "导入主密钥", "从之前导出的备份文件恢复主密钥，导入后作为保存。") {
+  begin();
   layout_header("返回主密钥管理");
 
   const int cw = kWinW - theme::kSidebarWidth - theme::kContentPad * 3;
@@ -936,6 +936,7 @@ ImportKeyPage::ImportKeyPage(MainWindow* host)
   cancel->callback([](Fl_Widget*, void* d) {
     static_cast<PageBase*>(d)->on_back();
   }, this);
+  end();
 }
 
 void ImportKeyPage::reload() {
@@ -1006,6 +1007,7 @@ void ImportKeyPage::on_import() {
 // =====================================================================
 ExportKeyPage::ExportKeyPage(MainWindow* host)
     : PageBase(host, "导出主密钥", "为导出文件新设保护密码，并将备份保存在你信任的位置。") {
+  begin();
   layout_header("返回主密钥管理");
 
   const int cw = kWinW - theme::kSidebarWidth - theme::kContentPad * 3;
@@ -1090,6 +1092,7 @@ ExportKeyPage::ExportKeyPage(MainWindow* host)
   cancel->callback([](Fl_Widget*, void* d) {
     static_cast<PageBase*>(d)->on_back();
   }, this);
+  end();
 }
 
 void ExportKeyPage::reload() {
@@ -1182,6 +1185,7 @@ void ExportKeyPage::on_export() {
 // =====================================================================
 SecretsPage::SecretsPage(MainWindow* host)
     : PageBase(host, "机密信息管理", "所有内容只保存在本机。") {
+  begin();
   count_label_ = new Fl_Box(theme::kContentPad, 76, 520, 22, "");
   count_label_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
   count_label_->labelsize(theme::kFontBody);
@@ -1318,6 +1322,7 @@ SecretsPage::SecretsPage(MainWindow* host)
   qmark_note->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
   qmark_note->labelsize(theme::kFontSmall);
   qmark_note->labelcolor(theme::kTextMuted);
+  end();
 }
 
 void SecretsPage::reload() {
@@ -1392,7 +1397,7 @@ void SecretsPage::refresh_detail() {
     detail_mk_id_->copy_label("");
     detail_mk_name_->copy_label("");
     detail_title_field_->copy_label("");
-    verified_->hide();
+    verified_->set_shown(false);
     verified_->redraw();
     reveal_btn_->set_enabled(false);
     copy_btn_->set_enabled(false);
@@ -1412,11 +1417,11 @@ void SecretsPage::refresh_detail() {
   if (found->master_key_found) {
     verified_->copy_label("已验证");
     verified_->labelcolor(theme::kAccent);
-    verified_->show();
+    verified_->set_shown(true);
   } else {
     verified_->copy_label("缺少主密钥");
     verified_->labelcolor(theme::kWarningText);
-    verified_->show();
+    verified_->set_shown(true);
   }
   verified_->redraw();
   hide_plaintext();
@@ -1586,6 +1591,7 @@ void SecretsPage::on_import() { host()->navigate(Page::kImportSecret); }
 // =====================================================================
 AddSecretPage::AddSecretPage(MainWindow* host)
     : PageBase(host, "新增机密信息", "保存任何你需要保密的文字，不限定内容格式。") {
+  begin();
   layout_header("返回列表");
 
   const int cw = kWinW - theme::kSidebarWidth - theme::kContentPad * 3;
@@ -1643,6 +1649,7 @@ AddSecretPage::AddSecretPage(MainWindow* host)
     self->counter_->copy_label(char_counter_text(v ? v : "").c_str());
     self->counter_->redraw();
   });
+  end();
 }
 
 void AddSecretPage::reload() {
@@ -1729,6 +1736,7 @@ void AddSecretPage::on_save() {
 // =====================================================================
 ImportSecretPage::ImportSecretPage(MainWindow* host)
     : PageBase(host, "导入机密信息", "读取本地加密文件，自动查找它使用的主密钥。") {
+  begin();
   const int cw = kWinW - theme::kSidebarWidth - theme::kContentPad * 3;
   const int cx = theme::kContentPad;
   new widgets::Card(cx, 104, cw, 620);
@@ -1824,6 +1832,7 @@ ImportSecretPage::ImportSecretPage(MainWindow* host)
   cancel->callback([](Fl_Widget*, void* d) {
     static_cast<PageBase*>(d)->on_back();
   }, this);
+  end();
 }
 
 void ImportSecretPage::draw() {
@@ -1934,6 +1943,7 @@ void ImportSecretPage::on_import() {
 // =====================================================================
 SettingsPage::SettingsPage(MainWindow* host)
     : PageBase(host, "安全设置", "减少明文暴露，让每次离开都安心。设置仅保存在本机。") {
+  begin();
   const int cw = kWinW - theme::kSidebarWidth - theme::kContentPad * 3;
   const int cx = theme::kContentPad;
   new widgets::Card(cx, 104, cw, 440);
@@ -2000,6 +2010,7 @@ SettingsPage::SettingsPage(MainWindow* host)
   lock_now->callback([](Fl_Widget*, void* d) {
     static_cast<SettingsPage*>(d)->on_lock_now();
   }, this);
+  end();
 }
 
 void SettingsPage::reload() {

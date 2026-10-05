@@ -11,6 +11,7 @@
 
 #include <FL/Fl_Double_Window.H>
 
+#include <array>
 #include <chrono>
 #include <memory>
 #include <string>
@@ -65,6 +66,8 @@ class MainWindow : public Fl_Double_Window {
  private:
   void build_menu();
   void show_page(Page page);
+  // 全部九个页面，按构造顺序。
+  std::array<Fl_Group*, 9> all_pages() const;
   static void on_menu_cb(Fl_Widget*, void* data);
   static void on_rotate_tick(void* data);
   static void on_idle_tick(void* data);

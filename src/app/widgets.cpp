@@ -11,11 +11,11 @@ namespace {
 // 主色按钮的悬浮态取设计稿里的 #3D6B6D。
 constexpr Fl_Color kPrimaryHover = theme::kAccentHover;
 
-void draw_label_centered(std::string_view text, int font_weight, int font_size,
+void draw_label_centered(const std::string& text, int font_weight, int font_size,
                          Fl_Color fg, int x, int y, int width, int height) {
   fl_color(fg);
   fl_font(theme::font_for(font_weight), font_size);
-  fl_draw(text.data(), x, y, width, height, FL_ALIGN_CENTER);
+  fl_draw(text.c_str(), x, y, width, height, FL_ALIGN_CENTER);
 }
 
 // 按像素宽度断行。FLTK 自带 fl_draw 的换行能力，但需要 Fl_Widget 上下文，
@@ -76,10 +76,18 @@ int Card::handle(int event) {
 // =====================================================================
 Button::Button(int x, int y, int w, int h, std::string_view label, ButtonKind kind)
     : Fl_Button(x, y, w, h, 0), kind_(kind) {
-  copy_label(label.data());
+  // string_view::data() 不保证以 NUL 结尾，必须拷贝后交给 FLTK。
+  label_ = std::string(label);
+  copy_label(label_.c_str());
   box(FL_NO_BOX);
   down_box(FL_NO_BOX);
   labelsize(theme::kFontBody);
+}
+
+void Button::set_label(std::string_view text) {
+  label_ = std::string(text);
+  Fl_Button::copy_label(label_.c_str());
+  redraw();
 }
 
 void Button::set_selected(bool on) {
@@ -134,8 +142,7 @@ void Button::draw() {
   if (kind_ != ButtonKind::kPrimary) {
     theme::stroke_rounded(x(), y(), w(), h(), theme::kRadiusButton, border);
   }
-  draw_label_centered(label() ? label() : "", theme::kWeightMedium,
-                      theme::kFontBody, fg, x(), y(), w(), h());
+  draw_label_centered(label_, theme::kWeightMedium, theme::kFontBody, fg, x(), y(), w(), h());
 }
 
 int Button::handle(int event) {
@@ -151,6 +158,7 @@ Pill::Pill(int x, int y, int w, int h, std::string_view text, Fl_Color fg, Fl_Co
 }
 
 int Pill::handle(int event) {
+  if (!shown_) return Fl_Widget::handle(event);
   if (event == FL_PUSH) {
     do_callback();
     return 1;
@@ -159,6 +167,7 @@ int Pill::handle(int event) {
 }
 
 void Pill::draw() {
+  if (!shown_) return;
   theme::fill_rounded(x(), y(), w(), h(), h() / 2, bg_);
   draw_label_centered(text_, theme::kWeightMedium, theme::kFontTiny, fg_, x(), y(), w(),
                       h());
@@ -185,6 +194,7 @@ int Notice::preferred_height() const {
 }
 
 void Notice::draw() {
+  if (!shown_) return;
   Fl_Color bg = theme::kAccentSoft;
   Fl_Color fg = theme::kAccent;
   Fl_Color strong = theme::kText;
@@ -425,7 +435,7 @@ void IconButton::draw() {
   Button::draw();
   // 图标画在文字左侧，整体（图标 + 文字）仍以按钮中心对齐。
   fl_font(theme::font_for(theme::kWeightMedium), theme::kFontBody);
-  const int text_w = static_cast<int>(fl_width(label() ? label() : ""));
+  const int text_w = static_cast<int>(fl_width(label_text().c_str()));
   const int gap = theme::kGapSm;
   const int total = kIconSize + gap + text_w;
   const int start_x = x() + (w() - total) / 2;

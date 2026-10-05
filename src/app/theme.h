@@ -10,6 +10,7 @@
 
 #include <FL/Enumerations.H>
 #include <FL/Fl_Widget.H>
+#include <string>
 #include <string_view>
 
 namespace secretkeeper::ui::theme {
@@ -93,11 +94,11 @@ void stroke_rounded(int x, int y, int w, int h, int radius, Fl_Color c, int line
 
 // 胶囊标签（状态标签 / 步骤标签）：返回实际占用宽度。
 // 背景为 tag_bg，文字为 tag_fg，居中绘制。
-int draw_pill(int x, int y, int w, int h, std::string_view text, Fl_Color fg,
+int draw_pill(int x, int y, int w, int h, const std::string& text, Fl_Color fg,
               Fl_Color bg);
 
 // 状态标签宽度预估（供布局计算，无需真正绘制）。
-int pill_width(std::string_view text, int font_size);
+int pill_width(const std::string& text, int font_size);
 
 // 按字重取 FLTK 字体。FLTK 只有 HELVETICA / HELVETICA_BOLD 两族，
 // 设计稿的 500 字重映射到常规族、700 映射到粗体族。

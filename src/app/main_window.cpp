@@ -11,6 +11,9 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdlib>
+#include <cstring>
+#include <cstdio>
 
 #include "app.h"
 #include "platform.h"
@@ -50,6 +53,9 @@ MainWindow::MainWindow() : Fl_Double_Window(kWinW, kWinH, "密匣 SecretKeeper")
   color(theme::kContentBg);
   begin();
 
+  // 每个页面都是 Fl_Group，构造时已 end() 封口（页面内的控件挂到页面自身）。
+  // 构造完成后必须显式 add() 把页面挂到窗口的 children 上——FLTK 不会
+  // 自动挂载用 new 创建的 Group。缺这一步，show()/hide() 会访问空 parent。
   unlock_ = std::make_unique<UnlockPage>(this);
   keys_ = std::make_unique<MasterKeysPage>(this);
   secrets_ = std::make_unique<SecretsPage>(this);
@@ -59,21 +65,31 @@ MainWindow::MainWindow() : Fl_Double_Window(kWinW, kWinH, "密匣 SecretKeeper")
   export_key_ = std::make_unique<ExportKeyPage>(this);
   add_secret_ = std::make_unique<AddSecretPage>(this);
   import_secret_ = std::make_unique<ImportSecretPage>(this);
+  for (Fl_Group* page : all_pages()) {
+    if (page == nullptr) continue;
+    add(page);
+    page->hide();
+  }
 
   build_menu();
 
-  lock_btn_ = new widgets::IconButton(kWinW - theme::kContentPad - 108, 8, 108, 32,
-                                      widgets::Icon::kLock, "立即锁定", widgets::ButtonKind::kSecondary);
-  lock_btn_->callback([](Fl_Widget*, void* data) {
-    static_cast<MainWindow*>(data)->lock_now();
-    static_cast<MainWindow*>(data)->navigate(Page::kMasterKeys);
-  }, this);
+  {
+    lock_btn_ = new widgets::IconButton(kWinW - theme::kContentPad - 108, 8, 108, 32,
+                                        widgets::Icon::kLock, "立即锁定",
+                                        widgets::ButtonKind::kSecondary);
+    lock_btn_->callback([](Fl_Widget*, void* data) {
+      static_cast<MainWindow*>(data)->lock_now();
+      static_cast<MainWindow*>(data)->navigate(Page::kMasterKeys);
+    }, this);
+  }
 
-  status_ = new Fl_Box(theme::kSidebarWidth + theme::kContentPad, kWinH - 40,
-                       kWinW - theme::kSidebarWidth - theme::kContentPad * 2, 26, "");
-  status_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  status_->labelsize(theme::kFontSmall);
-  status_->labelcolor(theme::kTextMuted);
+  {
+    status_ = new Fl_Box(theme::kSidebarWidth + theme::kContentPad, kWinH - 40,
+                         kWinW - theme::kSidebarWidth - theme::kContentPad * 2, 26, "");
+    status_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+    status_->labelsize(theme::kFontSmall);
+    status_->labelcolor(theme::kTextMuted);
+  }
 
   end();
 
@@ -97,6 +113,12 @@ MainWindow::~MainWindow() {
   Fl::remove_timeout(on_idle_tick, this);
   Fl::remove_timeout(on_clipboard_clear, this);
   service_.close();
+}
+
+std::array<Fl_Group*, 9> MainWindow::all_pages() const {
+  return {unlock_.get(),  keys_.get(),         secrets_.get(),
+          settings_page_.get(), create_key_.get(), import_key_.get(),
+          export_key_.get(), add_secret_.get(), import_secret_.get()};
 }
 
 void MainWindow::build_menu() {
@@ -178,43 +200,19 @@ void MainWindow::go_back() {
 void MainWindow::show_page(Page page) {
   current_ = page;
   // 全部页面都是本窗口的子控件，按需显示。
-  unlock_->hide();
-  keys_->hide();
-  secrets_->hide();
-  settings_page_->hide();
-  create_key_->hide();
-  import_key_->hide();
-  export_key_->hide();
-  add_secret_->hide();
-  import_secret_->hide();
+  for (Fl_Group* page : all_pages()) page->hide();
 
   Fl_Group* active = nullptr;
   Page reload_target = page;
   switch (page) {
-    case Page::kMasterKeys:
-      active = keys_.get();
-      break;
-    case Page::kSecrets:
-      active = secrets_.get();
-      break;
-    case Page::kSettings:
-      active = settings_page_.get();
-      break;
-    case Page::kCreateKey:
-      active = create_key_.get();
-      break;
-    case Page::kImportKey:
-      active = import_key_.get();
-      break;
-    case Page::kExportKey:
-      active = export_key_.get();
-      break;
-    case Page::kAddSecret:
-      active = add_secret_.get();
-      break;
-    case Page::kImportSecret:
-      active = import_secret_.get();
-      break;
+    case Page::kMasterKeys: active = keys_.get(); break;
+    case Page::kSecrets: active = secrets_.get(); break;
+    case Page::kSettings: active = settings_page_.get(); break;
+    case Page::kCreateKey: active = create_key_.get(); break;
+    case Page::kImportKey: active = import_key_.get(); break;
+    case Page::kExportKey: active = export_key_.get(); break;
+    case Page::kAddSecret: active = add_secret_.get(); break;
+    case Page::kImportSecret: active = import_secret_.get(); break;
   }
   if (active == nullptr) return;
   active->show();
@@ -223,7 +221,7 @@ void MainWindow::show_page(Page page) {
   // 刷新数据：子页面切回时也要 reload，否则显示旧值。
   switch (reload_target) {
     case Page::kMasterKeys:
-      keys_->reload();
+    keys_->reload();
       break;
     case Page::kSecrets:
       secrets_->reload();
@@ -267,14 +265,16 @@ void MainWindow::show_page(Page page) {
     menu_items_[i]->set_selected(kMenu[i].page == menu_page);
     menu_items_[i]->redraw();
   }
-  lock_btn_->show();
+  if (lock_btn_ != nullptr) lock_btn_->show();
   redraw();
 }
 
 void MainWindow::set_status(const std::string& text) {
   status_text_ = text;
-  status_->copy_label(text.c_str());
-  status_->redraw();
+  if (status_ != nullptr) {
+    status_->copy_label(text.c_str());
+    status_->redraw();
+  }
 }
 
 void MainWindow::show_error(svc::Error e) { set_status(error_text(e)); }
