@@ -11,6 +11,8 @@
 
 #include "core/crypto.h"
 
+#include <algorithm>
+
 #include <mbedtls/build_info.h>
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/entropy.h>
@@ -59,11 +61,16 @@ class GlobalDrbg {
 
   void random(std::span<std::uint8_t> out) {
     if (out.empty()) return;
-    const int rc = mbedtls_ctr_drbg_random(&ctx_, out.data(), out.size());
-    if (rc != 0) {
-      // A DRBG that has failed is not recoverable; reseeding is the only safe move.
-      reseed();
-      check(mbedtls_ctr_drbg_random(&ctx_, out.data(), out.size()), "ctr_drbg_random");
+    // MBEDTLS_CTR_DRBG_MAX_REQUEST caps one call (1024 by default in the
+    // trimmed config). A single oversized request fails with
+    // MBEDTLS_ERR_CTR_DRBG_REQUEST_TOO_BIG, so chunk instead of handing the
+    // whole buffer over. Callers legitimately ask for kilobytes.
+    constexpr std::size_t kChunk = 512;
+    std::size_t done = 0;
+    while (done < out.size()) {
+      const std::size_t n = std::min(kChunk, out.size() - done);
+      check(mbedtls_ctr_drbg_random(&ctx_, out.data() + done, n), "ctr_drbg_random");
+      done += n;
     }
   }
 
@@ -77,7 +84,23 @@ class GlobalDrbg {
     reseed();
   }
 
+  ~GlobalDrbg() {
+    mbedtls_ctr_drbg_free(&ctx_);
+    mbedtls_entropy_free(&entropy_);
+  }
+
+  GlobalDrbg(const GlobalDrbg&) = delete;
+  GlobalDrbg& operator=(const GlobalDrbg&) = delete;
+
   void reseed() {
+    // mbedtls_ctr_drbg_seed overwrites the context in place and expects it to be
+    // either freshly initialised or already freed. Seeding a live context leaks
+    // its internal AES-CTR state and, worse, leaves the entropy accumulator in
+    // an inconsistent state: the next call can fail with
+    // MBEDTLS_ERR_CTR_DRBG_ENTROPY_SOURCE_FAILED (-0x0038). Freeing first is
+    // what the API contract requires.
+    mbedtls_ctr_drbg_free(&ctx_);
+
     // The NIST personalisation string is a fixed, non-secret label; it is not
     // meant to add entropy, only to domain-separate this DRBG from any other in
     // the process.
