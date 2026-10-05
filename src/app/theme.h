@@ -18,6 +18,7 @@ namespace secretkeeper::ui::theme {
 inline constexpr Fl_Color kSidebarBg = 0x1D2C31;   // 侧栏底色
 inline constexpr Fl_Color kSidebarIcon = 0x96AFB3;  // 侧栏未选中图标
 inline constexpr Fl_Color kSidebarActiveBg = 0x24454A;  // 侧栏选中项底色
+inline constexpr Fl_Color kActiveBg = 0x24454A;  // 深色区上的浅色块（Logo 底、菜单选中）
 inline constexpr Fl_Color kSidebarActiveText = 0x68C3AD;  // 侧栏选中项文字
 
 inline constexpr Fl_Color kContentBg = 0xF3F5F6;  // 主内容区底色
@@ -104,11 +105,5 @@ Fl_Font font_for(int weight);
 
 // 统一设置常用外观：直角边框、背景色、文字色。
 void style(Fl_Widget& w, Fl_Color bg, Fl_Color fg);
-
-// 把 lf_char_t 中文串画在 (x,y,w,h) 内，垂直居中、按需换行。
-// FLTK 默认字体不含中日韩字形，这里假定宿主已装好中文字体，
-// 若系统无中文字形会显示为空白，这是已知的运行环境依赖。
-void draw_text(Fl_Widget& w, std::string_view text, int x, int y, int width, int height,
-               Fl_Align align);
 
 }  // namespace secretkeeper::ui::theme

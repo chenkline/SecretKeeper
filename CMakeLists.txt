@@ -272,6 +272,7 @@ if(SK_BUILD_APP)
     src/app/theme.cpp
     src/app/widgets.cpp
     src/app/pages.cpp
+    src/app/main_window.cpp
     src/app/view_model.cpp
   )
   if(SK_PLATFORM_WINDOWS)

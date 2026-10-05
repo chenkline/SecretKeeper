@@ -1,6 +1,5 @@
 #include "theme.h"
 
-#include <FL/Fl_Box.H>
 #include <FL/fl_draw.H>
 
 namespace secretkeeper::ui::theme {
@@ -43,14 +42,14 @@ void stroke_rounded(int x, int y, int w, int h, int radius, Fl_Color c, int line
 
 int pill_width(std::string_view text, int font_size) {
   fl_font(font_for(kWeightMedium), font_size);
-  return static_cast<int>(fl_width(text.c_str())) + 2 * kGapMd + kGapSm;
+  return static_cast<int>(fl_width(text.data())) + 2 * kGapMd + kGapSm;
 }
 
 int draw_pill(int x, int y, int w, int h, std::string_view text, Fl_Color fg, Fl_Color bg) {
   fill_rounded(x, y, w, h, h / 2, bg);
   fl_color(fg);
   fl_font(font_for(kWeightMedium), kFontTiny);
-  fl_draw(text.c_str(), x, y, w, h, FL_ALIGN_CENTER);
+  fl_draw(text.data(), x, y, w, h, FL_ALIGN_CENTER);
   return w;
 }
 
@@ -62,15 +61,5 @@ void style(Fl_Widget& w, Fl_Color bg, Fl_Color fg) {
   w.labelsize(kFontBody);
 }
 
-void draw_text(Fl_Widget& w, std::string_view text, int x, int y, int width, int height,
-               Fl_Align align) {
-  // 借用 Fl_Box 的绘制路径统一处理对齐与垂直居中。
-  Fl_Box scratch(x, y, width, height, text.data());
-  scratch.align(align | FL_ALIGN_INSIDE);
-  scratch.box(FL_NO_BOX);
-  scratch.labelfont(font_for(kWeightRegular));
-  scratch.labelsize(kFontBody);
-  w.draw_label(scratch);
-}
 
 }  // namespace secretkeeper::ui::theme

@@ -55,9 +55,17 @@ Card::Card(int x, int y, int w, int h) : Fl_Widget(x, y, w, h) {
   box(FL_NO_BOX);
 }
 
+Card::Card(int x, int y, int w, int h, Fl_Color bg) : Card(x, y, w, h) {
+  bg_ = bg;
+  custom_bg_ = true;
+}
+
 void Card::draw() {
-  theme::fill_rounded(x(), y(), w(), h(), theme::kRadiusCard, theme::kCardBg);
-  theme::stroke_rounded(x(), y(), w(), h(), theme::kRadiusCard, theme::kBorder);
+  theme::fill_rounded(x(), y(), w(), h(), theme::kRadiusCard,
+                      custom_bg_ ? bg_ : theme::kCardBg);
+  if (!custom_bg_) {
+    theme::stroke_rounded(x(), y(), w(), h(), theme::kRadiusCard, theme::kBorder);
+  }
 }
 
 int Card::handle(int event) {
@@ -72,6 +80,12 @@ Button::Button(int x, int y, int w, int h, std::string_view label, ButtonKind ki
   box(FL_NO_BOX);
   down_box(FL_NO_BOX);
   labelsize(theme::kFontBody);
+}
+
+void Button::set_selected(bool on) {
+  if (selected_ == on) return;
+  selected_ = on;
+  redraw();
 }
 
 void Button::set_enabled(bool on) {
@@ -109,6 +123,12 @@ void Button::draw() {
     bg = theme::kSubtleBg;
     border = theme::kBorder;
   }
+  if (selected_) {
+    // 侧栏选中项：主色浅底 + 主色文字（设计稿左侧菜单）。
+    bg = theme::kSidebarActiveBg;
+    fg = theme::kSidebarActiveText;
+    border = bg;
+  }
 
   theme::fill_rounded(x(), y(), w(), h(), theme::kRadiusButton, bg);
   if (kind_ != ButtonKind::kPrimary) {
@@ -127,6 +147,15 @@ int Button::handle(int event) {
 Pill::Pill(int x, int y, int w, int h, std::string_view text, Fl_Color fg, Fl_Color bg)
     : Fl_Widget(x, y, w, h), text_(text), fg_(fg), bg_(bg) {
   box(FL_NO_BOX);
+  when(FL_WHEN_RELEASE);
+}
+
+int Pill::handle(int event) {
+  if (event == FL_PUSH) {
+    do_callback();
+    return 1;
+  }
+  return Fl_Widget::handle(event);
 }
 
 void Pill::draw() {

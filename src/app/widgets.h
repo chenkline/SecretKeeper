@@ -30,8 +30,14 @@ namespace secretkeeper::ui::widgets {
 class Card : public Fl_Widget {
  public:
   Card(int x, int y, int w, int h);
+  // 自定义填充色（设计稿里的浅底块）。radius <= 0 时画直角。
+  Card(int x, int y, int w, int h, Fl_Color bg);
   void draw() override;
   int handle(int event) override;
+
+ private:
+  Fl_Color bg_ = 0xFFFFFF;
+  bool custom_bg_ = false;
 };
 
 // ---- 主色按钮 ----
@@ -45,16 +51,21 @@ class Button : public Fl_Button {
   void draw() override;
   void set_enabled(bool on);
   bool enabled() const { return enabled_; }
+  // 侧栏菜单高亮：选中项用主色浅底与主色文字。
+  void set_selected(bool on);
+  bool selected() const { return selected_; }
 
  protected:
   int handle(int event) override;
   // IconButton 在自己的 draw 里需要复用 Button 的配色判定。
   ButtonKind kind() const { return kind_; }
   bool is_enabled() const { return enabled_; }
+  bool is_selected() const { return selected_; }
 
  private:
   ButtonKind kind_;
   bool enabled_ = true;
+  bool selected_ = false;
 };
 
 // ---- 标签页 / 步骤胶囊 ----
@@ -63,8 +74,14 @@ class Pill : public Fl_Widget {
  public:
   Pill(int x, int y, int w, int h, std::string_view text, Fl_Color fg, Fl_Color bg);
   void draw() override;
+  // 设置页的可选项用它做点击目标。
+  void set_active(bool on) { active_ = on; }
+
+ protected:
+  int handle(int event) override;
 
  private:
+  bool active_ = false;
   std::string text_;
   Fl_Color fg_;
   Fl_Color bg_;
