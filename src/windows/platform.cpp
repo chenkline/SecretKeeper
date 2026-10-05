@@ -90,18 +90,22 @@ bool get_clipboard_text(std::string* out) {
 }  // namespace
 
 fs::path data_directory() {
-  wchar_t* roaming = nullptr;
+  // 必须持有 wstring 本身而不是它的 data() 指针：buffer 是局部对象，
+  // 函数返回前析构，留下的指针是悬垂的，后续用它构造 path 会读到
+  // 已释放的堆内存，表现为目录名变成乱码。
+  std::wstring roaming;
   const DWORD len = GetEnvironmentVariableW(L"APPDATA", nullptr, 0);
   if (len > 0) {
-    std::wstring buffer(len, L'\0');
-    const DWORD got = GetEnvironmentVariableW(L"APPDATA", buffer.data(), len);
+    roaming.resize(len);
+    const DWORD got = GetEnvironmentVariableW(L"APPDATA", roaming.data(), len);
     if (got > 0) {
-      buffer.resize(got);
-      roaming = buffer.empty() ? nullptr : buffer.data();
+      roaming.resize(got);
+    } else {
+      roaming.clear();
     }
   }
 
-  fs::path base = roaming != nullptr ? fs::path(roaming) : fs::temp_directory_path();
+  fs::path base = roaming.empty() ? fs::temp_directory_path() : fs::path(roaming);
   return base / L"SecretKeeper";
 }
 

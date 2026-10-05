@@ -55,6 +55,115 @@ Windows 端五目标自检均已通过，**RSA 路径真实执行、0 跳过**�
 transcript，证明相同输入在任何平台都得到相同字节 —— 这是向量校验做不到的，
 因为向量校验用的是另一套独立实现。
 
+## 编译指南
+
+三端共用根目录的 `CMakeLists.txt`。产物目录统一为：
+
+```
+build/{platform}/{arch}/{Debug,Release}          库与可执行程序
+build/{platform}/{arch}/{Debug,Release}/vendor/{module}   内置第三方各自的产物
+```
+
+例如 `build/windows/x64/Release/` 与 `build/windows/x64/Release/vendor/mbedtls/`。
+
+两种生成器的区别：**MSVC 是多配置生成器**，CMake 会在输出目录后
+自动追加 `Debug`/`Release`，配置名通过 `--config` 指定；**Ninja 是单配置生成器**，
+配置名必须写在目录里（`-DCMAKE_BUILD_TYPE=`），否则两种配置的产物会互相覆盖。
+
+### Windows（MSVC）
+
+需要 Visual Studio 2022 的 C++ 工具链与 CMake 3.20+。首先进入开发者命令提示符（
+`x64 Native Tools Command Prompt`，或自行运行 `VsDevCmd.bat`）：
+
+```
+cmake -S . -B build/windows/x64 -A x64
+cmake --build build/windows/x64 --config Debug
+cmake --build build/windows/x64 --config Release
+ctest --test-dir build/windows/x64 -C Debug
+ctest --test-dir build/windows/x64 -C Release
+```
+
+PowerShell 中若中文显示为乱码，先执行 `. .\scripts\ps-profile.ps1`。
+
+面向 ARM64 交叉编译（需要 `Microsoft.VisualStudio.Component.VC.Tools.ARM64`）：
+
+```
+cmake -S . -B build/windows/arm64 -A ARM64
+cmake --build build/windows/arm64 --config Release
+```
+
+交叉编译凭据不足时，mbedTLS 的 AES 加速会自动切到 Armv8 实现（不需要任何手工配置）。
+
+### Linux
+
+需要 CMake 3.20+ 与 Ninja，以及 FLTK 的 X11 依赖：
+
+```
+sudo apt-get install -y cmake ninja-build \
+  libx11-dev libxext-dev libxft-dev libxinerama-dev \
+  libxcursor-dev libxrender-dev libfontconfig1-dev libfreetype6-dev
+```
+
+配置与构建（把 `Release` 换成 `Debug` 即可得到调试版）：
+
+```
+cmake -S . -B build/linux/x64 -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build/linux/x64 --parallel
+ctest --test-dir build/linux/x64 --output-on-failure
+./build/linux/x64/Release/SecretKeeper
+```
+
+ARM64 目标（需要交叉编译器）：
+
+```
+sudo apt-get install -y g++-aarch64-linux-gnu
+cmake -S . -B build/linux/aarch64 -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
+  -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++
+cmake --build build/linux/aarch64 --parallel
+```
+
+只验证核心四层（不需要界面，因此不需要 X11 开发库）：加 `-DSK_BUILD_APP=OFF`。
+
+### macOS
+
+需要 Xcode Command Line Tools 与 CMake 3.20+：
+
+```
+xcode-select --install
+cmake -S . -B build/macos/arm64 -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build/macos/arm64 --parallel
+ctest --test-dir build/macos/arm64 --output-on-failure
+./build/macos/arm64/Release/SecretKeeper
+```
+
+Apple Silicon 上架构为 `arm64`；Intel Mac 改为 `build/macos/x64` 即可。
+
+### 产物检查
+
+Windows 下可确认产物不依赖任何第三方 DLL：
+
+```
+dumpbin /dependents build/windows/x64/Release/SecretKeeper.exe
+```
+
+出现 `fltk` / `msvcp` / `vcruntime` 等非系统 DLL 则说明静态链接失败。
+
+### 运行自检
+
+五个分层测试目标由 CTest 驱动，与生产代码的依赖方向一致（每层只测本层及之下）：
+
+| 目标 | 覆盖层 |
+|---|---|
+| `sk_crypto_test` | 密码学原语 + 黄金向量 |
+| `sk_serialize_test` | 字节级格式往返与负例 |
+| `sk_store_test` | SQLite 索引、原子写入、路径推导 |
+| `sk_service_test` | 需求 1/2/3 的全部业务用例 |
+| `sk_ui_test` | UI 层纯逻辑（不启动 FLTK 事件循环） |
+
+释放 UI 界面可用 `-DSK_BUILD_APP=OFF`，仅构建前四个目标。
+
 ## 文档
 
 全部文档位于 [docs/](docs/README.md)，建议从 [总体技术设计](docs/01-architecture/总体技术设计.md) 开始阅读。
