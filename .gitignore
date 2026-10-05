@@ -107,4 +107,7 @@ __pycache__/
 *.pyc
 
 # UI 设计调试脚本（临时文件）
+# 跨平台一致性探针的输出（各平台本地跑出来的 transcript，
+# 由 scripts/compare-conformance.py 比对，不入库）
+conformance-*.txt
 scripts/_*.py

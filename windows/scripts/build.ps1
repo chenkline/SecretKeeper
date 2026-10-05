@@ -21,7 +21,9 @@ param(
     [ValidateSet("x64", "arm64")]
     [string]$Architecture = "x64",
     [switch]$Test,
-    [switch]$CompileOnly
+    [switch]$CompileOnly,
+    # 只构建跨平台一致性探针。CI 用它产出 transcript 交给比对 job。
+    [switch]$Conformance
 )
 
 $ErrorActionPreference = "Stop"
@@ -128,102 +130,110 @@ $mbedtlsSrcs = @(
 
 $includeArgs = @(
     "/I src\include",
+    "/I src\app",
     "/I vendor\argon2\include",
     "/I vendor\sqlite",
     "/I vendor\mbedtls\include"
 )
 
 
-if ($Test -or $CompileOnly) {
+if ($Test -or $CompileOnly -or $Conformance) {
     if ($CompileOnly) {
         Write-Host "目标架构: $Architecture（仅编译，不运行）"
     }
-    Write-Host "`n=== 构建测试可执行文件 ==="
-    $srcs = $argonSrcs + $mbedtlsSrcs + @(
-        "src\common\crypto.cpp",
-        "src\common\container.cpp",
-        "tests\crypto_test.cpp"
+
+    # core 四层 + UI 纯逻辑，与生产代码的依赖方向一致。
+    # 每个目标只编译它自己这一层（及之下），不把下层测试拉进来。
+    $coreSrcs = @(
+        "src\common\core\crypto.cpp",
+        "src\common\core\serialize.cpp",
+        "src\common\core\_error.cpp",
+        "src\common\core\_text.cpp",
+        "src\common\core\_hex.cpp",
+        "src\common\core\_file_store.cpp",
+        "src\common\core\kek_cache.cpp",
+        "src\common\core\backoff.cpp",
+        "src\common\core\store.cpp",
+        "src\common\core\service.cpp"
     )
-    $cmd = "cl.exe /nologo /std:c++20 /utf-8 /EHsc /W4 $cfgFlag /MD " +
-           "/D_CRT_SECURE_NO_WARNINGS " +
-           ($includeArgs -join " ") + " " +
-           "/Fo:$objDir\ /Fe:$buildDir\crypto_test.exe " +
-           (($srcs | ForEach-Object { "`"$_`"" }) -join " ") +
-           " $($argonFlags -join ' ') /link bcrypt.lib"
-    cmd /c $cmd
-    if ($LASTEXITCODE -ne 0) { throw "编译失败" }
 
+    # 目标定义：Name / Exe / 额外源文件 / 额外源组。
+    # sqlite 只有 store 与 service 需要；argon2 与 mbedtls 由 crypto 引入。
+    $targets = @(
+        @{
+            Name = "conformance"; Exe = "crypto_conformance.exe"
+            Srcs = @("src\common\core\crypto.cpp", "tests\core\crypto_conformance.cpp")
+            Groups = @("argon", "mbedtls")
+            NoTest = $true
+        },
+        @{
+            Name = "crypto";   Exe = "crypto_test.exe"
+            Srcs = @("src\common\core\crypto.cpp", "tests\core\crypto_test.cpp")
+            Groups = @("argon", "mbedtls")
+        },
 
-    Write-Host "`n=== 构建存储层自检 ==="
-    $storeSrcs = $argonSrcs + $mbedtlsSrcs + $sqliteSrcs + @(
-        "src\common\crypto.cpp",
-        "src\common\text.cpp",
-        "src\common\error.cpp",
-        "src\common\backoff.cpp",
-        "src\common\kek_cache.cpp",
-        "src\common\master_key_service.cpp",
-        "src\common\secret_service.cpp",
-        "src\common\container.cpp",
-        "src\common\hex.cpp",
-        "src\common\index_db.cpp",
-        "src\common\file_store.cpp",
-        "tests\store_test.cpp"
+        @{
+            Name = "serialize"; Exe = "serialize_test.exe"
+            Srcs = @("src\common\core\serialize.cpp", "tests\core\serialize_test.cpp")
+            Groups = @()
+        },
+        @{
+            Name = "store";    Exe = "store_test.exe"
+            Srcs = @(
+                "src\common\core\serialize.cpp",
+                "src\common\core\_hex.cpp",
+                "src\common\core\_file_store.cpp",
+                "src\common\core\store.cpp",
+                "tests\core\store_test.cpp"
+            )
+            Groups = @("sqlite")
+        },
+        @{
+            Name = "service";  Exe = "service_test.exe"
+            Srcs = $coreSrcs + @("tests\core\service_test.cpp")
+            Groups = @("argon", "mbedtls", "sqlite")
+        },
+        @{
+            Name = "ui";       Exe = "ui_test.exe"
+            Srcs = $coreSrcs + @(
+                "src\app\view_model.cpp",
+                "tests\ui\view_model_test.cpp"
+            )
+            Groups = @("argon", "mbedtls", "sqlite")
+        }
     )
-    $storeCmd = "cl.exe /nologo /std:c++20 /utf-8 /EHsc $cfgFlag /MD " +
-                "/D_CRT_SECURE_NO_WARNINGS /DSQLITE_OMIT_LOAD_EXTENSION " +
-                ($includeArgs -join " ") + " " +
-                "/Fo:$objDir\ /Fd:$objDir\ /Fe:$buildDir\store_test.exe " +
-                (($storeSrcs | ForEach-Object { "`"$_`"" }) -join " ") +
-                " /link bcrypt.lib"
-    cmd /c $storeCmd
-    if ($LASTEXITCODE -ne 0) { throw "存储层编译失败" }
 
+    Write-Host "`n=== 构建自检程序（$($targets.Count) 个目标）==="
+    foreach ($t in $targets) {
+        Write-Host "`n--- $($t.Name) ---"
+        # cl.exe 不会自动创建 /Fo 指向的子目录。
+        $targetObjDir = Join-Path $objDir $t.Name
+        New-Item -ItemType Directory -Force -Path $targetObjDir | Out-Null
+        $all = @()
+        foreach ($g in $t.Groups) {
+            switch ($g) {
+                "argon"   { $all += $argonSrcs }
+                "mbedtls" { $all += $mbedtlsSrcs }
+                "sqlite"  { $all += $sqliteSrcs }
+            }
+        }
+        $all += $t.Srcs
 
-    Write-Host "`n=== 构建核心层自检 ==="
-    $coreSrcs = $argonSrcs + $mbedtlsSrcs + @(
-        "src\common\crypto.cpp",
-        "src\common\text.cpp",
-        "src\common\error.cpp",
-        "src\common\backoff.cpp",
-        "src\common\kek_cache.cpp",
-        "tests\core_test.cpp"
-    )
-    $coreCmd = "cl.exe /nologo /std:c++20 /utf-8 /EHsc $cfgFlag /MD " +
-               "/D_CRT_SECURE_NO_WARNINGS " +
+        $cmd = "cl.exe /nologo /std:c++20 /utf-8 /EHsc /W4 $cfgFlag /MD " +
+               "/D_CRT_SECURE_NO_WARNINGS /DSQLITE_OMIT_LOAD_EXTENSION " +
                ($includeArgs -join " ") + " " +
-               "/Fo:$objDir\ /Fd:$objDir\ /Fe:$buildDir\core_test.exe " +
-               (($coreSrcs | ForEach-Object { "`"$_`"" }) -join " ") +
+               "/Fo:$targetObjDir\ /Fd:$targetObjDir\ /Fe:$buildDir\$($t.Exe) " +
+               (($all | ForEach-Object { "`"$_`"" }) -join " ") +
                " $($argonFlags -join ' ') /link bcrypt.lib"
-    cmd /c $coreCmd
-    if ($LASTEXITCODE -ne 0) { throw "核心层编译失败" }
-
-
-    Write-Host "`n=== 构建业务层自检 ==="
-    $svcSrcs = $argonSrcs + $mbedtlsSrcs + $sqliteSrcs + @(
-        "src\common\crypto.cpp",
-        "src\common\container.cpp",
-        "src\common\text.cpp",
-        "src\common\error.cpp",
-        "src\common\backoff.cpp",
-        "src\common\kek_cache.cpp",
-        "src\common\master_key_service.cpp",
-        "src\common\secret_service.cpp",
-        "src\common\hex.cpp",
-        "src\common\index_db.cpp",
-        "src\common\file_store.cpp",
-        "tests\service_test.cpp"
-    )
-    $svcCmd = "cl.exe /nologo /std:c++20 /utf-8 /EHsc $cfgFlag /MD " +
-              "/D_CRT_SECURE_NO_WARNINGS /DSQLITE_OMIT_LOAD_EXTENSION " +
-              ($includeArgs -join " ") + " " +
-              "/Fo:$objDir\ /Fd:$objDir\ /Fe:$buildDir\service_test.exe " +
-              (($svcSrcs | ForEach-Object { "`"$_`"" }) -join " ") +
-              " $($argonFlags -join ' ') /link bcrypt.lib"
-    cmd /c $svcCmd
-    if ($LASTEXITCODE -ne 0) { throw "业务层编译失败" }
+        cmd /c $cmd
+        if ($LASTEXITCODE -ne 0) { throw "$($t.Name) 编译失败" }
+        if ($Conformance -and -not $Test -and $t.Name -ne "crypto") { break }
+    }
 
     if ($CompileOnly) {
         Write-Host "`n交叉编译完成（未运行测试）。"
+    } elseif ($Conformance -and -not $Test) {
+        Write-Host "`n一致性探针已构建：$buildDir\crypto_conformance.exe"
     } else {
         # 执行逻辑移交 run-tests.ps1：编译与执行分离，交叉编译时无需运行。
         & pwsh -NoProfile -File "windows/scripts/run-tests.ps1" `
@@ -232,5 +242,5 @@ if ($Test -or $CompileOnly) {
     }
 } else {
     Write-Host "构建目标：库（尚未定义 UI 工程）"
-    Write-Host "提示：加 -CompileOnly 可只编译四层自检程序而不运行。"
+    Write-Host "提示：加 -CompileOnly 可只编译自检程序而不运行。"
 }

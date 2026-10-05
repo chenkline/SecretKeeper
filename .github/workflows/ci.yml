@@ -89,6 +89,21 @@ jobs:
           chcp 65001 >nul
           pwsh -NoProfile -File windows/scripts/run-tests.ps1 -Architecture x64 -Root .
 
+      - name: 生成跨平台一致性探针
+        shell: cmd
+        run: |
+          call "%VSDEVCMD%"
+          chcp 65001 >nul
+          pwsh -NoProfile -File windows/scripts/build.ps1 -Conformance -Architecture x64
+          windows\build\x64\crypto_conformance.exe > conformance-windows.txt
+          type conformance-windows.txt
+      - name: 上传一致性 transcript
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance-windows
+          path: conformance-windows.txt
+          if-no-files-found: error
       - name: 上传测试日志
         if: always()
         uses: actions/upload-artifact@v4
@@ -255,6 +270,15 @@ jobs:
         run: |
           cmake --build build/linux --parallel
           ctest --test-dir build/linux --output-on-failure
+      - name: 生成跨平台一致性探针
+        run: ./build/linux/sk_crypto_conformance | tee conformance-linux.txt
+      - name: 上传一致性 transcript
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance-linux
+          path: conformance-linux.txt
+          if-no-files-found: error
 
 
   # ---------- macOS ----------
@@ -278,8 +302,42 @@ jobs:
         run: |
           cmake --build build/macos --parallel
           ctest --test-dir build/macos --output-on-failure
+      - name: 生成跨平台一致性探针
+        run: ./build/macos/sk_crypto_conformance | tee conformance-macos.txt
+      - name: 上传一致性 transcript
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance-macos
+          path: conformance-macos.txt
+          if-no-files-found: error
 
   # ---------- Android ----------
+  # ---------- 跨平台一致性比对 ----------
+  # 三个原生平台的探针 transcript 在这里逐行比对。verify-vectors.py 只能
+  # 证明「向量本身自洽」（用独立的 Python 实现重算一遍），证明不了
+  # 「各平台的 C++ 实现真的产出了同样的字节」。这一步跑的是实际交付的
+  # 代码，因此才是端到端的一致性证据。
+  conformance:
+    name: 跨平台一致性比对
+    needs: [windows, linux, macos]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 下载各平台 transcript
+        uses: actions/download-artifact@v4
+        with:
+          path: transcripts
+      - name: 比对
+        run: >
+          python scripts/compare-conformance.py
+          transcripts/conformance-windows/conformance-windows.txt
+          transcripts/conformance-linux/conformance-linux.txt
+          transcripts/conformance-macos/conformance-macos.txt
+
   android:
     name: Android (Kotlin/Compose)
     runs-on: ubuntu-24.04

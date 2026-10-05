@@ -296,6 +296,13 @@ add_executable(sk_crypto_test tests/core/crypto_test.cpp)
 target_link_libraries(sk_crypto_test PRIVATE sk_crypto)
 add_test(NAME crypto COMMAND sk_crypto_test "${CMAKE_SOURCE_DIR}")
 
+# 跨平台一致性探针。不参与 pass/fail 判定，而是输出一份 transcript，
+# 由 scripts/compare-conformance.py 比对各平台的输出。它跑的是实际交付的
+# C++ 代码，因此证明的是「各端实现一致」，而 verify-vectors.py 证明的只是
+# 「向量本身自洽」。
+add_executable(sk_crypto_conformance tests/core/crypto_conformance.cpp)
+target_link_libraries(sk_crypto_conformance PRIVATE sk_crypto)
+
 add_executable(sk_serialize_test tests/core/serialize_test.cpp)
 target_link_libraries(sk_serialize_test PRIVATE sk_serialize)
 add_test(NAME serialize COMMAND sk_serialize_test "${CMAKE_SOURCE_DIR}")

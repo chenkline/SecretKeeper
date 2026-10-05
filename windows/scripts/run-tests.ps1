@@ -1,6 +1,6 @@
 # SecretKeeper - 测试驱动脚本
 #
-# 用途：把「编译」与「执行测试」分开。build.ps1 负责产出四个自检程序，
+# 用途：把「编译」与「执行测试」分开。build.ps1 负责产出五个自检程序，
 # 本脚本负责按正确顺序、带上正确参数逐个执行，并汇总结果。
 #
 # 拆分理由：CI 与本地都需要「只编译不运行」（ARM64 交叉编译、UI 构建）
@@ -26,15 +26,16 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 $buildDir = "windows\build\$Architecture"
 
-# 四个自检程序及其调用方式。
+# 五个自检程序及其调用方式，顺序与依赖方向一致（每层只测本层及之下）。
 #
-# root 参数：crypto / store 两层的测试要读仓库里的 test-vectors/ 目录，
-# 因此需要传入仓库根路径。core / service 两层的用例自包含，不需要参数。
+# root 参数：crypto / serialize 两层的测试要读仓库里的 test-vectors/ 目录，
+# 因此需要传入仓库根路径。store / service / ui 的用例自包含，不需要参数。
 $suites = @(
-    @{ Name = "密码学层"; Exe = "crypto_test.exe";  Args = @($Root); Vector = $true },
-    @{ Name = "存储层";   Exe = "store_test.exe";   Args = @($Root); Vector = $true },
-    @{ Name = "核心层";   Exe = "core_test.exe";    Args = @();      Vector = $false },
-    @{ Name = "业务层";   Exe = "service_test.exe"; Args = @();      Vector = $false }
+    @{ Name = "crypto";     Exe = "crypto_test.exe";    Args = @($Root); Vector = $true },
+    @{ Name = "serialize";  Exe = "serialize_test.exe"; Args = @($Root); Vector = $true },
+    @{ Name = "store";      Exe = "store_test.exe";     Args = @();      Vector = $false },
+    @{ Name = "service";    Exe = "service_test.exe";   Args = @();      Vector = $false },
+    @{ Name = "ui";         Exe = "ui_test.exe";        Args = @();      Vector = $false }
 )
 
 $failed = @()
