@@ -1,9 +1,15 @@
 // SecretKeeper - main window implementation (FLTK).
 //
-// Layering: this file owns widgets and user intent only. Every byte operation
-// goes through the four shared layers (container / crypto / store / core). The
-// only platform calls are the four thin wrappers in platform.h, so the same file
+// Layering: this file owns widgets and user intent only. It includes exactly
+// three headers from outside the standard library -- core/service.h (the single
+// core facade), view_model.h (testable presentation logic) and platform.h (the
+// four OS capabilities it cannot implement portably). It never reaches into
+// crypto, serialize or store, and it never holds key material. The same file
 // serves Windows, Linux and macOS.
+//
+// Passwords: the UI owns no KEK. It first calls the service with an empty
+// password; only when the service answers kNeedsPassword does it prompt and
+// retry the same call. Which key needs a password is the service's decision.
 //
 // Two rules from docs/04-requirements are load bearing and must survive future
 // edits:
@@ -11,7 +17,7 @@
 //   1. The yellow question mark is part of the master key ID *column value* and
 //      means "master key not found locally". It has nothing to do with whether
 //      the master key name column is empty.
-//   2. Every user-visible error string comes from core::message(). This file
+//   2. Every user-visible error string comes from service::message(). This file
 //      never assembles or rewrites the wording.
 
 #include "app.h"
@@ -38,30 +44,22 @@
 #include <string>
 #include <vector>
 
-#include "backoff.h"
-#include "container.h"
-#include "error.h"
-#include "file_store.h"
-#include "hex.h"
-#include "index_db.h"
-#include "kek_cache.h"
-#include "master_key_service.h"
 #include "platform.h"
-#include "secret_service.h"
-#include "text.h"
+#include "view_model.h"
+
+#include "core/service.h"
 
 namespace secretkeeper::ui {
 namespace {
 
-using core::Error;
+using service::Error;
 namespace fs = std::filesystem;
 using Clock = std::chrono::steady_clock;
 
 // ---- tunables from docs/04-requirements section 4 -----------------------------
 constexpr double kIdleLockMinutes = 5.0;              // 4.1
 constexpr double kClipboardClearSeconds = 30.0;       // 4.3
-constexpr double kKekRotateSeconds =
-    static_cast<double>(core::kKekRotationSeconds);   // 2.7
+constexpr double kKekRotateSeconds = 30.0;          // 2.7
 
 constexpr int kWindowWidth = 980;
 constexpr int kWindowHeight = 640;
@@ -133,11 +131,9 @@ class DataTable : public Fl_Table_Row {
     col_width(2, c2);
   }
 
-  // missing_rows[i] is true when row i's master key is absent locally.
-  void set_rows(std::vector<std::array<std::string, 3>> rows,
-                std::vector<bool> missing_rows) {
+  // row.show_question_mark is true when that row's master key is absent locally.
+  void set_rows(std::vector<Row> rows) {
     data_ = std::move(rows);
-    missing_ = std::move(missing_rows);
     Fl_Table_Row::rows(static_cast<int>(data_.size()));
     redraw();
   }
@@ -170,9 +166,7 @@ class DataTable : public Fl_Table_Row {
         fl_color(is_selected ? FL_YELLOW : FL_WHITE);
         fl_rectf(X, Y, W, H);
 
-        // The marker sits in a reserved slot on the ID column only. An empty
-        // name column never triggers it.
-        const bool marker = C == 0 && R < static_cast<int>(missing_.size()) && missing_[R];
+        const bool marker = C == 0 && data_[static_cast<std::size_t>(R)].show_question_mark;
         int text_width = W;
         if (marker) {
           text_width = W - kMarkerSlotWidth;
@@ -181,7 +175,9 @@ class DataTable : public Fl_Table_Row {
                   FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
         }
         fl_color(FL_BLACK);
-        fl_draw(data_[R][C].c_str(), X + 5, Y, text_width - 5, H,
+        const Row& row = data_[static_cast<std::size_t>(R)];
+        const std::string& cell = C == 0 ? row.c0 : (C == 1 ? row.c1 : row.c2);
+        fl_draw(cell.c_str(), X + 5, Y, text_width - 5, H,
                 FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
         break;
       }
@@ -194,8 +190,7 @@ class DataTable : public Fl_Table_Row {
  private:
   const char* headers_[3] = {nullptr, nullptr, nullptr};
   int header_count_ = 0;
-  std::vector<std::array<std::string, 3>> data_;
-  std::vector<bool> missing_;
+  std::vector<Row> data_;
 };
 
 // ---- password dialog ----------------------------------------------------------
@@ -391,13 +386,8 @@ class MainWindow : public Fl_Double_Window {
       set_status("无法创建数据目录");
       return false;
     }
-    files_.set_data_dir(dir.string());
-    std::string layout_error;
-    if (!files_.ensure_layout(&layout_error)) {
-      set_status("无法访问数据目录");
-      return false;
-    }
-    if (db_.open((dir / "secret.db").string()) != store::StoreError::kOk) {
+    // service_.open 建目录并开索引库，两件事都在 service 内部完成。
+    if (service_.open(dir.string()) != Error::kOk) {
       set_status("无法打开索引库");
       return false;
     }
@@ -410,87 +400,69 @@ class MainWindow : public Fl_Double_Window {
     status_->redraw();
   }
 
-  void show_error(Error e) {
-    // Requirement wording is fixed in core::message(); the UI only displays it.
-    set_status(std::string(core::message(e)));
-  }
+  void show_error(Error e) { set_status(error_text(e)); }
 
   // ---- list refresh ----
   void refresh_all() {
-    default_key_id_ = db_.default_master_key_id();
+    default_key_id_ = service_.default_master_key_id();
     refresh_keys();
     refresh_secrets();
   }
 
+  // Row projection and the yellow question mark live in view_model so they can
+  // be tested without an FLTK event loop.
   void refresh_keys() {
-    std::vector<std::array<std::string, 3>> rows;
-    for (const core::MasterKeyListItem& item : keys_.list()) {
-      rows.push_back({item.master_key_id, item.name, item.is_default ? "是" : ""});
-    }
-    mk_table_->set_rows(std::move(rows), {});
+    mk_table_->set_rows(project_master_keys(service_.list_master_keys()));
   }
 
   void refresh_secrets() {
-    std::vector<std::array<std::string, 3>> rows;
-    std::vector<bool> missing;
-    for (const core::SecretListItem& item : secrets_.list()) {
-      // The yellow question mark rides on the ID column value. It is shown
-      // because the key is missing -- never because the name happens to be empty.
-      rows.push_back({item.master_key_id, item.master_key_name, item.title});
-      missing.push_back(!item.master_key_found);
-    }
-    sec_table_->set_rows(std::move(rows), std::move(missing));
+    sec_table_->set_rows(project_secrets(service_.list_secrets()));
   }
 
   // ---- selection ----
   std::string selected_master_key_id() const {
     const int row = mk_table_->selected();
-    const std::vector<core::MasterKeyListItem> items = keys_.list();
+    const std::vector<service::MasterKeyListItem> items = service_.list_master_keys();
     if (row < 0 || row >= static_cast<int>(items.size())) return {};
     return items[static_cast<std::size_t>(row)].master_key_id;
   }
 
   std::string selected_secret_id() const {
     const int row = sec_table_->selected();
-    const std::vector<core::SecretListItem> items = secrets_.list();
+    const std::vector<service::SecretListItem> items = service_.list_secrets();
     if (row < 0 || row >= static_cast<int>(items.size())) return {};
     return items[static_cast<std::size_t>(row)].secret_id;
   }
 
-  std::optional<core::SecretListItem> find_secret_item(const std::string& id) const {
-    for (const core::SecretListItem& item : secrets_.list()) {
+  std::optional<service::SecretListItem> find_secret_item(const std::string& id) const {
+    for (const service::SecretListItem& item : service_.list_secrets()) {
       if (item.secret_id == id) return item;
     }
     return std::nullopt;
   }
 
   std::string master_key_name(std::string_view master_key_id) const {
-    for (const core::MasterKeyListItem& item : keys_.list()) {
+    for (const service::MasterKeyListItem& item : service_.list_master_keys()) {
       if (item.master_key_id == master_key_id) return item.name;
     }
     return {};
   }
 
-  // ---- KEK acquisition ----
-  // Default key => the cache. Any other key => prompt for that key's password.
-  bool kek_for(std::string_view master_key_id, crypto::Kek* out) {
-    if (default_key_id_.has_value() && master_key_id == *default_key_id_) {
-      const std::optional<crypto::Kek> cached = kek_cache_.peek();
-      if (!cached.has_value()) {
-        set_status("请先解锁");
-        return false;
-      }
-      *out = *cached;
-      return true;
-    }
-    return prompt_kek_for_key(master_key_id, out);
+  // ---- password acquisition ----
+  // The UI never holds key material. It asks for a password string when the
+  // service refuses the call with kNeedsPassword, then retries the same call with
+  // the password attached. Which key needs a password is the service's decision.
+  bool in_backoff() {
+    const service::BackoffStatus st = service_.backoff();
+    if (st.waiting) set_status(backoff_text(st));
+    return st.waiting;
   }
 
-  bool prompt_kek_for_key(std::string_view master_key_id, crypto::Kek* out) {
-    if (backoff_.is_waiting()) {
-      report_backoff();
-      return false;
-    }
+  // Prompts for the password of master_key_id and retries `retry` with it.
+  // Returns false when the user cancels; the caller then does nothing.
+  template <typename Fn>
+  bool with_password(std::string_view master_key_id, const char* title, Fn&& retry) {
+    if (in_backoff()) return false;
     // 3.4 / 3.6: show both the ID and the name so the two keys are not confused.
     const std::string name = master_key_name(master_key_id);
     std::string label = "主密钥 ID: ";
@@ -500,97 +472,57 @@ class MainWindow : public Fl_Double_Window {
     label += "\n请输入该主密钥密码";
 
     std::string password;
-    if (!prompt_password("验证主密钥", label.c_str(), "主密钥密码", nullptr, &password)) {
+    if (!ask_password(title, label.c_str(), "主密钥密码", nullptr, &password)) {
       return false;
     }
-    container::MasterKeyFile file;
-    if (keys_.load_file(master_key_id, &file) != Error::kOk) {
-      scrub_password(&password);
-      show_error(Error::kMasterKeyNotFound);
-      return false;
-    }
-    const crypto::Kek kek = crypto::derive_kek(as_bytes(password.c_str()), file.salt);
+    const Error e = retry(as_bytes(password.c_str()));
     scrub_password(&password);
-    crypto::SecureBytes probe;
-    if (keys_.public_key_der(master_key_id, kek, &probe) != Error::kOk) {
-      note_password_failure();
-      return false;
-    }
-    note_password_success();
-    *out = kek;
-    return true;
+    if (e != Error::kOk) show_error(e);
+    return e == Error::kOk;
   }
 
-  // ---- password prompting with backoff (requirement 4.5) ----
+  // Runs `attempt` with no password. If the service answers kNeedsPassword the
+  // password is requested and the same call is retried once with it.
+  template <typename Fn>
+  bool run_or_prompt(std::string_view master_key_id, const char* title, Fn&& attempt) {
+    const Error e = attempt({});
+    if (e != Error::kNeedsPassword) {
+      if (e != Error::kOk) show_error(e);
+      return e == Error::kOk;
+    }
+    return with_password(master_key_id, title, std::forward<Fn>(attempt));
+  }
+
   // Every interactive prompt funnels through here so the exponential backoff
-  // cannot be bypassed. The counter is memory only; exceeding it never locks
-  // the app out, it only lengthens the wait.
+  // (requirement 4.5) cannot be bypassed.
   bool prompt_password(const char* title, const char* label, const char* field,
                        const char* confirm_field, std::string* out) {
-    if (backoff_.is_waiting()) {
-      report_backoff();
-      return false;
-    }
+    if (in_backoff()) return false;
     return ask_password(title, label, field, confirm_field, out);
   }
-
-  void note_password_failure() {
-    const std::uint32_t wait = backoff_.record_failure();
-    if (wait > 0) {
-      set_status(std::string(core::message(Error::kRateLimited)) + std::to_string(wait) +
-                 " 秒（主密钥密码错误）");
-    } else {
-      set_status(std::string(core::message(Error::kPasswordWrong)));
-    }
-  }
-
-  void report_backoff() {
-    set_status(std::string(core::message(Error::kRateLimited)) +
-               std::to_string(backoff_.remaining_seconds()) + " 秒");
-  }
-
-  void note_password_success() { backoff_.reset(); }
-
   // ---- unlock / lock (requirements 4.1, 4.2) ----
   void unlock() {
     if (!default_key_id_.has_value()) {
       set_status("尚未创建主密钥，请先生成");
       return;
     }
-    if (backoff_.is_waiting()) {
-      report_backoff();
-      return;
-    }
+    if (in_backoff()) return;
     std::string password;
-    if (!ask_password("解锁", "请输入默认主密钥密码以解锁", "主密钥密码", nullptr,
-                      &password)) {
+    if (!ask_password("解锁", "请输入主密钥密码以解锁", "主密钥密码", nullptr, &password)) {
       return;
     }
-    container::MasterKeyFile file;
-    if (keys_.load_file(*default_key_id_, &file) != Error::kOk) {
-      scrub_password(&password);
-      show_error(Error::kMasterKeyNotFound);
-      return;
-    }
-    const crypto::Kek kek = crypto::derive_kek(as_bytes(password.c_str()), file.salt);
-    crypto::SecureBytes probe;
-    const Error rc = keys_.public_key_der(*default_key_id_, kek, &probe);
+    const Error rc = service_.unlock(*default_key_id_, as_bytes(password.c_str()));
     scrub_password(&password);
     if (rc != Error::kOk) {
-      note_password_failure();
+      show_error(rc);
       return;
     }
-    note_password_success();
-    kek_cache_.load(kek);
-    // 4.2: rotate immediately after a successful unlock, independent of the
-    // 30 second timer.
-    kek_cache_.rotate();
     last_activity_ = Clock::now();
     set_status("已解锁");
   }
 
   void lock_now() {
-    kek_cache_.clear();
+    service_.lock();
     hide_plaintext();
     last_activity_ = Clock::now();
     set_status("已锁定");
@@ -598,10 +530,10 @@ class MainWindow : public Fl_Double_Window {
 
   // ---- timers ----
   static void on_rotate_tick(void* data) {
-    auto* self = static_cast<MainWindow*>(data);
-    // 2.7: rotate every 30 seconds while unlocked.
-    if (self->kek_cache_.has_value()) self->kek_cache_.rotate();
-    Fl::repeat_timeout(kKekRotateSeconds, on_rotate_tick, self);
+    // 2.7: rotate every 30 seconds. The service owns the cache and is a no-op
+    // while locked.
+    static_cast<MainWindow*>(data)->service_.rotate_kek();
+    Fl::repeat_timeout(kKekRotateSeconds, on_rotate_tick, data);
   }
 
   static void on_idle_tick(void* data) {
@@ -611,7 +543,7 @@ class MainWindow : public Fl_Double_Window {
   }
 
   void check_idle() {
-    if (!kek_cache_.has_value()) return;
+    if (!service_.is_unlocked()) return;
     if (std::chrono::duration<double>(Clock::now() - last_activity_).count() >=
         kIdleLockMinutes * 60.0) {
       lock_now();
@@ -646,7 +578,6 @@ class MainWindow : public Fl_Double_Window {
     secret_detail_->copy_label("");
     secret_detail_->redraw();
   }
-
   // ---- clipboard (requirement 4.3) ----
   void copy_plaintext() {
     if (!plaintext_visible_ || plaintext_.empty()) {
@@ -670,6 +601,10 @@ class MainWindow : public Fl_Double_Window {
 
   // ---- master key operations (requirement 2) ----
   void on_new_master_key() {
+    if (service_.quota().master_keys >= service::kMaxMasterKeys) {
+      show_error(Error::kMasterKeyQuotaExceeded);
+      return;
+    }
     std::string name;
     if (!ask_text("主密钥名称（可留空）", "", &name)) return;
 
@@ -678,8 +613,7 @@ class MainWindow : public Fl_Double_Window {
                          &password)) {
       return;
     }
-    const bool is_first = db_.master_key_count() == 0;
-    const Error e = keys_.create(name, as_bytes(password.c_str()), is_first);
+    const Error e = service_.create_master_key(name, as_bytes(password.c_str()));
     scrub_password(&password);
     if (e != Error::kOk) {
       show_error(e);
@@ -695,21 +629,42 @@ class MainWindow : public Fl_Double_Window {
       set_status("请先选择主密钥");
       return;
     }
-    crypto::Kek kek;
-    if (!kek_for(id, &kek)) return;
+    if (in_backoff()) return;
 
+    // Requirement 2.3: the export file is protected by a NEW password, so it can
+    // never be the cached KEK. Ask for it up front, then hand it to the service.
     std::string protection;
     if (!prompt_password("导出主密钥", "请设置导出文件的保护密码", "保护密码", "确认密码",
                          &protection)) {
       return;
     }
+
     std::vector<std::uint8_t> bytes;
-    const Error e = keys_.export_to(id, kek, as_bytes(protection.c_str()), &bytes);
+    // First try the cached default KEK; ask for the key's own password only when
+    // the target is not the unlocked default.
+    Error e = service_.export_master_key(id, {}, &bytes);
+    if (e == Error::kNeedsPassword) {
+      const std::string name = master_key_name(id);
+      std::string label = "主密钥 ID: ";
+      label += id;
+      label += "\n主密钥名称: ";
+      label += name.empty() ? "(空)" : name;
+      label += "\n请输入该主密钥密码";
+
+      std::string key_password;
+      if (!ask_password("导出主密钥", label.c_str(), "主密钥密码", nullptr, &key_password)) {
+        scrub_password(&protection);
+        return;
+      }
+      e = service_.export_master_key(id, as_bytes(key_password.c_str()), &bytes);
+      scrub_password(&key_password);
+    }
     scrub_password(&protection);
     if (e != Error::kOk) {
       show_error(e);
       return;
     }
+
     const std::optional<std::string> path =
         choose_save_file("导出主密钥", "*.smkexp", id + ".smkexp");
     if (!path.has_value()) return;
@@ -721,6 +676,10 @@ class MainWindow : public Fl_Double_Window {
   }
 
   void on_import_master_key() {
+    if (service_.quota().master_keys >= service::kMaxMasterKeys) {
+      show_error(Error::kMasterKeyQuotaExceeded);
+      return;
+    }
     const std::optional<std::string> path = choose_open_file("导入主密钥", "*.smkexp");
     if (!path.has_value()) return;
     const std::optional<std::vector<std::uint8_t>> bytes = read_bytes(*path);
@@ -739,12 +698,12 @@ class MainWindow : public Fl_Double_Window {
       scrub_password(&protection);
       return;
     }
-    const Error e =
-        keys_.import_from(*bytes, as_bytes(protection.c_str()), as_bytes(password.c_str()));
+    const Error e = service_.import_master_key(*bytes, as_bytes(protection.c_str()),
+                                               as_bytes(password.c_str()));
     scrub_password(&protection);
     scrub_password(&password);
     if (e != Error::kOk) {
-      if (is_password_error(e)) note_password_failure(); else show_error(e);
+      show_error(e);
       return;
     }
     refresh_all();
@@ -761,29 +720,36 @@ class MainWindow : public Fl_Double_Window {
       set_status("该主密钥已是默认主密钥");
       return;
     }
-    std::string old_password;
-    if (default_key_id_.has_value()) {
-      if (!prompt_password("切换默认主密钥", "请输入原默认主密钥密码", "原主密钥密码",
-                           nullptr, &old_password)) {
+    if (in_backoff()) return;
+
+    // Requirement 2.5: both the outgoing and the incoming default must verify.
+    // While unlocked the service accepts two empty passwords (the cached KEK is
+    // the session credential), so only a locked safe is asked for them.
+    if (!service_.is_unlocked()) {
+      std::string current;
+      if (default_key_id_.has_value() &&
+          !ask_password("切换默认主密钥", "请输入原默认主密钥密码", "原主密钥密码", nullptr,
+                        &current)) {
         return;
       }
-    }
-    std::string new_password;
-    if (!prompt_password("切换默认主密钥", "请输入新默认主密钥的密码", "新主密钥密码",
-                         nullptr, &new_password)) {
-      scrub_password(&old_password);
+      std::string incoming;
+      if (!ask_password("切换默认主密钥", "请输入新默认主密钥的密码", "新主密钥密码", nullptr,
+                        &incoming)) {
+        scrub_password(&current);
+        return;
+      }
+      const Error e = service_.switch_default_master_key(id, as_bytes(current.c_str()),
+                                                         as_bytes(incoming.c_str()));
+      scrub_password(&current);
+      scrub_password(&incoming);
+      if (e != Error::kOk) {
+        show_error(e);
+        return;
+      }
+    } else if (service_.switch_default_master_key(id, {}, {}) != Error::kOk) {
+      show_error(Error::kPasswordWrong);
       return;
     }
-    const Error e =
-        keys_.switch_default(id, as_bytes(old_password.c_str()), as_bytes(new_password.c_str()));
-    scrub_password(&old_password);
-    scrub_password(&new_password);
-    if (e != Error::kOk) {
-      if (is_password_error(e)) note_password_failure(); else show_error(e);
-      return;
-    }
-    // The cached KEK belongs to the previous default key, so drop it.
-    kek_cache_.clear();
     refresh_all();
     set_status("已切换默认主密钥，请重新解锁");
   }
@@ -798,32 +764,27 @@ class MainWindow : public Fl_Double_Window {
       show_error(Error::kCannotDeleteDefault);
       return;
     }
+    if (in_backoff()) return;
     // 2.6: the user must confirm a backup exists before the key is destroyed.
     if (fl_choice("删除主密钥前请确认已导出备份。", "立即导出", "已经导出", nullptr) == 0) {
       on_export_master_key();
     }
-    std::string password;
-    if (!prompt_password("删除主密钥", "请输入该主密钥密码以确认删除", "主密钥密码",
-                         nullptr, &password)) {
-      return;
-    }
-    const Error e = keys_.remove(id, as_bytes(password.c_str()));
-    scrub_password(&password);
-    if (e != Error::kOk) {
-      if (is_password_error(e)) note_password_failure(); else show_error(e);
+    if (!run_or_prompt(id, "删除主密钥",
+                       [&](std::span<const std::uint8_t> pw) {
+                         return service_.delete_master_key(id, pw);
+                       })) {
       return;
     }
     refresh_all();
     set_status("主密钥已删除，其机密信息已保留");
   }
-
   // ---- secret operations (requirement 3) ----
   void on_add_secret() {
     if (!default_key_id_.has_value()) {
       set_status("尚未创建主密钥，请先生成");
       return;
     }
-    if (db_.secret_count() >= store::kMaxSecrets) {
+    if (service_.quota().secrets >= service::kMaxSecrets) {
       show_error(Error::kSecretQuotaExceeded);
       return;
     }
@@ -834,7 +795,8 @@ class MainWindow : public Fl_Double_Window {
       return;
     }
     // 3.2: the limit counts Unicode code points, not bytes or UTF-16 units.
-    if (text::count_code_points(plaintext) > text::kMaxSecretLength) {
+    // service_.add_secret applies the same gate, this only shortens the loop.
+    if (service::Service::secret_char_count(plaintext) > service::kMaxSecretChars) {
       show_error(Error::kSecretTooLong);
       return;
     }
@@ -842,13 +804,10 @@ class MainWindow : public Fl_Double_Window {
     if (!ask_text("机密信息标题（可留空）", "", &title)) return;
 
     const std::string owner = *default_key_id_;
-    crypto::Kek kek;
-    if (!kek_for(owner, &kek)) return;
-
-    std::string new_id;
-    const Error e = secrets_.add(title, plaintext, owner, kek, &new_id);
-    if (e != Error::kOk) {
-      show_error(e);
+    if (!run_or_prompt(owner, "新增机密信息",
+                       [&](std::span<const std::uint8_t> pw) {
+                         return service_.add_secret(title, plaintext, owner, pw);
+                       })) {
       return;
     }
     refresh_secrets();
@@ -862,7 +821,9 @@ class MainWindow : public Fl_Double_Window {
       return;
     }
     std::vector<std::uint8_t> bytes;
-    if (secrets_.export_to(id, &bytes) != Error::kOk) {
+    // Requirement 3.3: the export is byte-identical to the stored file, so it
+    // needs no password. The parameter is reserved for the v1.0.0 policy.
+    if (service_.export_secret(id, {}, &bytes) != Error::kOk) {
       show_error(Error::kSecretNotFound);
       return;
     }
@@ -884,29 +845,18 @@ class MainWindow : public Fl_Double_Window {
       set_status("文件读写失败");
       return;
     }
-    if (db_.secret_count() >= store::kMaxSecrets) {
+    if (service_.quota().secrets >= service::kMaxSecrets) {
       show_error(Error::kSecretQuotaExceeded);
       return;
     }
-    // 3.4: the export file names its master key, so the password prompt can
-    // identify the key before the import runs.
-    container::ParseError perr = container::ParseError::kOk;
-    const std::optional<container::SecretFile> parsed = container::parse_secret(*bytes, &perr);
-    if (!parsed.has_value()) {
-      show_error(perr == container::ParseError::kUnsupportedVersion
-                     ? Error::kImportVersionTooHigh
-                     : Error::kImportBadFormat);
-      return;
-    }
-    const std::string owner =
-        store::bytes_to_hex(std::span<const std::uint8_t>(parsed->master_key_id));
-    crypto::Kek kek;
-    if (!kek_for(owner, &kek)) return;
-
-    std::string new_id;
-    const Error e = secrets_.import_from(*bytes, kek, &new_id);
-    if (e != Error::kOk) {
-      if (is_password_error(e)) note_password_failure(); else show_error(e);
+    if (in_backoff()) return;
+    // Requirement 3.4: the file names its master key, so the password prompt can
+    // identify the key. service_.import_secret reports kImportMasterKeyMissing
+    // when that key is absent locally, so ask for no password in that case.
+    if (!run_or_prompt({}, "导入机密信息",
+                       [&](std::span<const std::uint8_t> pw) {
+                         return service_.import_secret(*bytes, {}, pw);
+                       })) {
       return;
     }
     refresh_all();
@@ -919,7 +869,7 @@ class MainWindow : public Fl_Double_Window {
       set_status("请先选择机密信息");
       return;
     }
-    const std::optional<core::SecretListItem> item = find_secret_item(id);
+    const std::optional<service::SecretListItem> item = find_secret_item(id);
     if (!item.has_value()) {
       show_error(Error::kSecretNotFound);
       return;
@@ -928,29 +878,12 @@ class MainWindow : public Fl_Double_Window {
       show_masked_detail();
       return;
     }
-    // The default key reuses the cache; any other key asks for its password.
-    crypto::Kek prompted;
-    const crypto::Kek* kek_ptr = nullptr;
-    if (default_key_id_.has_value() && item->master_key_id == *default_key_id_) {
-      const std::optional<crypto::Kek> cached = kek_cache_.peek();
-      if (cached.has_value()) kek_ptr = &*cached;
-    }
-    if (kek_ptr == nullptr) {
-      if (!kek_for(item->master_key_id, &prompted)) return;
-      kek_ptr = &prompted;
-    }
-    core::SecretDetail detail;
-    const Error e = secrets_.detail(id, kek_ptr, &detail);
-    if (e != Error::kOk) {
-      if (is_password_error(e)) note_password_failure(); else show_error(e);
+    if (!run_or_prompt(item->master_key_id, "查看机密信息",
+                       [&](std::span<const std::uint8_t> pw) {
+                         return service_.reveal_secret_plaintext(id, pw, &plaintext_);
+                       })) {
       return;
     }
-    if (detail.plaintext_masked) {
-      show_masked_detail();
-      return;
-    }
-    std::fill(plaintext_.begin(), plaintext_.end(), '\0');
-    plaintext_ = detail.plaintext;
     plaintext_visible_ = true;
     secret_detail_->copy_label(plaintext_.c_str());
     secret_detail_->redraw();
@@ -959,7 +892,7 @@ class MainWindow : public Fl_Double_Window {
 
   void show_masked_detail() {
     // 3.5: the master key is missing, so the plaintext is replaced by 6 asterisks.
-    plaintext_.assign(core::kMaskedPlaintext);
+    plaintext_.assign(service::kMaskedPlaintext);
     plaintext_visible_ = false;
     secret_detail_->copy_label(plaintext_.c_str());
     secret_detail_->redraw();
@@ -972,31 +905,26 @@ class MainWindow : public Fl_Double_Window {
       set_status("请先选择机密信息");
       return;
     }
+    if (in_backoff()) return;
     // 3.6: confirm a backup before destroying the record.
     if (fl_choice("删除机密信息前请确认已导出备份。", "立即导出", "已经导出", nullptr) == 0) {
       on_export_secret();
     }
-    const std::optional<core::SecretListItem> item = find_secret_item(id);
+    const std::optional<service::SecretListItem> item = find_secret_item(id);
     if (!item.has_value()) {
       show_error(Error::kSecretNotFound);
       return;
     }
-    // A non-default key needs its password before the record may be removed.
-    if (item->master_key_found &&
-        (!default_key_id_.has_value() || item->master_key_id != *default_key_id_)) {
-      crypto::Kek kek;
-      if (!kek_for(item->master_key_id, &kek)) return;
-    }
-    const Error e = secrets_.remove(id);
-    if (e != Error::kOk) {
-      show_error(e);
+    if (!run_or_prompt(item->master_key_id, "删除机密信息",
+                       [&](std::span<const std::uint8_t> pw) {
+                         return service_.delete_secret(id, pw);
+                       })) {
       return;
     }
     hide_plaintext();
     refresh_secrets();
     set_status("机密信息已删除");
   }
-
   // ---- static callbacks ----
   static void on_unlock_cb(Fl_Widget*, void* data) {
     static_cast<MainWindow*>(data)->unlock();
@@ -1033,12 +961,10 @@ class MainWindow : public Fl_Double_Window {
   }
 
   // ---- state ----
-  store::IndexDb db_;
-  store::FileStore files_;
-  core::MasterKeyService keys_{db_, files_};
-  core::SecretService secrets_{db_, files_, keys_};
-  core::KekCache kek_cache_;
-  core::PasswordBackoff backoff_;
+  // The UI owns exactly one core object. Everything below it -- the index
+  // database, the data files, the KEK cache, the backoff counter and the
+  // quota -- lives behind this facade.
+  service::Service service_;
 
   DataTable* mk_table_ = nullptr;
   DataTable* sec_table_ = nullptr;

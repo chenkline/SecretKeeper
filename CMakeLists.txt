@@ -266,13 +266,13 @@ if(SK_BUILD_APP)
   # 因为数据目录与文件对话框必须用各自的系统 API。
   if(SK_PLATFORM_WINDOWS)
     set(SK_PLATFORM_DIR windows)
-    add_executable(SecretKeeper WIN32 src/app/app.cpp src/windows/platform.cpp)
+    add_executable(SecretKeeper WIN32 src/app/app.cpp src/app/view_model.cpp src/windows/platform.cpp)
   elseif(SK_PLATFORM_MACOS)
     set(SK_PLATFORM_DIR macos)
-    add_executable(SecretKeeper src/app/app.cpp src/macos/platform.cpp)
+    add_executable(SecretKeeper src/app/app.cpp src/app/view_model.cpp src/macos/platform.cpp)
   else()
     set(SK_PLATFORM_DIR linux)
-    add_executable(SecretKeeper src/app/app.cpp src/linux/platform.cpp)
+    add_executable(SecretKeeper src/app/app.cpp src/app/view_model.cpp src/linux/platform.cpp)
   endif()
 
   # app.cpp include 的是 "platform.h"，故平台目录必须排在共享头文件之前。
