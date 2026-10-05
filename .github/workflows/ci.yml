@@ -297,7 +297,10 @@ jobs:
       - name: 分层依赖门禁
         run: python scripts/check-layering.py
       - name: 配置
-        run: cmake -S . -B build/macos -DCMAKE_BUILD_TYPE=Release
+        # 与 Linux job 对齐使用 Ninja。macOS runner 上 CMake 默认落到 Makefile
+        # 生成器，Apple Silicon 只有 3 核，FLTK 的三百多个源文件被串行编译，
+        # 整个 job 要 16 分钟；换 Ninja 后与 Linux 一样两分钟内完成。
+        run: cmake -S . -B build/macos -G Ninja -DCMAKE_BUILD_TYPE=Release
       - name: 构建并测试
         run: |
           cmake --build build/macos --parallel
