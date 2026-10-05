@@ -35,13 +35,14 @@ Secret/
 │   ├── 07-testing/
 │   └── ui/                            # 界面设计图与规范
 ├── src/                               # 桌面三端共享代码
-│   ├── include/                       # 跨端共享头文件
-│   ├── common/                        # 跨端共享实现（四层）
-│   ├── app/                           # FLTK 界面（三端共享同一份）
+│   ├── include/core/                  # core 四层头文件（见第 8.2 节）
+│   ├── common/core/                   # core 四层实现
+│   ├── app/                           # FLTK 界面 + 可测视图模型（三端共享）
 │   ├── windows/                       # Windows 平台层（Win32 剪贴板 / %APPDATA%）
 │   ├── linux/                         # Linux 平台层（XDG 目录）
 │   └── macos/                         # macOS 平台层（~/Library/Application Support）
-├── tests/                             # 四层自检（三端共用）
+├── tests/core/                        # core 四层自检（三端共用）
+├── tests/ui/                          # 视图模型自检（无需 FLTK 事件循环）
 ├── test-vectors/                      # 跨平台黄金测试向量（单一真相源）
 ├── vendor/                            # 内置第三方源码（见 9.2）
 │   ├── argon2/                        # Argon2id 参考实现
@@ -67,14 +68,14 @@ Secret/
 | iOS | Swift | SwiftUI | 必须原生，禁止跨平台方案 |
 
 **铁律一：桌面三端（Windows / Linux / macOS）共享同一套 C++ 业务与界面代码。**
-`src/common`（四层实现）、`src/include`（四层头文件）、`src/app`（FLTK 界面）是唯一实现；
-`src/windows`、`src/linux`、`src/macos` 各只有一个 `platform.{h,cpp}`，封装剪贴板、
-用户数据目录与原生文件对话框。修复缺陷只改一处，自动覆盖三端。
+`src/common/core`（四层实现）、`src/include/core`（四层头文件）、`src/app`（FLTK 界面）
+是唯一实现；`src/windows`、`src/linux`、`src/macos` 各只有一个 `platform.{h,cpp}`，
+封装剪贴板、用户数据目录与原生文件对话框。修复缺陷只改一处，自动覆盖三端。
 
 **铁律二：移动两端（Android / iOS）保持各自原生实现，不共享代码。**
 它们靠 `test-vectors/` 的黄金向量与 `docs/03-data/` 的格式规范强制对齐桌面三端。
 
-**铁律三：`src/common/` 内的代码不得引用任何平台 API。** 确需 OS 能力时，
+**铁律三：`src/common/core/` 内的代码不得引用任何平台 API。** 确需 OS 能力时，
 由 `src/<platform>/` 提供薄封装供界面层调用。
 
 ---
@@ -160,8 +161,8 @@ Secret/
 ### 8.1 改动纪律（最小改动，铁律）
 
 - **全仓库统一 LF，不留例外。** `.gitattributes` 已声明 `* text=auto eol=lf`，
-  任何文件都不得写入 CRLF。这条纪律来之不易：历史上 `src/common/container.cpp`
-  是 CRLF、`.github/workflows/ci.yml` 与 `scripts/gen-vectors.py` 是 CRLF/LF 混排，
+  任何文件都不得写入 CRLF。这条纪律来之不易：历史上 `src/common/core/serialize.cpp`
+  曾是 CRLF、`.github/workflows/ci.yml` 与 `scripts/gen-vectors.py` 是 CRLF/LF 混排，
   git 因此把整份文件判定为重写，真实改动被淹没。
 
   写文件时固定 `io.open(p, "w", encoding="utf-8", newline="\n")`。若不慎写成 CRLF，
@@ -175,6 +176,45 @@ Secret/
   编码固定 UTF-8 **无 BOM**。
 - 只改必须改的行。发现顺手的格式问题（过期表述、旧数字、错别字），
   若不在本次任务范围内，只在交付说明里指出，**不要顺手改**。
+
+### 8.2 core 四层分层（依赖方向不得回潮）
+
+`src/common/core` 与 `src/include/core` 严格分四层，依赖**单向、无回边**：
+
+```
+vendor  ->  platform  ->  UI(src/app)  ->  core/service
+                                          |
+                                   core/store
+                                     |
+                            core/serialize      core/crypto
+```
+
+| 层 | 目录 | 职责 | 允许依赖 |
+|---|---|---|---|
+| crypto | `crypto.{h,cpp}` | 密码学**原语**：随机、ID、Argon2id、AES-GCM、RSA-OAEP、RSA 密钥生成。不出现业务名词 | 无（仅 vendor） |
+| serialize | `serialize.{h,cpp}` | 字节与内存对象互转（`MasterKeyFile` / `SecretFile`） | 无 |
+| store | `store.{h,cpp}` | SQLite 索引 + 数据文件存取；经序列化层提供**对象级**读写（`MasterKeyStore` / `SecretStore`） | serialize |
+| service | `service.{h,cpp}` | core 总入口。独占 KEK 缓存、密码退避、限额（2/15/150） | store + serialize + crypto |
+| UI | `src/app` | 控件与用户意图；列表投影等纯逻辑在 `view_model.{h,cpp}` | service + platform |
+
+**四条不可违反的约束**：
+
+1. `src/app/*.cpp` 只允许 include `core/service.h`。不得触碰 crypto / serialize / store，
+   也不得自行判断"是不是默认密钥"来决定要不要密码 —— 那是 service 的决定。
+2. **UI 不得持有任何密钥材料**，不得出现 `crypto::Kek`、`derive_kek`、
+   `aes_gcm_*` 等调用。UI 只传密码字节，问或不解锁由 service 决定。
+3. **限额只在 service 定义**（`kMaxMasterKeys` / `kMaxSecrets` / `kMaxSecretChars`）。
+   存储层只如实计数，不做判定。v1.0.0 由 License 覆盖时只改 service 一处。
+4. crypto 与 serialize **互不依赖**，连头文件都不互相 include。serialize 自持
+   `Id` / `Salt` / `Nonce` / `Tag` 别名，不引用 crypto.h。
+
+**密码交互约定**：每个需要密码的操作只有**一个入口**，密码是可空的
+`std::span<const std::uint8_t>`。空密码表示"用已解锁的默认 KEK"；
+若目标不是默认主密钥且未传密码，service 返回 `Error::kNeedsPassword`，
+UI 弹框后带密码**重试同一调用**。不引入回调。
+
+`scripts/check-layering.py` 是这条纪律的自动门禁，已接入 CI 六个 job。
+本地提交前应先跑一次。
 
 ---
 
@@ -256,7 +296,7 @@ GCC/Clang 会把它当成链接器输入文件，直接报
 ### 9.3 本机与 CI 的环境差异
 
 - VS BuildTools 在**非默认路径** `D:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools`（不是 `Program Files (x86)`）
-- 本机已有 **CMake 4.4.3**（`C:\Program Files\CMake\bin`），三端统一用根 `CMakeLists.txt`；四层自检仍走 `windows/scripts/build.ps1`（`cl.exe` 直编，供 ARM64 交叉编译复用）
+- 本机已有 **CMake 4.4.3**（`C:\Program Files\CMake\bin`），三端统一用根 `CMakeLists.txt`；自检统一走根 `CMakeLists.txt` 的 CTest；`windows/scripts/build.ps1` 保留 `cl.exe` 直编链路供 ARM64 交叉编译复用
 - PowerShell 里中文显示为乱码、或 Python 抛 `UnicodeEncodeError` 时，先 `. .\scripts\ps-profile.ps1`。该文件入库但**不自动改写用户 `$PROFILE`**，需手动 source；CI 脚本内部自行重配编码，不依赖它
 - 本机 **MSVC 缺 ARM64 目标工具与库**（VS 组件 `Microsoft.VisualStudio.Component.VC.Tools.ARM64` 未安装），
   Windows SDK 的 arm64 库却是齐的。因此 ARM64 **只能交叉编译且只能走 CI**：
@@ -284,13 +324,13 @@ GitHub `windows-2022` runner 的 CNG **均不提供** RSA/ECDH/ECDSA/DH/DSA：
 **现在的做法**：密码学层全量换成 vendor 的 mbedTLS 3.6.7（纯软件，RSA 恒可用）。
 
 - `has_asymmetric_support()` **恒返回 true**，改名自 `cng_has_asymmetric_support()`
-  （共 8 处引用：`crypto.h`、`crypto.cpp`、`core/master_key_service.cpp`、
-  `core/secret_service.cpp`、`tests/crypto_test.cpp` 2 处、`tests/service_test.cpp` 2 处）。
+  （共 8 处引用：`crypto.h`、`crypto.cpp`、`core/service.cpp`、
+  `core/service.cpp`、`tests/core/crypto_test.cpp` 2 处、`tests/core/service_test.cpp` 2 处）。
 - 保留该函数而不是删掉，是为了让测试能**断言跳过路径永不触发**。它是构建缺陷的探针，
   不是能力开关。
 - Windows 侧只需链接 `bcrypt.lib`（`BCryptGenRandom` 提供平台熵），不再依赖 CNG 密钥 API。
 
-**换库后 RSA 路径首次真实执行**，四层测试 0 失败、0 跳过（见 9.6）。
+**换库后 RSA 路径首次真实执行**，五目标自检 0 失败、0 跳过（见 9.6）。
 
 ### 9.5 mbedTLS 3.6 API 坑位（已实测踩过，勿重犯）
 
@@ -316,36 +356,42 @@ GitHub `windows-2022` runner 的 CNG **均不提供** RSA/ECDH/ECDSA/DH/DSA：
 
 - **解密缓冲区长度算错**：GCM 是流模式，**密文长度 == 明文长度**。旧代码按密文向量总长
   （含 16 字节 tag 尾）分配输出，导致恢复出的 DER 尾部多出 16 个零字节，RSA 解析器直接
-  拒绝。已新增 `plain_size()` 统一口径（`src/common/master_key_service.cpp`，6 处调用）。
-  `secret_service.cpp` 本来就减了尾，是对的。
+  拒绝。已新增 `plain_size()` 统一口径（`src/common/core/service.cpp`，6 处调用）。
+  机密信息侧本来就减了尾，是对的。
 - **测试 SKIP 文案误导**：旧的 SKIP 提示写 "this host CNG"，会让读者以为 CNG 环境限制仍在。
   现已改为 "RSA reports unavailable on this host / mbedTLS is pure software, so this
   indicates a build defect"。文档提到这段时须与之一致。
 
 ### 9.6 当前自检基线
 
-| 层 | 测试文件 | 自检项数 | 失败 | 跳过 |
-|---|---|---|---|---|
-| 密码学层 | `tests/crypto_test.cpp` | 86 | 0 | 0 |
-| 存储层 | `tests/store_test.cpp` | 81 | 0 | 0 |
-| 核心层 | `tests/core_test.cpp` | 178 | 0 | 0 |
-| 业务层 | `tests/service_test.cpp` | 54 | 0 | **0（RSA 真实执行）** |
-| 黄金向量 | `scripts/verify-vectors.py` | 91 | 0 | — |
+| 层 | 测试目标 | 测试文件 | 自检项数 | 失败 | 跳过 |
+|---|---|---|---|---|---|
+| crypto | `sk_crypto_test` | `tests/core/crypto_test.cpp` | 43 | 0 | 0 |
+| serialize | `sk_serialize_test` | `tests/core/serialize_test.cpp` | 43 | 0 | 0 |
+| store | `sk_store_test` | `tests/core/store_test.cpp` | 84 | 0 | 0 |
+| service | `sk_service_test` | `tests/core/service_test.cpp` | 85 | 0 | **0（RSA 真实执行）** |
+| UI 纯逻辑 | `sk_ui_test` | `tests/ui/view_model_test.cpp` | 29 | 0 | 0 |
+| 黄金向量 | — | `scripts/verify-vectors.py` | 91 | 0 | — |
+| 分层门禁 | — | `scripts/check-layering.py` | — | 0 违规 | — |
 
-四层自检由 CMake 的 CTest 驱动（`ctest --test-dir build/<平台>`），也可走
-`windows/scripts/run-tests.ps1`。注意 crypto 与 store 两层要读仓库里的
-`test-vectors/`，**必须传入仓库根路径**，否则读不到向量而失败。
+合计 **284 项自检 + 91 项向量**。五个测试目标与第 8.2 节的四层一一对应，
+依赖方向与生产代码一致。由 CMake 的 CTest 驱动（`ctest --test-dir build/<平台> -C Release`）。
+注意 crypto 与 serialize 两层要读仓库里的 `test-vectors/`，**必须传入仓库根路径**，
+否则读不到向量而失败。
+
+`service` 层只走 `Service` 门面，不碰 store / serialize / crypto，
+是需求 1/2/3 全部十二项功能、限额、锁定态、退避递增与 `kNeedsPassword` 分支的主要守护。
 
 ### 9.7 桌面三端 CI 状态（全部通过）
 
 | job | 验证内容 | 状态 |
 |---|---|---|
-| Windows (C++/FLTK) | 四层自检 + ARM64 直编链路 | 通过 |
+| Windows (C++/FLTK) | 五目标自检 + 分层门禁 + ARM64 直编链路 | 通过 |
 | Windows UI (FLTK + CMake) | 构建 exe + **校验无第三方 DLL 依赖** | 通过 |
 | Windows ARM64 (交叉编译) | `build.ps1 -CompileOnly` | 通过 |
-| Linux (C++/FLTK) | 同一份核心代码 + CTest | 通过 |
-| macOS (C++/FLTK) | 同一份核心代码 + CTest（Apple Silicon） | 通过 |
-| 向量校验 | 91 项黄金向量 | 通过 |
+| Linux (C++/FLTK) | 同一份 core 四层 + CTest | 通过 |
+| macOS (C++/FLTK) | 同一份 core 四层 + CTest（Apple Silicon） | 通过 |
+| 向量校验 | 91 项黄金向量 + 分层门禁（六个 job 均执行） | 通过 |
 | Android / iOS | 工程尚未创建，CI 探测后跳过 | 通过 |
 
 **本地可用 WSL 验证 Linux 与 ARM64**：本机装有 Ubuntu 24.04（WSL2）。
@@ -357,12 +403,12 @@ wsl -d Ubuntu -- bash -lc "cd /mnt/d/src/github/Secret && \
   cmake -S . -B build/aarch64 -G Ninja -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
     -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++ -DSK_BUILD_APP=OFF && \
-  cmake --build build/aarch64 --target sk_crypto_test sk_store_test sk_core_test sk_service_test"
+  cmake --build build/aarch64 --target sk_crypto_test sk_serialize_test sk_store_test sk_service_test sk_ui_test"
 ```
 
 这条链路能在提交前复现 macOS ARM64 的链接问题，不必等CI。
 `SK_BUILD_APP=OFF` 是因为 WSL 未装 X11/arm64 开发库，FLTK 需要它们；
-但四层自检不需要界面，能独立验证密码学与存储层。
+但五个自检目标不需要界面，能独立验证 crypto / serialize / store / service。
 
 **"跳过 0" 是硬要求。** 任何一层出现 `skipped != 0` 都是构建缺陷，不是环境限制。
 
