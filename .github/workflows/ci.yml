@@ -95,7 +95,7 @@ jobs:
           call "%VSDEVCMD%"
           chcp 65001 >nul
           pwsh -NoProfile -File windows/scripts/build.ps1 -Conformance -Architecture x64
-          windows\build\x64\crypto_conformance.exe > conformance-windows.txt
+          build\windows\x64\Release\crypto_conformance.exe > conformance-windows.txt
           type conformance-windows.txt
       - name: 上传一致性 transcript
         if: always()
