@@ -1154,7 +1154,8 @@ void ExportKeyPage::on_export() {
   std::string protection = prot;
   std::vector<std::uint8_t> bytes;
   const svc::Error rc =
-      host()->service().export_master_key(key_id_, as_bytes(original), &bytes);
+      host()->service().export_master_key(key_id_, as_bytes(original),
+                                          as_bytes(protection), &bytes);
   scrub(&original);
   original_->value("");
   protection_->value("");
@@ -1165,11 +1166,6 @@ void ExportKeyPage::on_export() {
     redraw();
     return;
   }
-  // 注意：service::export_master_key 当前签名的密码参数是「该主密钥自身的密码」，
-  // 用于校验身份；需求 2.3 要求的「为导出文件另设保护密码」尚无对应参数。
-  // 在 service 层补齐该能力之前，这里写出的文件沿用主密钥原密码的保护，
-  // 与设计稿 05 号的「导出文件保护密码」语义不一致。此为已知待办。
-  (void)prot;
   if (!write_bytes(location_, bytes)) {
     last_error_ = "文件读写失败";
     redraw();

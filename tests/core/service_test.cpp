@@ -141,11 +141,19 @@ int main() {
   // ---- optional-password convention ----
   std::printf("Optional-password convention\n");
   // Default key + empty password -> uses the cached KEK, no prompt needed.
-  check(svc_.export_master_key(key_id, pwd("prot"), nullptr) == svc::Error::kInternal,
+  check(svc_.export_master_key(key_id, pwd("prot"), pwd("prot"), nullptr) == svc::Error::kInternal,
         "export rejects a null output pointer");
   std::vector<std::uint8_t> mk_export;
-  check(svc_.export_master_key(key_id, {}, &mk_export) == svc::Error::kPasswordWrong,
+  check(svc_.export_master_key(key_id, {}, {}, &mk_export) == svc::Error::kPasswordWrong,
         "export requires a protection password");
+  check(svc_.export_master_key(key_id, pwd("wrong"), pwd("prot"), &mk_export) ==
+            svc::Error::kPasswordWrong,
+        "export rejects a wrong master key password");
+  check(svc_.export_master_key(key_id, pwd(pw1.c_str()), {}, &mk_export) ==
+            svc::Error::kPasswordWrong,
+        "export requires a new protection password");
+  check(svc_.export_master_key(key_id, pwd(pw1.c_str()), pwd("prot"), &mk_export) == kOk,
+        "export succeeds with separate passwords");
   // Non-default key + empty password -> the UI must prompt.
   check(svc_.delete_master_key(key2_id, {}) == svc::Error::kNeedsPassword,
         "deleting a non-default key without a password asks for one");
@@ -169,6 +177,20 @@ int main() {
 
   // Delete the non-default key; its secrets must survive as dangling references.
   check(svc_.delete_master_key(key2_id, pwd(pw1.c_str())) == kOk, "delete non-default key");
+
+  // The exported key uses its own protection password and can be imported back.
+  check(svc_.import_master_key(mk_export, {}, pwd("imported")) ==
+            svc::Error::kPasswordWrong,
+        "master key import rejects an empty protection password");
+  check(svc_.import_master_key(mk_export, pwd("wrong"), pwd("imported")) ==
+            svc::Error::kPasswordWrong,
+        "master key import rejects a wrong protection password");
+  check(svc_.import_master_key(mk_export, pwd("prot"), pwd("imported")) == kOk,
+        "master key export/import round-trips");
+  const std::string imported_key_id = svc_.list_master_keys()[1].master_key_id;
+  check(!svc_.list_master_keys()[1].is_default, "imported key is not default");
+  check(svc_.delete_master_key(imported_key_id, pwd("imported")) == kOk,
+        "imported key can be deleted to restore quota");
 
   const auto items = svc_.list_secrets();
   check(items.size() == 3, "secrets survive master key deletion");

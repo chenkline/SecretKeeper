@@ -174,10 +174,12 @@ class Service {
   // 生成一把新主密钥。第一把自动成为默认主密钥。
   Error create_master_key(std::string_view name, std::span<const std::uint8_t> password);
 
-  // 导出主密钥。password 为空且目标是默认主密钥时用缓存的 KEK；
+  // 导出主密钥。master_password 为空且目标是默认主密钥时用缓存的 KEK；
   // 否则必须提供该密钥的密码，否则返回 kNeedsPassword。
+  // protection_password 是导出文件的新保护密码，不能与主密钥密码混用。
   Error export_master_key(std::string_view master_key_id,
-                          std::span<const std::uint8_t> password,
+                          std::span<const std::uint8_t> master_password,
+                          std::span<const std::uint8_t> protection_password,
                           std::vector<std::uint8_t>* out);
 
   // 导入主密钥：用 protection_password 解开文件，再用 new_password 重加密保存。

@@ -303,16 +303,17 @@ Error Service::verify_master_key_password(std::string_view master_key_id,
 }
 
 Error Service::export_master_key(std::string_view master_key_id,
-                                 std::span<const std::uint8_t> password,
+                                 std::span<const std::uint8_t> master_password,
+                                 std::span<const std::uint8_t> protection_password,
                                  std::vector<std::uint8_t>* out) {
   if (out == nullptr) return Error::kInternal;
-  if (password.empty()) {
-    // 保护密码是导出时新设的，不能与主密钥密码混用，因此这里必须非空。
+  if (protection_password.empty()) {
+    // 保护密码是导出时新设的，不能与主密钥密码混用。
     return Error::kPasswordWrong;
   }
 
   crypto::Kek kek{};
-  const Error ke = impl_->resolve_kek(master_key_id, password, &kek);
+  const Error ke = impl_->resolve_kek(master_key_id, master_password, &kek);
   if (ke != Error::kOk) return ke;
 
   serialize::MasterKeyFile f;
@@ -338,7 +339,7 @@ Error Service::export_master_key(std::string_view master_key_id,
   // masterKeyId 与 name 与本地一致；因保护密码不同，密文必然不同。
   crypto::Salt salt{};
   crypto::random_bytes(std::span<std::uint8_t>(salt));
-  const crypto::Kek prot_kek = crypto::derive_kek(password, salt);
+  const crypto::Kek prot_kek = crypto::derive_kek(protection_password, salt);
 
   SealedKeys sealed;
   if (!seal_keys(prot_kek, std::span<const std::uint8_t>(f.master_key_id),
