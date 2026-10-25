@@ -63,13 +63,13 @@ python scripts/fetch-figma.py
 - 桌面三端（Windows / Linux / macOS）共享同一套 C++ 业务与界面代码；移动两端独立原生实现，跨端一致性由格式规范与测试向量保证。
 - 主密钥为 RSA-2048 密钥对；公钥用 RSA-OAEP-SHA256 封装数据密钥，公钥与私钥**均**由 KEK 以 AES-256-GCM 保护（各自独立随机 nonce）。
 - KEK 由 Argon2id 派生，**每条记录独立 16 字节随机盐并明文随记录保存**。
-- 密码学：Windows 与 Linux 固定使用 **mbedTLS 3.6.7**（`vendor/mbedtls/`，Apache-2.0），Argon2id 来自 `vendor/argon2`；macOS / iOS / Android 不强制，但必须逐字节对齐黄金向量。
+- 密码学：桌面三端固定使用 **mbedTLS 3.6.7**（`vendor/mbedtls/`，Apache-2.0），Argon2id 来自 `vendor/argon2`；iOS / Android 不强制，但必须逐字节对齐黄金向量。
 - 数据格式为自定义紧凑二进制容器，同一份字节流既作导出文件又能直接切分进二维码。
 - 存储为单个 SQLite 索引 + 独立数据文件。
 - v0.0.1 限额：2 个主密钥、15 条机密信息、单条 150 字符。
 - SM2 国密、License 激活均在 v1.0.0，v0.0.1 仅预留接口。
 - 容器 Magic 恒为 `SMK1` / `SSC1`，`Version` 恒为 `0x0001`；**未经明确指示不得升版本**。
-- Windows 端已完成密码学 / 存储 / 核心 / 业务四层，RSA 路径真实执行、0 跳过（86 / 81 / 178 / 54 项，黄金向量 91 项）。
+- 桌面三端共享密码学 / 序列化 / 存储 / 业务四层与 FLTK UI，RSA 路径真实执行、0 跳过；当前基线为 292 项自检 + 91 项向量 + 57 项一致性探针。
 
 ## 约定
 
