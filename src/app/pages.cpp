@@ -215,7 +215,8 @@ void ask_password(const char* title, const char* body, const char* first_label,
 // PageBase
 // =====================================================================
 PageBase::PageBase(MainWindow* host, const char* title, const char* subtitle)
-    : Fl_Group(0, 0, kWinW, kWinH), subtitle_(subtitle ? subtitle : "") {
+    : Fl_Group(0, 0, kWinW, kWinH), host_(host),
+      subtitle_(subtitle ? subtitle : "") {
   box(FL_NO_BOX);
   color(theme::kContentBg);
   back_ = nullptr;
