@@ -414,14 +414,14 @@ GitHub `windows-2022` runner 的 CNG **均不提供** RSA/ECDH/ECDSA/DH/DSA：
 | crypto | `sk_crypto_test` | `tests/core/crypto_test.cpp` | 43 | 0 | 0 |
 | serialize | `sk_serialize_test` | `tests/core/serialize_test.cpp` | 43 | 0 | 0 |
 | store | `sk_store_test` | `tests/core/store_test.cpp` | 84 | 0 | 0 |
-| service | `sk_service_test` | `tests/core/service_test.cpp` | 85 | 0 | **0（RSA 真实执行）** |
+| service | `sk_service_test` | `tests/core/service_test.cpp` | 93 | 0 | **0（RSA 真实执行）** |
 | UI 纯逻辑 | `sk_ui_test` | `tests/ui/view_model_test.cpp` | 29 | 0 | 0 |
 | 黄金向量 | — | `scripts/verify-vectors.py` | 91 | 0 | — |
 | 分层门禁 | — | `scripts/check-layering.py` | — | 0 违规 | — |
 | 跨端一致性探针 | `sk_crypto_conformance` | `tests/core/crypto_conformance.cpp` | 57 | 0 | — |
 | 一致性比对 | — | `scripts/compare-conformance.py` | 20 行 | 0 差异 | — |
 
-合计 **284 项自检 + 91 项向量 + 57 项探针**。五个测试目标与第 8.2 节的四层一一对应，
+合计 **292 项自检 + 91 项向量 + 57 项探针**。五个测试目标与第 8.2 节的四层一一对应，
 依赖方向与生产代码一致。由 CMake 的 CTest 驱动（`ctest --test-dir build/<平台>/<arch> -C Release`）。
 注意 crypto 与 serialize 两层要读仓库里的 `test-vectors/`，**必须传入仓库根路径**，
 否则读不到向量而失败。
