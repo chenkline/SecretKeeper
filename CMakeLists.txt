@@ -335,6 +335,10 @@ if(SK_BUILD_APP)
   # app.cpp include 的是 "platform.h"，故平台目录必须排在共享头文件之前。
   target_include_directories(SecretKeeper PRIVATE src/${SK_PLATFORM_DIR} src/app)
   target_link_libraries(SecretKeeper PRIVATE sk_core fltk)
+  if(SK_PLATFORM_WINDOWS)
+    # MiniDumpWriteDump 在 dbghelp.lib，用于崩溃自动落盘。
+    target_link_libraries(SecretKeeper PRIVATE dbghelp)
+  endif()
   if(APPLE)
     target_link_libraries(SecretKeeper PRIVATE "-framework Cocoa" "-framework UniformTypeIdentifiers")
   endif()

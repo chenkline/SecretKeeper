@@ -12,6 +12,8 @@
 
 #include <windows.h>
 
+#include <dbghelp.h>
+
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -166,6 +168,70 @@ std::optional<std::string> choose_save_file(const std::string& title,
   if (picked == nullptr) return std::nullopt;
   return std::string(picked);
 }
+
+// ---------------------------------------------------------------- 崩溃落盘
+namespace {
+
+LONG WINAPI on_crash(EXCEPTION_POINTERS* info) {
+  // 只写最必要的状态：发生崩溃时下文维护标志可能已损坏，
+  // 所以不调用 C++ 容器（会再分配内存并可能再次崩溃）。
+  const std::filesystem::path dir = data_directory();
+  const std::filesystem::path file = dir / L"SecretKeeper.dmp";
+  if (std::filesystem::exists(file)) return EXCEPTION_EXECUTE_HANDLER;
+
+  HANDLE h = ::CreateFileW(file.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW,
+                           FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (h == INVALID_HANDLE_VALUE) return EXCEPTION_EXECUTE_HANDLER;
+
+  MINIDUMP_EXCEPTION_INFORMATION mdei{};
+  mdei.ThreadId = ::GetCurrentThreadId();
+  mdei.ExceptionPointers = info;
+  mdei.ClientPointers = FALSE;
+
+  // 不要 MiniDumpWithIndirectlyReferencedMemory：dbghelp 为了收集它会再次
+  // NtGetContextThread，而此时下文已在损坏状态，会造成二次崩溃，
+  // 反而把真实的崩溃地址覆盖掉。只取调用栈与参数区已够定位。
+  // 另外 MiniDumpWithThreadInfo 会为每个线程补齐密库状态，但也需要额外系统调用，
+  // 在此处一律关闭以据资源而定。
+  const auto flags = static_cast<MINIDUMP_TYPE>(MiniDumpWithUnloadedModules);
+  const BOOL ok = ::MiniDumpWriteDump(::GetCurrentProcess(), ::GetCurrentProcessId(),
+                                     h, flags, nullptr, nullptr, nullptr);
+  ::CloseHandle(h);
+
+  // 单独写一份文本。ExceptionStream 在 dbghelp 自身崩溃时可能不会落盘，
+  // 而异常码与出错指针本身就在手上，不需要任何额外系统调用。
+  {
+    const std::filesystem::path txt = dir / L"SecretKeeper.crash.txt";
+    HANDLE th = ::CreateFileW(txt.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+                              FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (th != INVALID_HANDLE_VALUE) {
+      char line[256];
+      const int n = _snprintf_s(line, sizeof(line), _TRUNCATE,
+                                "ExceptionCode=0x%08lX\r\n"
+                                "ExceptionAddress=0x%016llX\r\n"
+                                "MiniDumpWritten=%d\r\n",
+                                info->ExceptionRecord->ExceptionCode,
+                                static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(
+                                    info->ExceptionRecord->ExceptionAddress)),
+                                ok ? 1 : 0);
+      if (n > 0) {
+        DWORD written = 0;
+        ::WriteFile(th, line, static_cast<DWORD>(n), &written, nullptr);
+      }
+      ::CloseHandle(th);
+    }
+  }
+  return ok ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_EXECUTE_HANDLER;
+}
+
+}  // namespace
+
+void install_crash_dumper() {
+  // 保留未处理异常，只为“进程不再可执行”的硬崩溃落盘。
+  // 未捕获的崩溃仍由 WER 的本地 dump 处理，两者不冲突。
+  ::SetUnhandledExceptionFilter(on_crash);
+}
+
 
 std::string last_native_message() {
   if (!last_error_.empty()) return last_error_;

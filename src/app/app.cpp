@@ -12,12 +12,21 @@
 #include <FL/Fl.H>
 
 #include "main_window.h"
+#include "platform.h"
+
 
 int main(int argc, char** argv) {
   (void)argc;
   (void)argv;
+  // 必须在任何窗口与控件构造之前安装，否则构造期间的崩溃捕不到。
+  secretkeeper::ui::install_crash_dumper();
+
+  SK_DEBUG_PAUSE("before visual");
+
   Fl::visual(FL_RGB);
+  SK_DEBUG_PAUSE("before MainWindow\n");
   secretkeeper::ui::MainWindow window;
-  window.show();
+  SK_DEBUG_PAUSE("before show\n");
+  // window.show();
   return Fl::run();
 }

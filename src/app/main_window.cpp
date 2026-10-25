@@ -50,12 +50,19 @@ constexpr int kMenuGap = 10;
 }  // namespace
 
 MainWindow::MainWindow() : Fl_Double_Window(kWinW, kWinH, "密匣 SecretKeeper") {
+
+  SK_DEBUG_PAUSE("begin\n");
   color(theme::kContentBg);
+  SK_DEBUG_PAUSE("before begin\n");
   begin();
 
+  SK_DEBUG_PAUSE("after begin\n");
+
   // 每个页面都是 Fl_Group，构造时已 end() 封口（页面内的控件挂到页面自身）。
-  // 构造完成后必须显式 add() 把页面挂到窗口的 children 上——FLTK 不会
-  // 自动挂载用 new 创建的 Group。缺这一步，show()/hide() 会访问空 parent。
+  // **不能再 add()**：Fl_Widget 的构造器末尾会把自己挂到
+  // Fl_Group::current()（此时就是本窗口），Fl_Group::add() 又是
+  // 无去重的 insert(o, children_)，重复调用会让同一节点在 children
+  // 链上出现两次，之后 hide()/resize() 遍历时必然出错。
   unlock_ = std::make_unique<UnlockPage>(this);
   keys_ = std::make_unique<MasterKeysPage>(this);
   secrets_ = std::make_unique<SecretsPage>(this);
@@ -65,13 +72,19 @@ MainWindow::MainWindow() : Fl_Double_Window(kWinW, kWinH, "密匣 SecretKeeper")
   export_key_ = std::make_unique<ExportKeyPage>(this);
   add_secret_ = std::make_unique<AddSecretPage>(this);
   import_secret_ = std::make_unique<ImportSecretPage>(this);
+
+  SK_DEBUG_PAUSE("before all_pages\n");
+
   for (Fl_Group* page : all_pages()) {
     if (page == nullptr) continue;
-    add(page);
     page->hide();
   }
 
+  SK_DEBUG_PAUSE("before build_menu\n");
+
   build_menu();
+
+  SK_DEBUG_PAUSE("after build_menu\n");
 
   {
     lock_btn_ = new widgets::IconButton(kWinW - theme::kContentPad - 108, 8, 108, 32,
@@ -91,7 +104,11 @@ MainWindow::MainWindow() : Fl_Double_Window(kWinW, kWinH, "密匣 SecretKeeper")
     status_->labelcolor(theme::kTextMuted);
   }
 
+  SK_DEBUG_PAUSE("before end\n");
+
   end();
+
+  SK_DEBUG_PAUSE("after end\n");
 
   // 打开数据目录并初始化 service。
   std::error_code ec;
@@ -103,9 +120,17 @@ MainWindow::MainWindow() : Fl_Double_Window(kWinW, kWinH, "密匣 SecretKeeper")
     set_status("无法打开索引库");
   }
 
+  SK_DEBUG_PAUSE("before navigate\n");
+
+  show();
   navigate(Page::kMasterKeys);
+ 
+  SK_DEBUG_PAUSE("after navigate\n");
+
+
   Fl::add_timeout(kKekRotateSeconds, on_rotate_tick, this);
   Fl::repeat_timeout(1.0, on_idle_tick, this);
+  SK_DEBUG_PAUSE("return\n");
 }
 
 MainWindow::~MainWindow() {
@@ -200,6 +225,7 @@ void MainWindow::go_back() {
 void MainWindow::show_page(Page page) {
   current_ = page;
   // 全部页面都是本窗口的子控件，按需显示。
+  SK_DEBUG_PAUSE("before hide");
   for (Fl_Group* page : all_pages()) page->hide();
 
   Fl_Group* active = nullptr;
@@ -215,9 +241,12 @@ void MainWindow::show_page(Page page) {
     case Page::kImportSecret: active = import_secret_.get(); break;
   }
   if (active == nullptr) return;
+
+  SK_DEBUG_PAUSE("before show");
   active->show();
   active->redraw();
 
+  SK_DEBUG_PAUSE("before reload");
   // 刷新数据：子页面切回时也要 reload，否则显示旧值。
   switch (reload_target) {
     case Page::kMasterKeys:
@@ -246,6 +275,8 @@ void MainWindow::show_page(Page page) {
       break;
   }
 
+  SK_DEBUG_PAUSE("");
+
   // 菜单高亮：子页面归属到对应的管理页。
   Page menu_page = page;
   switch (page) {
@@ -261,12 +292,18 @@ void MainWindow::show_page(Page page) {
     default:
       break;
   }
+
+  SK_DEBUG_PAUSE("");
+
   for (int i = 0; i < 3; ++i) {
     menu_items_[i]->set_selected(kMenu[i].page == menu_page);
     menu_items_[i]->redraw();
   }
+  SK_DEBUG_PAUSE("");
   if (lock_btn_ != nullptr) lock_btn_->show();
+  SK_DEBUG_PAUSE("");
   redraw();
+  SK_DEBUG_PAUSE("");
 }
 
 void MainWindow::set_status(const std::string& text) {
