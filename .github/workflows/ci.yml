@@ -372,6 +372,8 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - uses: android-actions/setup-android@v3
+        if: steps.has_android.outputs.exists == 'true'
       - name: 安装 Android SDK 并接受许可协议
         if: steps.has_android.outputs.exists == 'true'
         run: |
