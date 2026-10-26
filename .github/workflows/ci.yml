@@ -372,13 +372,12 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - uses: android-actions/setup-android@v3
-        if: steps.has_android.outputs.exists == 'true'
       - name: 安装 Android SDK 并接受许可协议
         if: steps.has_android.outputs.exists == 'true'
         run: |
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" > /dev/null
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$sdkmanager" --licenses > /dev/null 2>&1 || true
+          "$sdkmanager" "platform-tools" "platforms;android-34" "build-tools;34.0.0" > /dev/null
       - name: 构建并测试
         if: steps.has_android.outputs.exists == 'true'
         run: |
