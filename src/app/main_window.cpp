@@ -1,8 +1,12 @@
 // SecretKeeper - 主窗口实现
 //
-// 左侧主菜单三项，路由到九个页面（docs/ui/svg/ 的 01-09 号设计稿）。
+// 左侧导航五项（02-09 号画板公共），路由到九个页面。
 // 定时器有三：KEK 轮换（需求 2.7 的 30 秒）、闲置锁定（4.1）、
 // 剪贴板定时清除（4.3）。
+//
+// 绘制顺序说明：窗口子控件按加入顺序绘制——九个页面在前，导航按钮等
+// chrome 在后，因此页面自己的 draw() 先画好侧栏装饰（paint_sidebar_decor），
+// chrome 控件再叠在其上。解锁页没有侧栏，chrome 在 show_page 里整体隐藏。
 
 #include "main_window.h"
 
@@ -25,38 +29,51 @@ namespace {
 namespace svc = secretkeeper::service;
 using Clock = std::chrono::steady_clock;
 
-constexpr int kWinW = 1180;
-constexpr int kWinH = 800;
-
 // KEK 轮换间隔固定 30 秒（需求 2.7），不随安全设置变化。
 constexpr double kKekRotateSeconds = 30.0;
 
-struct MenuDef {
-  Page page;
-  const char* label;
-  widgets::Icon icon;
-};
+// 侧栏导航项（02 号画板）：x=20 w=168 h=44，从客户区 y=99 起，间距 52。
+constexpr int kNavX = 20;
+constexpr int kNavW = 168;
+constexpr int kNavH = 44;
+constexpr int kNavTop = 99;
+constexpr int kNavStep = 52;
 
-const MenuDef kMenu[3] = {
-    {Page::kMasterKeys, "主密钥管理", widgets::Icon::kKey},
-    {Page::kSecrets, "机密信息管理", widgets::Icon::kFile},
-    {Page::kSettings, "安全设置", widgets::Icon::kSettings},
-};
+// 侧栏底部：锁定按钮距底 89，离线行距底 33（02 号画板实测）。
+constexpr int kLockFromBottom = 89;
+constexpr int kOfflineFromBottom = 33;
 
-constexpr int kMenuTop = 140;
-constexpr int kMenuItemH = 44;
-constexpr int kMenuGap = 10;
+// 容量卡（02 号画板）：x=20 y=383 w=168 h=108。
+constexpr int kQuotaCardX = 20;
+constexpr int kQuotaCardY = 383;
+constexpr int kQuotaCardW = 168;
+constexpr int kQuotaCardH = 108;
+
+// 内容页页脚：距底 53（02 号画板 786 = 839 − 53）。
+constexpr int kFooterFromBottom = 53;
+
+// 各页客户区高度 = 对应画板高度 − 36（自绘标题栏改用系统标题栏）。
+int page_height(Page page) {
+  switch (page) {
+    case Page::kUnlock: return theme::kUnlockH;
+    case Page::kMasterKeys: return theme::kKeysH;
+    case Page::kSecrets: return theme::kSecretsH;
+    case Page::kSettings: return theme::kSettingsH;
+    case Page::kCreateKey: return theme::kCreateKeyH;
+    case Page::kImportKey: return theme::kImportKeyH;
+    case Page::kExportKey: return theme::kExportKeyH;
+    case Page::kAddSecret: return theme::kAddSecretH;
+    case Page::kImportSecret: return theme::kImportSecretH;
+  }
+  return theme::kKeysH;
+}
 
 }  // namespace
 
-MainWindow::MainWindow() : Fl_Double_Window(kWinW, kWinH, "密匣 SecretKeeper") {
-
-  SK_DEBUG_PAUSE("begin\n");
+MainWindow::MainWindow()
+    : Fl_Double_Window(theme::kWinW, theme::kUnlockH, "密匣 SecretKeeper") {
   color(theme::kContentBg);
-  SK_DEBUG_PAUSE("before begin\n");
   begin();
-
-  SK_DEBUG_PAUSE("after begin\n");
 
   // 每个页面都是 Fl_Group，构造时已 end() 封口（页面内的控件挂到页面自身）。
   // **不能再 add()**：Fl_Widget 的构造器末尾会把自己挂到
@@ -73,42 +90,14 @@ MainWindow::MainWindow() : Fl_Double_Window(kWinW, kWinH, "密匣 SecretKeeper")
   add_secret_ = std::make_unique<AddSecretPage>(this);
   import_secret_ = std::make_unique<ImportSecretPage>(this);
 
-  SK_DEBUG_PAUSE("before all_pages\n");
-
   for (Fl_Group* page : all_pages()) {
     if (page == nullptr) continue;
     page->hide();
   }
 
-  SK_DEBUG_PAUSE("before build_menu\n");
-
-  build_menu();
-
-  SK_DEBUG_PAUSE("after build_menu\n");
-
-  {
-    lock_btn_ = new widgets::IconButton(kWinW - theme::kContentPad - 108, 8, 108, 32,
-                                        widgets::Icon::kLock, "立即锁定",
-                                        widgets::ButtonKind::kSecondary);
-    lock_btn_->callback([](Fl_Widget*, void* data) {
-      static_cast<MainWindow*>(data)->lock_now();
-      static_cast<MainWindow*>(data)->navigate(Page::kMasterKeys);
-    }, this);
-  }
-
-  {
-    status_ = new Fl_Box(theme::kSidebarWidth + theme::kContentPad, kWinH - 40,
-                         kWinW - theme::kSidebarWidth - theme::kContentPad * 2, 26, "");
-    status_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-    status_->labelsize(theme::kFontSmall);
-    status_->labelcolor(theme::kTextMuted);
-  }
-
-  SK_DEBUG_PAUSE("before end\n");
+  build_chrome();
 
   end();
-
-  SK_DEBUG_PAUSE("after end\n");
 
   // 打开数据目录并初始化 service。
   std::error_code ec;
@@ -120,17 +109,16 @@ MainWindow::MainWindow() : Fl_Double_Window(kWinW, kWinH, "密匣 SecretKeeper")
     set_status("无法打开索引库");
   }
 
-  SK_DEBUG_PAUSE("before navigate\n");
-
-  show();
-  navigate(Page::kMasterKeys);
- 
-  SK_DEBUG_PAUSE("after navigate\n");
-
+  // 路由入口（01 号画板）：已有主密钥先解锁；首台设备没有主密钥，
+  // 直接进主密钥管理页生成第一把。
+  if (service_.list_master_keys().empty()) {
+    navigate(Page::kMasterKeys);
+  } else {
+    navigate(Page::kUnlock);
+  }
 
   Fl::add_timeout(kKekRotateSeconds, on_rotate_tick, this);
   Fl::repeat_timeout(1.0, on_idle_tick, this);
-  SK_DEBUG_PAUSE("return\n");
 }
 
 MainWindow::~MainWindow() {
@@ -146,17 +134,72 @@ std::array<Fl_Group*, 9> MainWindow::all_pages() const {
           export_key_.get(), add_secret_.get(), import_secret_.get()};
 }
 
-void MainWindow::build_menu() {
-  for (int i = 0; i < 3; ++i) {
+void MainWindow::build_chrome() {
+  // 导航五项（02 号画板）：机密信息 / 主密钥管理 / 文件导入 / 文件导出 / 安全设置。
+  // 「文件导出」没有独立落地页，导出入口在机密信息管理页内。
+  struct NavDef {
+    Page page;
+    const char* label;
+    widgets::Icon icon;
+  };
+  static const NavDef kNav[kNavCount] = {
+      {Page::kSecrets, "机密信息", widgets::Icon::kFile},
+      {Page::kMasterKeys, "主密钥管理", widgets::Icon::kKey},
+      {Page::kImportSecret, "文件导入", widgets::Icon::kImport},
+      {Page::kSecrets, "文件导出", widgets::Icon::kExport},
+      {Page::kSettings, "安全设置", widgets::Icon::kSettings},
+  };
+  for (int i = 0; i < kNavCount; ++i) {
     menu_targets_[i].window = this;
-    menu_targets_[i].page = kMenu[i].page;
-    auto* btn = new widgets::Button(theme::kGapLg, kMenuTop + i * (kMenuItemH + kMenuGap),
-                                    theme::kSidebarWidth - theme::kGapLg * 2, kMenuItemH,
-                                    kMenu[i].label, widgets::ButtonKind::kSecondary);
-    // FLTK 回调的第二个参数是 void*，这里放「窗口 + 页号」的组合。
+    menu_targets_[i].page = kNav[i].page;
+    auto* btn = new widgets::IconButton(kNavX, kNavTop + i * kNavStep, kNavW, kNavH,
+                                        kNav[i].icon, kNav[i].label,
+                                        widgets::ButtonKind::kNav);
     btn->callback(on_menu_cb, &menu_targets_[i]);
     menu_items_[i] = btn;
   }
+
+  // 容量卡文本（边框与进度条在 paint_sidebar_decor 里画）。
+  quota_version_ = new Fl_Box(kQuotaCardX + 12, kQuotaCardY + 12, 144, 14,
+                              "基础版 · 本地存储");
+  quota_version_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  quota_version_->labelsize(theme::kFontTiny);
+  quota_version_->labelcolor(theme::kSidebarIcon);
+
+  quota_secrets_ = new Fl_Box(kQuotaCardX + 12, kQuotaCardY + 61, 144, 16, "机密信息 0 / 15");
+  quota_secrets_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  quota_secrets_->labelsize(theme::kFontSmall);
+  quota_secrets_->labelcolor(0xFFFFFF00);
+
+  quota_keys_ = new Fl_Box(kQuotaCardX + 12, kQuotaCardY + 80, 144, 16, "主密钥 0 / 2");
+  quota_keys_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  quota_keys_->labelsize(theme::kFontSmall);
+  quota_keys_->labelcolor(0xFFFFFF00);
+
+  // 锁定按钮（02 号画板底部，kGhost 样式）。位置随页高变化，在 show_page 摆放。
+  lock_btn_ = new widgets::IconButton(kNavX, 0, kNavW, 40, widgets::Icon::kLock,
+                                      "立即锁定", widgets::ButtonKind::kGhost);
+  lock_btn_->labelsize(theme::kFontSmall);
+  lock_btn_->callback([](Fl_Widget*, void* data) {
+    static_cast<MainWindow*>(data)->lock_now();
+  }, this);
+
+  offline_line_ = new Fl_Box(kNavX, 0, kNavW, 14, "● 完全离线　 v0.0.1");
+  offline_line_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  offline_line_->labelsize(theme::kFontTiny);
+  offline_line_->labelcolor(theme::kSidebarIcon);
+
+  // 瞬时状态消息：有内容时盖在离线行上（两者互斥显示）。
+  status_ = new Fl_Box(kNavX, 0, kNavW, 14, "");
+  status_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  status_->labelsize(theme::kFontTiny);
+  status_->labelcolor(theme::kTextFaint);
+  status_->hide();
+
+  // 内容页页脚的安全状态胶囊（文案由 show_page 后的 reload 刷新）。
+  state_pill_ = new widgets::Pill(theme::kWinW - theme::kContentPad - 49, 0, 49, 21,
+                                  "已锁定", theme::kAccent, theme::kAccentSoft);
+  state_pill_->set_shown(false);
 }
 
 void MainWindow::on_menu_cb(Fl_Widget*, void* data) {
@@ -164,20 +207,64 @@ void MainWindow::on_menu_cb(Fl_Widget*, void* data) {
   target->window->navigate(target->page);
 }
 
-void MainWindow::draw() {
-  Fl_Double_Window::draw();
-  // 左侧栏底色（菜单项已在 build_menu 中作为子控件添加）。
-  fl_color(theme::kSidebarBg);
-  fl_rectf(0, 0, theme::kSidebarWidth, kWinH);
+void MainWindow::refresh_chrome() {
+  const svc::QuotaStatus q = service_.quota();
+  const std::string secrets = "机密信息 " + std::to_string(q.secrets) + " / " +
+                              std::to_string(q.max_secrets);
+  const std::string keys = "主密钥 " + std::to_string(q.master_keys) + " / " +
+                           std::to_string(q.max_master_keys);
+  quota_secrets_->copy_label(secrets.c_str());
+  quota_keys_->copy_label(keys.c_str());
+  quota_secret_ratio_ = q.max_secrets == 0
+                            ? 0.0
+                            : static_cast<double>(q.secrets) / static_cast<double>(q.max_secrets);
+  quota_key_ratio_ = q.max_master_keys == 0
+                         ? 0.0
+                         : static_cast<double>(q.master_keys) /
+                               static_cast<double>(q.max_master_keys);
+  quota_secrets_->redraw();
+  quota_keys_->redraw();
 
-  // Logo 区
-  widgets::draw_icon(widgets::Icon::kKey, theme::kGapXl + 8, 56, theme::kSidebarActiveText);
-  fl_color(0xFFFFFF);
-  fl_font(theme::font_for(theme::kWeightBold), 20);
-  fl_draw("密匣", theme::kGapXl + 40, 52, 120, 28, FL_ALIGN_LEFT);
+  // 页脚胶囊：已解锁 / 已锁定。
+  const bool unlocked = service_.is_unlocked();
+  state_pill_->copy_label(unlocked ? "已解锁" : "已锁定");
+  state_pill_->redraw();
+}
+
+void MainWindow::paint_sidebar_decor() {
+  // 侧栏底色。
+  fl_color(theme::kSidebarBg);
+  fl_rectf(0, 0, theme::kSidebarWidth, h());
+
+  // 品牌（02 号画板）：盾牌 30px + 密匣 fs22 白 + SecretKeeper fs10。
+  widgets::draw_icon(widgets::Icon::kKey, 20, 32, theme::kSidebarActiveText);
+  fl_color(0xFFFFFF00);
+  fl_font(theme::font_for(theme::kWeightRegular), 22);
+  fl_draw("密匣", 60, 28, 120, 27, FL_ALIGN_LEFT);
   fl_color(theme::kSidebarIcon);
-  fl_font(theme::font_for(theme::kWeightRegular), theme::kFontSmall);
-  fl_draw("SecretKeeper", theme::kGapXl + 40, 80, 140, 18, FL_ALIGN_LEFT);
+  fl_font(theme::font_for(theme::kWeightRegular), 10);
+  fl_draw("SecretKeeper", 60, 55, 130, 13, FL_ALIGN_LEFT);
+
+  // 容量卡：描边框 + 两条进度条。
+  theme::stroke_rounded(kQuotaCardX, kQuotaCardY, kQuotaCardW, kQuotaCardH, 8,
+                        theme::kSidebarBorder);
+  const int track_x = kQuotaCardX + 12;
+  theme::fill_rounded(track_x, kQuotaCardY + 65, 144, 3, 2, theme::kProgressTrack);
+  const int fill1 = static_cast<int>(144 * std::clamp(quota_secret_ratio_, 0.0, 1.0));
+  if (fill1 > 0) {
+    theme::fill_rounded(track_x, kQuotaCardY + 65, fill1, 3, 2, theme::kSidebarActiveText);
+  }
+  theme::fill_rounded(track_x, kQuotaCardY + 84, 144, 3, 2, theme::kProgressTrack);
+  const int fill2 = static_cast<int>(144 * std::clamp(quota_key_ratio_, 0.0, 1.0));
+  if (fill2 > 0) {
+    theme::fill_rounded(track_x, kQuotaCardY + 84, fill2, 3, 2, theme::kSidebarActiveText);
+  }
+}
+
+void MainWindow::draw() {
+  // 不在窗口层画任何装饰：内容页的 draw() 先画侧栏装饰，
+  // chrome 子控件（导航按钮等）随后自然叠在其上。
+  Fl_Double_Window::draw();
 }
 
 int MainWindow::handle(int event) {
@@ -224,13 +311,30 @@ void MainWindow::go_back() {
 
 void MainWindow::show_page(Page page) {
   current_ = page;
+
+  // 窗口高度随页面切换（各画板高度不同），侧栏装饰与 chrome 位置随之摆放。
+  const int w = theme::kWinW;
+  const int h = page_height(page);
+  if (w != this->w() || h != this->h()) resize(x(), y(), w, h);
+
+  const bool chrome = page != Page::kUnlock;
+  const int lock_y = h - kLockFromBottom;
+  const int offline_y = h - kOfflineFromBottom;
+  const int footer_y = h - kFooterFromBottom;
+  lock_btn_->position(kNavX, lock_y);
+  offline_line_->position(kNavX, offline_y);
+  status_->position(kNavX, offline_y);
+  state_pill_->position(theme::kWinW - theme::kContentPad - 49, footer_y);
+  lock_btn_->show();
+  offline_line_->show();
+  state_pill_->set_shown(chrome);
+
   // 全部页面都是本窗口的子控件，按需显示。
-  SK_DEBUG_PAUSE("before hide");
-  for (Fl_Group* page : all_pages()) page->hide();
+  for (Fl_Group* p : all_pages()) p->hide();
 
   Fl_Group* active = nullptr;
-  Page reload_target = page;
   switch (page) {
+    case Page::kUnlock: active = unlock_.get(); break;
     case Page::kMasterKeys: active = keys_.get(); break;
     case Page::kSecrets: active = secrets_.get(); break;
     case Page::kSettings: active = settings_page_.get(); break;
@@ -242,15 +346,55 @@ void MainWindow::show_page(Page page) {
   }
   if (active == nullptr) return;
 
-  SK_DEBUG_PAUSE("before show");
+  // chrome 的显隐与页脚文本：解锁页整屏自绘，无侧栏。
+  // 导航高亮：子页面归并到所属管理页（文件导入有自己的导航项）。
+  Page menu_page = page;
+  switch (page) {
+    case Page::kCreateKey:
+    case Page::kImportKey:
+    case Page::kExportKey:
+      menu_page = Page::kMasterKeys;
+      break;
+    case Page::kAddSecret:
+      menu_page = Page::kSecrets;
+      break;
+    default:
+      break;
+  }
+  for (int i = 0; i < kNavCount; ++i) {
+    if (chrome) {
+      menu_items_[i]->show();
+    } else {
+      menu_items_[i]->hide();
+    }
+    // 第 3 项「文件导出」是机密信息页的别名入口，永不单独高亮。
+    menu_items_[i]->set_selected(menu_targets_[i].page == menu_page && i != 3);
+    menu_items_[i]->redraw();
+  }
+  if (chrome) {
+    quota_version_->show();
+    quota_secrets_->show();
+    quota_keys_->show();
+  } else {
+    lock_btn_->hide();
+    offline_line_->hide();
+    status_->hide();
+    quota_version_->hide();
+    quota_secrets_->hide();
+    quota_keys_->hide();
+  }
+  refresh_chrome();
+
   active->show();
   active->redraw();
 
-  SK_DEBUG_PAUSE("before reload");
   // 刷新数据：子页面切回时也要 reload，否则显示旧值。
-  switch (reload_target) {
+  switch (page) {
+    case Page::kUnlock:
+      unlock_->reload();
+      break;
     case Page::kMasterKeys:
-    keys_->reload();
+      keys_->reload();
       break;
     case Page::kSecrets:
       secrets_->reload();
@@ -275,43 +419,21 @@ void MainWindow::show_page(Page page) {
       break;
   }
 
-  SK_DEBUG_PAUSE("");
-
-  // 菜单高亮：子页面归属到对应的管理页。
-  Page menu_page = page;
-  switch (page) {
-    case Page::kCreateKey:
-    case Page::kImportKey:
-    case Page::kExportKey:
-      menu_page = Page::kMasterKeys;
-      break;
-    case Page::kAddSecret:
-    case Page::kImportSecret:
-      menu_page = Page::kSecrets;
-      break;
-    default:
-      break;
-  }
-
-  SK_DEBUG_PAUSE("");
-
-  for (int i = 0; i < 3; ++i) {
-    menu_items_[i]->set_selected(kMenu[i].page == menu_page);
-    menu_items_[i]->redraw();
-  }
-  SK_DEBUG_PAUSE("");
-  if (lock_btn_ != nullptr) lock_btn_->show();
-  SK_DEBUG_PAUSE("");
   redraw();
-  SK_DEBUG_PAUSE("");
 }
 
 void MainWindow::set_status(const std::string& text) {
   status_text_ = text;
-  if (status_ != nullptr) {
+  if (status_ == nullptr) return;
+  if (text.empty()) {
+    status_->hide();
+    offline_line_->show();
+  } else {
     status_->copy_label(text.c_str());
-    status_->redraw();
+    offline_line_->hide();
+    status_->show();
   }
+  status_->redraw();
 }
 
 void MainWindow::show_error(svc::Error e) { set_status(error_text(e)); }
@@ -320,6 +442,7 @@ void MainWindow::refresh() {
   keys_->reload();
   secrets_->reload();
   settings_page_->reload();
+  refresh_chrome();
 }
 
 void MainWindow::note_activity() {
@@ -329,15 +452,14 @@ void MainWindow::note_activity() {
 
 void MainWindow::on_unlocked() {
   hide_plaintext();
+  refresh_chrome();
   navigate(Page::kSecrets);
-  set_status("已解锁");
 }
 
 void MainWindow::lock_now() {
   service_.lock();
   hide_plaintext();
-  set_status("已锁定");
-  redraw();
+  navigate(Page::kUnlock);
 }
 
 void MainWindow::arm_clipboard_clear() {

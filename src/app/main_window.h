@@ -2,11 +2,13 @@
 
 // SecretKeeper - 主窗口
 //
-// 负责三件事：
-//   1. 左侧主菜单（三项：主密钥管理 / 机密信息管理 / 安全设置）与页面路由；
-//   2. 持有唯一的 service 实例，把所有页面需要的能力以只读访问器暴露出去；
-//   3. 定时器：KEK 轮换、闲置锁定、剪贴板定时清除。
+// 负责四件事：
+//   1. 左侧导航（02-09 号画板公共：品牌、五项导航、容量卡、锁定、离线状态）；
+//   2. 页面路由与按页窗口高度（各画板高度不同）；
+//   3. 持有唯一的 service 实例，把页面需要的能力以只读访问器暴露出去；
+//   4. 定时器：KEK 轮换、闲置锁定、剪贴板定时清除。
 //
+// 解锁页（01 号）没有侧栏：它的左侧是 456px 品牌承诺区。
 // 页面通过 MainWindow 访问 service 与设置，不直接持有 service。
 
 #include <FL/Fl_Double_Window.H>
@@ -26,7 +28,7 @@ using Clock = std::chrono::steady_clock;
 
 class MainWindow;
 
-// 见下方 build_menu 的注释：FLTK 回调只能传一个 void*。
+// FLTK 回调只能传一个 void*，用 MenuTarget 把「窗口 + 目标页」一起带过去。
 struct MenuTarget {
   MainWindow* window = nullptr;
   Page page = Page::kMasterKeys;
@@ -59,13 +61,19 @@ class MainWindow : public Fl_Double_Window {
   void lock_now();
   void arm_clipboard_clear();
 
+  // 绘制 02-09 号画板公共的侧栏装饰（底色、品牌、容量卡框与进度条）。
+  // 各内容页在自己的 draw() 最开头调用，保证装饰位于页面内容之下、
+  // 导航按钮等窗口子控件之上。
+  void paint_sidebar_decor();
+
  protected:
   void draw() override;
   int handle(int event) override;
 
  private:
-  void build_menu();
+  void build_chrome();
   void show_page(Page page);
+  void refresh_chrome();
   // 全部九个页面，按构造顺序。
   std::array<Fl_Group*, 9> all_pages() const;
   static void on_menu_cb(Fl_Widget*, void* data);
@@ -78,7 +86,7 @@ class MainWindow : public Fl_Double_Window {
   service::Service service_;
   SecuritySettings settings_;
 
-  Page current_ = Page::kMasterKeys;
+  Page current_ = Page::kUnlock;
   std::unique_ptr<UnlockPage> unlock_;
   std::unique_ptr<MasterKeysPage> keys_;
   std::unique_ptr<SecretsPage> secrets_;
@@ -89,11 +97,21 @@ class MainWindow : public Fl_Double_Window {
   std::unique_ptr<AddSecretPage> add_secret_;
   std::unique_ptr<ImportSecretPage> import_secret_;
 
-  // FLTK 回调只能传一个 void*，用 MenuTarget 把「窗口 + 目标页」一起带过去。
-  MenuTarget menu_targets_[3];
-  widgets::Button* menu_items_[3] = {nullptr, nullptr, nullptr};
+  // ---- 侧栏 chrome（02-09 号画板公共，解锁页整体隐藏）----
+  static constexpr int kNavCount = 5;
+  MenuTarget menu_targets_[kNavCount];
+  widgets::IconButton* menu_items_[kNavCount] = {};
+  widgets::Button* lock_btn_ = nullptr;
+  Fl_Box* quota_version_ = nullptr;
+  Fl_Box* quota_secrets_ = nullptr;
+  Fl_Box* quota_keys_ = nullptr;
+  Fl_Box* offline_line_ = nullptr;
   Fl_Box* status_ = nullptr;
-  widgets::IconButton* lock_btn_ = nullptr;
+  // 内容页页脚（本机加密保存 · 无网络连接 · 无云同步 + 锁定状态胶囊）。
+  widgets::Pill* state_pill_ = nullptr;
+
+  double quota_secret_ratio_ = 0.0;
+  double quota_key_ratio_ = 0.0;
 
   std::string export_target_;
   std::string status_text_;

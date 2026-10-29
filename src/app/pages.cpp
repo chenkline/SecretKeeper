@@ -39,15 +39,10 @@ namespace {
 using widgets::ButtonKind;
 using widgets::Icon;
 
-// 界面固定尺寸。设计稿为 1200x844，实际窗口留出系统边框后按 1180x800 起，
-// 内容区高度不足时由各页面自行裁剪（列表页滚动、设置页不滚动）。
-constexpr int kWinW = 1180;
-constexpr int kWinH = 800;
-
-// 左侧主菜单三项的顺序与设计稿一致。
-constexpr int kMenuTop = 140;
-constexpr int kMenuItemH = 44;
-constexpr int kMenuGap = 10;
+// 界面固定尺寸：宽 1200（theme::kWinW）；高度按页不同，见 theme.h 的
+// kUnlockH 等常量。尚未重排的页面暂用 kWinH 兜底，重排时逐页替换。
+constexpr int kWinW = theme::kWinW;
+constexpr int kWinH = theme::kKeysH;
 
 std::span<const std::uint8_t> as_bytes(const std::string& text) {
   return {reinterpret_cast<const std::uint8_t*>(text.data()), text.size()};
@@ -220,23 +215,32 @@ PageBase::PageBase(MainWindow* host, const char* title, const char* subtitle)
   box(FL_NO_BOX);
   color(theme::kContentBg);
   back_ = nullptr;
-  title_box_ = new Fl_Box(theme::kContentPad, 40, 560, 36, title);
+  // 页头（02/03 号画板）：内容区 x=208+32=240，标题 fs24、说明 fs13。
+  title_box_ = new Fl_Box(theme::kSidebarWidth + theme::kContentPad, 32, 656, 33, title);
   title_box_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  title_box_->labelfont(theme::font_for(theme::kWeightBold));
-  title_box_->labelsize(theme::kFontTitle);
+  title_box_->labelfont(theme::font_for(theme::kWeightRegular));
+  title_box_->labelsize(24);
   title_box_->labelcolor(theme::kText);
-  subtitle_box_ = new Fl_Box(theme::kContentPad, 76, 700, 22, subtitle_.c_str());
+  subtitle_box_ = new Fl_Box(theme::kSidebarWidth + theme::kContentPad, 72, 700, 21,
+                             subtitle_.c_str());
   subtitle_box_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
   subtitle_box_->labelfont(theme::font_for(theme::kWeightRegular));
-  subtitle_box_->labelsize(theme::kFontBody);
+  subtitle_box_->labelsize(theme::kFontLabel);
   subtitle_box_->labelcolor(theme::kTextMuted);
   end();
 }
 
+void PageBase::draw() {
+  // 先画 02-09 号画板公共的侧栏装饰，再画本页子控件。
+  host_->paint_sidebar_decor();
+  Fl_Group::draw();
+}
+
 void PageBase::layout_header(const char* back_label) {
   if (back_label != nullptr) {
-    back_ = new widgets::Button(kWinW - theme::kContentPad - 110, 44, 110, 34, back_label,
-                                ButtonKind::kSecondary);
+    // 返回按钮（03 号画板）：白底描边，右缘与内容区对齐，高 44。
+    back_ = new widgets::Button(0, 40, 110, 44, back_label, ButtonKind::kSecondary);
+    back_->position(kWinW - theme::kContentPad - back_->w(), 40);
     back_->callback([](Fl_Widget*, void* data) {
       static_cast<PageBase*>(data)->on_back();
     }, this);
@@ -248,111 +252,139 @@ void PageBase::on_back() { host_->go_back(); }
 // =====================================================================
 // 01 解锁与锁定
 // =====================================================================
-UnlockPage::UnlockPage(MainWindow* host) : Fl_Group(0, 0, kWinW, kWinH), host_(host) {
+UnlockPage::UnlockPage(MainWindow* host) : Fl_Group(0, 0, kWinW, theme::kUnlockH), host_(host) {
   begin();
   box(FL_NO_BOX);
-  color(theme::kContentBg);
+  color(theme::kBrandBg);
 
-  // ---- 右侧表单区 ----
-  const int form_x = 560;
-  const int form_w = 560;
-  state_pill_ = new widgets::Pill(form_x + theme::kContentPad, 64, 92, 26, "已锁定",
-                                  theme::kTextMuted, theme::kSubtleBg);
+  // ---- 解锁区（01 号画板 x=456..1200，左右留白 112）----
+  const int form_x = 568;
+  const int form_w = 520;
 
-  Fl_Box welcome(form_x + theme::kContentPad, 300, form_w - theme::kContentPad * 2, 40,
-                 "欢迎回来");
-  welcome.align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  welcome.labelfont(theme::font_for(theme::kWeightBold));
-  welcome.labelsize(theme::kFontTitle);
-  welcome.labelcolor(theme::kText);
+  state_pill_ = new widgets::Pill(form_x, 64, 49, 21, "已锁定", theme::kTextMuted,
+                                  theme::kSubtleBg);
 
-  Fl_Box tip(form_x + theme::kContentPad, 342, form_w - theme::kContentPad * 2, 22,
-             "选择主密钥，输入主密钥密码解锁。");
-  tip.align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  tip.labelfont(theme::font_for(theme::kWeightRegular));
-  tip.labelsize(theme::kFontBody);
-  tip.labelcolor(theme::kTextMuted);
+  auto* welcome = new Fl_Box(form_x, 184, form_w, 44, "欢迎回来");
+  welcome->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  welcome->labelfont(theme::font_for(theme::kWeightRegular));
+  welcome->labelsize(32);
+  welcome->labelcolor(theme::kText);
 
-  Fl_Box key_label(form_x + theme::kContentPad, 388, 200, 20, "主密钥");
-  key_label.align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  key_label.labelfont(theme::font_for(theme::kWeightRegular));
-  key_label.labelsize(theme::kFontSmall);
-  key_label.labelcolor(theme::kTextMuted);
+  auto* tip = new Fl_Box(form_x, 239, form_w, 22, "输入默认主密钥密码，解锁本机的密匣。");
+  tip->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  tip->labelfont(theme::font_for(theme::kWeightRegular));
+  tip->labelsize(theme::kFontBody);
+  tip->labelcolor(theme::kTextMuted);
 
-  selector_ = new widgets::KeySelector(form_x + theme::kContentPad, 410,
-                                       form_w - theme::kContentPad * 2, 64);
-  selector_->set_placeholder("尚未创建主密钥");
+  // 默认主密钥卡（01 号画板 #F8FAFA r8，两行：标签 + 名称与 ID）。
+  selector_ = new widgets::KeySelector(form_x, 285, form_w, 81);
+  selector_->set_placeholder("尚未创建主密钥，请先生成");
   selector_->callback([](Fl_Widget*, void* data) {
     static_cast<UnlockPage*>(data)->on_pick_key();
   }, this);
 
-  Fl_Box pwd_label(form_x + theme::kContentPad, 490, 200, 20, "主密钥密码");
-  pwd_label.align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  pwd_label.labelfont(theme::font_for(theme::kWeightRegular));
-  pwd_label.labelsize(theme::kFontSmall);
-  pwd_label.labelcolor(theme::kTextMuted);
+  auto* pwd_label = new Fl_Box(form_x, 390, form_w, 21, "默认主密钥密码");
+  pwd_label->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  pwd_label->labelfont(theme::font_for(theme::kWeightRegular));
+  pwd_label->labelsize(theme::kFontLabel);
+  pwd_label->labelcolor(theme::kText);
 
-  password_ = new widgets::Field(form_x + theme::kContentPad, 512,
-                                 form_w - theme::kContentPad * 2 - 34, 38);
+  password_ = new widgets::Field(form_x, 419, form_w, 46);
   password_->type(FL_SECRET_INPUT);
   password_->when(FL_WHEN_ENTER_KEY);
   password_->callback([](Fl_Widget*, void* data) {
     static_cast<UnlockPage*>(data)->on_unlock();
   }, this);
 
-  unlock_btn_ = new widgets::IconButton(form_x + theme::kContentPad, 566,
-                                        form_w - theme::kContentPad * 2, 44, Icon::kLock,
-                                        "解锁密匣");
+  unlock_btn_ = new widgets::IconButton(form_x, 489, form_w, 44, Icon::kLock, "解锁密匣");
   unlock_btn_->callback([](Fl_Widget*, void* data) {
     static_cast<UnlockPage*>(data)->on_unlock();
   }, this);
 
-  error_ = new Fl_Box(form_x + theme::kContentPad, 626, form_w - theme::kContentPad * 2, 22, "");
+  auto* hint = new Fl_Box(form_x, 557, form_w, 19,
+                          "密码丢失无法解密；密匣没有在线找回方式。");
+  hint->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  hint->labelfont(theme::font_for(theme::kWeightRegular));
+  hint->labelsize(theme::kFontSmall);
+  hint->labelcolor(theme::kTextMuted);
+
+  // 错误提示：设计稿没有专门位置，放在操作提示下方，动态显隐。
+  error_ = new Fl_Box(form_x, 583, form_w, 19, "");
   error_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
   error_->labelfont(theme::font_for(theme::kWeightRegular));
   error_->labelsize(theme::kFontSmall);
   error_->labelcolor(theme::kTextMuted);
+
+  auto* lock_note = new Fl_Box(form_x, 675, form_w, 19,
+                               "锁定后已隐藏明文，并清空内存密钥缓存。");
+  lock_note->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  lock_note->labelfont(theme::font_for(theme::kWeightRegular));
+  lock_note->labelsize(theme::kFontSmall);
+  lock_note->labelcolor(theme::kTextMuted);
+
+  auto* rotate_note = new Fl_Box(form_x, 702, form_w, 18,
+                                 "下次解锁将重新轮换内存随机密钥。");
+  rotate_note->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  rotate_note->labelfont(theme::font_for(theme::kWeightRegular));
+  rotate_note->labelsize(theme::kFontTiny);
+  rotate_note->labelcolor(theme::kTextFaint);
   end();
 }
 
 void UnlockPage::draw() {
+  // 01 号画板：右解锁区底色为纯白（其余内容页是 #F3F5F6），先铺底再画子控件。
+  fl_color(theme::kFieldBg);
+  fl_rectf(0, 0, w(), h());
   Fl_Group::draw();
-  // 左侧品牌区：深色底 + 盾牌 Logo + 标语。
-  const int side_w = theme::kSidebarWidth;
-  fl_color(theme::kSidebarBg);
-  fl_rectf(0, 0, side_w, kWinH);
 
-  const int cx = side_w / 2;
-  // Logo：圆角方块 + 盾牌轮廓 + 对勾
-  const int box = 76;
-  theme::fill_rounded(cx - box / 2, 250, box, box, 20, theme::kActiveBg);
-  fl_color(theme::kSidebarActiveText);
-  fl_line_style(FL_SOLID, 2);
-  const int sx = cx - 16, sy = 268;
-  fl_line(sx + 16, sy, sx + 30, sy + 6);
-  fl_line(sx + 30, sy + 6, sx + 16, sy + 28);
-  fl_arc(sx + 16, sy + 14, 16, 0.0f, 3.14159265f);
-  fl_line(sx, sy + 14, sx, sy + 26);
-  fl_line(sx + 32, sy + 14, sx + 32, sy + 26);
-  fl_line_style(FL_SOLID, 0);
+  // ---- 左侧品牌承诺区（01 号画板 x=0..456，#172C31）----
+  const int side_w = 456;
+  fl_color(theme::kBrandBg);
+  fl_rectf(0, 0, side_w, h());
 
-  // 本机密匣角标
-  const int tag_w = 76, tag_h = 22;
-  theme::draw_pill(cx + 8, 344, tag_w, tag_h, "本机密匣", theme::kSidebarActiveText,
-                   theme::kActiveBg);
-
-  fl_color(0xFFFFFF);
-  fl_font(theme::font_for(theme::kWeightBold), 26);
-  fl_draw("只在你的设备里，", 28, 490, side_w - 40, 34, FL_ALIGN_LEFT);
-  fl_draw("只由你的密钥开启。", 28, 524, side_w - 40, 34, FL_ALIGN_LEFT);
-
+  // 品牌行：盾牌 34px + 密匣 fs26 白 + SecretKeeper fs12。
+  widgets::draw_icon(Icon::kKey, 48, 54, theme::kBrandTeal);
+  fl_color(0xFFFFFF00);
+  fl_font(theme::font_for(theme::kWeightRegular), 26);
+  fl_draw("密匣", 94, 48, 120, 32, FL_ALIGN_LEFT);
   fl_color(theme::kSidebarIcon);
   fl_font(theme::font_for(theme::kWeightRegular), theme::kFontSmall);
-  fl_draw("完全离线的个人私密信息匣。", 28, 576, side_w - 40, 20, FL_ALIGN_LEFT);
-  fl_draw("不联网、不登录、不上传。", 28, 598, side_w - 40, 20, FL_ALIGN_LEFT);
+  fl_draw("SecretKeeper", 94, 81, 140, 15, FL_ALIGN_LEFT);
 
+  // 安全视觉：两个同心圆 + 安全核心 + 本机加密角标（01 号画板实测）。
+  // fl_arc 的角度单位是度，不是弧度。
+  fl_line_style(FL_SOLID, 1);
+  fl_color(theme::kBrandBorder);
+  fl_arc(188, 316, 122, 0, 360);
+  fl_color(theme::kAccentHover);
+  fl_arc(188, 317, 91, 0, 360);
+  fl_line_style(FL_SOLID, 0);
+  theme::fill_rounded(138, 260, 100, 114, 20, theme::kActiveBg);
+  theme::stroke_rounded(138, 260, 100, 114, 20, theme::kCoreStroke);
+  widgets::draw_icon(Icon::kCheck, 178, 306, theme::kBrandTeal);
+
+  theme::fill_rounded(225, 380, 56, 28, 6, theme::kBrandBg);
+  theme::stroke_rounded(225, 380, 56, 28, 6, theme::kBrandBorder);
+  fl_color(theme::kBrandTeal);
+  fl_font(theme::font_for(theme::kWeightRegular), 10);
+  fl_draw("本机加密", 225, 380, 56, 28, FL_ALIGN_CENTER);
+
+  // 品牌承诺 fs30 两行 + 说明 fs14 两行。
+  fl_color(0xFFFFFF00);
+  fl_font(theme::font_for(theme::kWeightRegular), 30);
+  fl_draw("只在你的设备里，", 48, 468, side_w - 96, 44, FL_ALIGN_LEFT);
+  fl_draw("只由你的密钥开启。", 48, 511, side_w - 96, 44, FL_ALIGN_LEFT);
+  fl_color(theme::kSidebarIcon);
+  fl_font(theme::font_for(theme::kWeightRegular), theme::kFontBody);
+  fl_draw("完全离线的个人机密信息匣。", 48, 572, side_w - 96, 26, FL_ALIGN_LEFT);
+  fl_draw("不联网、不登录、不上传。", 48, 597, side_w - 96, 26, FL_ALIGN_LEFT);
+
+  // 版本信息（01 号画板 y=758 → 客户区 722）。
   fl_font(theme::font_for(theme::kWeightRegular), theme::kFontSmall);
-  fl_draw("v0.0.1", 28, kWinH - 48, 120, 20, FL_ALIGN_LEFT);
+  fl_draw("基础版　/　v0.0.1　/　文件备份", 48, 722, 300, 15, FL_ALIGN_LEFT);
+
+  // 锁定状态行右上角的锁图标。
+  widgets::draw_icon(Icon::kLock, 1068, 64, theme::kTextMuted);
 }
 
 int UnlockPage::handle(int event) {
@@ -390,6 +422,7 @@ void UnlockPage::reload() {
   const auto& item = keys[static_cast<std::size_t>(index)];
   selected_key_id_ = item.master_key_id;
   selector_->set_key(item.name, item.master_key_id, item.is_default);
+  selector_->set_switchable(keys.size() > 1);
   error_->copy_label("");
 }
 

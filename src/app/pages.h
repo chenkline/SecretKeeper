@@ -26,6 +26,7 @@ namespace secretkeeper::ui {
 
 // ---- 页面标识 ----
 enum class Page {
+  kUnlock,          // 01 解锁与锁定（无侧栏）
   kMasterKeys,      // 02 主密钥管理
   kSecrets,         // 06 机密信息管理
   kSettings,        // 09 安全设置
@@ -59,7 +60,9 @@ class PageBase : public Fl_Group {
   void on_back();
 
  protected:
-  // 顶部大标题 + 副标题的公共外壳。调用方在其下方继续摆内容。
+  void draw() override;
+  // 顶部大标题 + 副标题的公共外壳。调用方在其下方继续摆内容；
+  // back_label 非空时在页头右侧放「返回」按钮（03 号画板样式）。
   void layout_header(const char* back_label);
 
   MainWindow* host() const { return host_; }

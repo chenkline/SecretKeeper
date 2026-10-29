@@ -41,8 +41,9 @@ class Card : public Fl_Widget {
 };
 
 // ---- 主色按钮 ----
-// 填充分三种：主色实心、次要（白底描边）、危险（红字红边）。
-enum class ButtonKind { kPrimary, kSecondary, kDanger };
+// 填充分五种：主色实心、次要（白底描边，如返回）、安静（浅灰底，如删除）、
+// 危险（红字红边）、侧栏专用（锁定 kGhost / 导航 kNav）。
+enum class ButtonKind { kPrimary, kSecondary, kDanger, kQuiet, kGhost, kNav };
 
 class Button : public Fl_Button {
  public:
@@ -218,6 +219,8 @@ class KeySelector : public Fl_Widget {
   KeySelector(int x, int y, int w, int h);
   void set_key(std::string_view name, std::string_view id, bool is_default);
   void set_placeholder(std::string_view text);
+  // 存在多把主密钥时在右侧显示「点按切换」提示。
+  void set_switchable(bool on);
   void draw() override;
   int handle(int event) override;
 
@@ -225,6 +228,7 @@ class KeySelector : public Fl_Widget {
   std::string name_;
   std::string id_;
   bool is_default_ = false;
+  bool switchable_ = false;
   std::string placeholder_;
 };
 

@@ -118,7 +118,27 @@ void Button::draw() {
       fg = enabled_ ? theme::kDangerText : theme::kTextFaint;
       border = theme::kDangerBorder;
       break;
-    case ButtonKind::kSecondary:
+    case ButtonKind::kQuiet:
+      // 安静按钮（导入主密钥 / 删除主密钥等）：浅灰底浅灰字。
+      bg = theme::kSecondaryBg;
+      fg = enabled_ ? theme::kSecondaryText : theme::kTextFaint;
+      border = theme::kSecondaryBg;
+      break;
+    case ButtonKind::kGhost:
+      // 侧栏锁定按钮：透明底 + 深描边 + 白字。
+      bg = theme::kSidebarBg;
+      fg = 0xFFFFFF00;
+      border = theme::kSidebarBorder;
+      break;
+    case ButtonKind::kNav: {
+      // 侧栏导航项：未选中透明，选中 #24454A。
+      // 文字与图标由 IconButton::draw 左对齐绘制，这里只画底。
+      if (selected_) {
+        theme::fill_rounded(x(), y(), w(), h(), theme::kRadiusButton,
+                            theme::kSidebarActiveBg);
+      }
+      return;
+    }
     default:
       bg = theme::kCardBg;
       fg = enabled_ ? theme::kText : theme::kTextFaint;
@@ -126,16 +146,11 @@ void Button::draw() {
       break;
   }
 
-  if (!enabled_) {
+  if (!enabled_ && kind_ != ButtonKind::kGhost) {
     // 禁用态统一降到浅灰底，忽略 kind 的配色。
     bg = theme::kSubtleBg;
     border = theme::kBorder;
-  }
-  if (selected_) {
-    // 侧栏选中项：主色浅底 + 主色文字（设计稿左侧菜单）。
-    bg = theme::kSidebarActiveBg;
-    fg = theme::kSidebarActiveText;
-    border = bg;
+    fg = theme::kTextFaint;
   }
 
   theme::fill_rounded(x(), y(), w(), h(), theme::kRadiusButton, bg);
@@ -433,6 +448,19 @@ IconButton::IconButton(int x, int y, int w, int h, Icon icon, std::string_view l
 
 void IconButton::draw() {
   Button::draw();
+  if (kind() == ButtonKind::kNav) {
+    // 侧栏导航项：图标 18px 靠左，文字左对齐（设计稿 02 号侧栏）。
+    // 未选中：图标与文字 #96AFB3；选中：图标 #74CFBA、文字白色加粗。
+    const bool sel = is_selected();
+    draw_icon(icon_, x() + theme::kGapMd, y() + (h() - 18) / 2,
+              sel ? theme::kBrandTeal : theme::kSidebarIcon);
+    fl_color(sel ? 0xFFFFFF00 : theme::kSidebarIcon);
+    fl_font(theme::font_for(sel ? theme::kWeightBold : theme::kWeightRegular),
+            theme::kFontLabel);
+    fl_draw(label_text().c_str(), x() + 42, y(), w() - 42, h(),
+            FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+    return;
+  }
   // 图标画在文字左侧，整体（图标 + 文字）仍以按钮中心对齐。
   fl_font(theme::font_for(theme::kWeightMedium), theme::kFontBody);
   const int text_w = static_cast<int>(fl_width(label_text().c_str()));
@@ -440,6 +468,7 @@ void IconButton::draw() {
   const int total = kIconSize + gap + text_w;
   const int start_x = x() + (w() - total) / 2;
   Fl_Color fg = kind() == ButtonKind::kPrimary ? theme::kOnAccent : theme::kText;
+  if (kind() == ButtonKind::kGhost) fg = 0xFFFFFF00;
   if (!is_enabled()) fg = theme::kTextFaint;
   draw_icon(icon_, start_x, y() + (h() - kIconSize) / 2, fg);
 }
@@ -462,6 +491,12 @@ void KeySelector::set_placeholder(std::string_view text) {
   redraw();
 }
 
+void KeySelector::set_switchable(bool on) {
+  if (switchable_ == on) return;
+  switchable_ = on;
+  redraw();
+}
+
 int KeySelector::handle(int event) {
   if (event == FL_PUSH) {
     do_callback();
@@ -472,50 +507,42 @@ int KeySelector::handle(int event) {
 
 void KeySelector::draw() {
   const bool empty = name_.empty() && id_.empty();
-  theme::fill_rounded(x(), y(), w(), h(), theme::kRadiusField,
-                      empty ? theme::kSubtleBg : theme::kCardBg);
-  theme::stroke_rounded(x(), y(), w(), h(), theme::kRadiusField,
-                       empty ? theme::kBorder : theme::kAccent);
+  // 设计稿 01 号：默认主密钥是 #F8FAFA 圆角卡，无图标无箭头。
+  theme::fill_rounded(x(), y(), w(), h(), theme::kRadiusCard, theme::kSubtleBg);
 
   const int pad = theme::kGapLg;
-  const int icon_x = x() + pad;
-  const int text_x = icon_x + kIconSize + theme::kGapMd;
-  const int chevron_w = 24;
-  const int pill_w = is_default_ ? theme::pill_width("默认", theme::kFontTiny) : 0;
-  const int text_w = w() - (text_x - x()) - pad - chevron_w - pill_w;
-
-  draw_icon(Icon::kKey, icon_x, y() + (h() - kIconSize) / 2, theme::kAccent);
+  const int inner_w = w() - pad * 2;
 
   if (empty) {
     fl_color(theme::kTextMuted);
     fl_font(theme::font_for(theme::kWeightRegular), theme::kFontBody);
-    fl_draw(placeholder_.c_str(), text_x, y(), text_w, h(), FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  } else {
-    fl_color(theme::kText);
-    fl_font(theme::font_for(theme::kWeightMedium), theme::kFontBody);
-    fl_draw(name_.c_str(), text_x, y(), text_w, h() / 2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-    fl_color(theme::kTextMuted);
-    fl_font(theme::font_for(theme::kWeightRegular), theme::kFontSmall);
-    fl_draw(id_.c_str(), text_x, y() + h() / 2, text_w, h() / 2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+    fl_draw(placeholder_.c_str(), x() + pad, y(), inner_w, h(),
+            FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+    return;
   }
 
-  int cursor = x() + w() - pad - chevron_w;
-  if (is_default_) {
-    const int ph = 22;
-    const int py = y() + (h() - ph) / 2;
-    theme::draw_pill(cursor - theme::pill_width("默认", theme::kFontTiny), py,
-                     theme::pill_width("默认", theme::kFontTiny), ph, "默认",
-                     theme::kAccent, theme::kAccentSoft);
-    cursor -= theme::pill_width("默认", theme::kFontTiny) + theme::kGapSm;
-  }
-  // 下拉箭头
+  // 第一行：固定标签「默认主密钥」。
   fl_color(theme::kTextMuted);
-  fl_line_style(FL_SOLID, 1);
-  const int cx = cursor + 8;
-  const int cy = y() + h() / 2 - 2;
-  fl_line(cx - 4, cy, cx, cy + 4);
-  fl_line(cx, cy + 4, cx + 4, cy);
-  fl_line_style(FL_SOLID, 0);
+  fl_font(theme::font_for(theme::kWeightRegular), theme::kFontSmall);
+  fl_draw("默认主密钥", x() + pad, y() + 16 - theme::kFontSmall, inner_w, h(),
+          FL_ALIGN_LEFT | FL_ALIGN_TOP | FL_ALIGN_INSIDE);
+
+  // 第二行：密钥名 + 右侧 ID（fs13 fw500）。
+  fl_color(theme::kText);
+  fl_font(theme::font_for(theme::kWeightRegular), theme::kFontBody);
+  fl_draw(name_.c_str(), x() + pad, y() + 22, inner_w, h() - 22,
+          FL_ALIGN_LEFT | FL_ALIGN_TOP | FL_ALIGN_INSIDE);
+  fl_font(theme::font_for(theme::kWeightMedium), theme::kFontLabel);
+  const int id_w = static_cast<int>(fl_width(id_.c_str()));
+  fl_draw(id_.c_str(), x() + w() - pad - id_w, y() + 25, id_w, h() - 25,
+          FL_ALIGN_LEFT | FL_ALIGN_TOP | FL_ALIGN_INSIDE);
+
+  if (switchable_) {
+    fl_color(theme::kTextFaint);
+    fl_font(theme::font_for(theme::kWeightRegular), theme::kFontTiny);
+    fl_draw("点按切换", x() + pad, y() + 25, inner_w - id_w - theme::kGapMd, h() - 25,
+            FL_ALIGN_RIGHT | FL_ALIGN_TOP | FL_ALIGN_INSIDE);
+  }
 }
 
 // =====================================================================
@@ -579,7 +606,7 @@ void draw_icon(Icon icon, int x, int y, Fl_Color color) {
       // 文件 + 向下箭头
       fl_color(color);
       fl_line_style(FL_SOLID, 1);
-      fl_rect(x + 4, y + 2, x + 9, y + 11);
+      fl_rect(x + 4, y + 2, 9, 11);
       fl_line(x + 15, y + 8, x + 15, y + 17);
       fl_line(x + 12, y + 14, x + 15, y + 17);
       fl_line(x + 15, y + 17, x + 18, y + 14);
@@ -589,7 +616,7 @@ void draw_icon(Icon icon, int x, int y, Fl_Color color) {
     case Icon::kExport: {
       fl_color(color);
       fl_line_style(FL_SOLID, 1);
-      fl_rect(x + 3, y + 9, x + 9, y + 9);
+      fl_rect(x + 3, y + 9, 9, 9);
       fl_line(x + 13, y + 12, x + 13, y + 3);
       fl_line(x + 10, y + 6, x + 13, y + 3);
       fl_line(x + 13, y + 3, x + 16, y + 6);
@@ -608,7 +635,7 @@ void draw_icon(Icon icon, int x, int y, Fl_Color color) {
       // 锁体 + 上方 U 形 shackle
       fl_color(color);
       fl_line_style(FL_SOLID, 1);
-      fl_rect(x + 4, y + 9, x + 17, y + 18);
+      fl_rect(x + 4, y + 9, 13, 9);
       fl_arc(x + 10, y + 9, 4, 0.0f, 3.14159265f);
       fl_line(x + 6, y + 9, x + 6, y + 13);
       fl_line(x + 15, y + 9, x + 15, y + 13);
@@ -700,8 +727,8 @@ void draw_icon(Icon icon, int x, int y, Fl_Color color) {
     case Icon::kCopy: {
       fl_color(color);
       fl_line_style(FL_SOLID, 1);
-      fl_rect(x + 7, y + 3, x + 15, y + 14);
-      fl_rect(x + 4, y + 7, x + 12, y + 18);
+      fl_rect(x + 7, y + 3, 8, 11);
+      fl_rect(x + 4, y + 7, 8, 11);
       fl_line_style(FL_SOLID, 0);
       break;
     }
