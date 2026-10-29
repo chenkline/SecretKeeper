@@ -83,6 +83,13 @@ ctest --test-dir build/windows/x64 -C Debug
 ctest --test-dir build/windows/x64 -C Release
 ```
 
+界面开发可用离屏截图出口逐页与设计稿比对（产物为 BMP，不入库）：
+
+```
+./build/windows/x64/Release/SecretKeeper.exe --screenshot=01,02   # 页号 1-9
+# 输出到 build/ui-shots/<页名>.bmp
+```
+
 PowerShell 中若中文显示为乱码，先执行 `. .\scripts\ps-profile.ps1`。
 
 面向 ARM64 交叉编译（需要 `Microsoft.VisualStudio.Component.VC.Tools.ARM64`）：
