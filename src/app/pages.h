@@ -68,6 +68,8 @@ class PageBase : public Fl_Group {
   MainWindow* host() const { return host_; }
   // PageBase 供各页调用 ask_password 等需要主窗口上下文的场合。
   MainWindow* host_window() const { return host_; }
+  // 更新页头副标题（06 号的「共 N 条」随数据刷新）。
+  void set_subtitle(const std::string& text);
 
  private:
   MainWindow* host_ = nullptr;
@@ -250,9 +252,11 @@ class SecretsPage : public PageBase {
 
  protected:
   void draw() override;
+  int handle(int event) override;
 
  private:
   void on_row_select();
+  void on_row_click(int row);
   void on_add();
   void on_import();
   void on_copy();
@@ -261,10 +265,14 @@ class SecretsPage : public PageBase {
   void on_toggle_reveal();
   void refresh_detail();
   void refresh_meta();
+  // 06 号画板：行高 52，行数随过滤结果变化。
+  int list_row_height() const { return 52; }
 
   Fl_Box* count_label_ = nullptr;
+  Fl_Box* sort_label_ = nullptr;
+  Fl_Box* missing_label_ = nullptr;
   widgets::Field* search_ = nullptr;
-  widgets::List* list_ = nullptr;
+  std::vector<widgets::ListRow> rows_;
   Fl_Box* detail_title_ = nullptr;
   widgets::Pill* verified_ = nullptr;
   Fl_Box* detail_mk_id_ = nullptr;
@@ -276,10 +284,12 @@ class SecretsPage : public PageBase {
   widgets::IconButton* copy_btn_ = nullptr;
   widgets::IconButton* exp_btn_ = nullptr;
   widgets::IconButton* del_btn_ = nullptr;
-  widgets::Notice* hide_notice_ = nullptr;
+  widgets::Card* hide_notice_ = nullptr;
+  Fl_Box* hide_notice_text_ = nullptr;
   widgets::IconButton* imp_btn_ = nullptr;
   widgets::IconButton* add_btn_ = nullptr;
   std::vector<std::string> ids_;
+  int selected_row_ = -1;
   std::string selected_id_;
   std::string plaintext_;
   bool revealed_ = false;

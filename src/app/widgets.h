@@ -60,6 +60,8 @@ class Button : public Fl_Button {
 
  protected:
   int handle(int event) override;
+  // 画背景与描边（不含文字）；IconButton 在其上画「图标+文字」整体居中。
+  void draw_background();
   // IconButton 在自己的 draw 里需要复用 Button 的配色判定。
   ButtonKind kind() const { return kind_; }
   bool is_enabled() const { return enabled_; }

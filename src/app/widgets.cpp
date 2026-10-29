@@ -102,35 +102,30 @@ void Button::set_enabled(bool on) {
   redraw();
 }
 
-void Button::draw() {
+void Button::draw_background() {
   Fl_Color bg = theme::kCardBg;
-  Fl_Color fg = theme::kText;
   Fl_Color border = theme::kBorder;
 
   switch (kind_) {
     case ButtonKind::kPrimary:
       bg = (active() && enabled_) ? kPrimaryHover : theme::kAccent;
-      fg = theme::kOnAccent;
       border = bg;
       break;
     case ButtonKind::kDanger:
       bg = theme::kDangerBg;
-      fg = enabled_ ? theme::kDangerText : theme::kTextFaint;
       border = theme::kDangerBorder;
       break;
     case ButtonKind::kQuiet:
-      // 安静按钮（导入主密钥 / 删除主密钥等）：浅灰底浅灰字。
+      // 安静按钮（导入主密钥 / 删除主密钥等）：浅灰底。
       bg = theme::kSecondaryBg;
-      fg = enabled_ ? theme::kSecondaryText : theme::kTextFaint;
       border = theme::kSecondaryBg;
       break;
     case ButtonKind::kGhost:
-      // 侧栏锁定按钮：透明底 + 深描边 + 白字。
+      // 侧栏锁定按钮：透明底 + 深描边。
       bg = theme::kSidebarBg;
-      fg = 0xFFFFFF00;
       border = theme::kSidebarBorder;
       break;
-    case ButtonKind::kNav: {
+    case ButtonKind::kNav:
       // 侧栏导航项：未选中透明，选中 #24454A。
       // 文字与图标由 IconButton::draw 左对齐绘制，这里只画底。
       if (selected_) {
@@ -138,10 +133,8 @@ void Button::draw() {
                             theme::kSidebarActiveBg);
       }
       return;
-    }
     default:
       bg = theme::kCardBg;
-      fg = enabled_ ? theme::kText : theme::kTextFaint;
       border = theme::kBorder;
       break;
   }
@@ -150,14 +143,18 @@ void Button::draw() {
     // 禁用态统一降到浅灰底，忽略 kind 的配色。
     bg = theme::kSubtleBg;
     border = theme::kBorder;
-    fg = theme::kTextFaint;
   }
 
   theme::fill_rounded(x(), y(), w(), h(), theme::kRadiusButton, bg);
   if (kind_ != ButtonKind::kPrimary) {
     theme::stroke_rounded(x(), y(), w(), h(), theme::kRadiusButton, border);
   }
-  draw_label_centered(label_, theme::kWeightMedium, theme::kFontBody, fg, x(), y(), w(), h());
+}
+
+void Button::draw() {
+  draw_background();
+  draw_label_centered(label_, theme::kWeightMedium, theme::kFontBody,
+                      enabled_ ? theme::kText : theme::kTextFaint, x(), y(), w(), h());
 }
 
 int Button::handle(int event) {
@@ -447,10 +444,10 @@ IconButton::IconButton(int x, int y, int w, int h, Icon icon, std::string_view l
     : Button(x, y, w, h, label, kind), icon_(icon) {}
 
 void IconButton::draw() {
-  Button::draw();
   if (kind() == ButtonKind::kNav) {
     // 侧栏导航项：图标 18px 靠左，文字左对齐（设计稿 02 号侧栏）。
     // 未选中：图标与文字 #96AFB3；选中：图标 #74CFBA、文字白色加粗。
+    draw_background();
     const bool sel = is_selected();
     draw_icon(icon_, x() + theme::kGapMd, y() + (h() - 18) / 2,
               sel ? theme::kBrandTeal : theme::kSidebarIcon);
@@ -461,16 +458,23 @@ void IconButton::draw() {
             FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
     return;
   }
-  // 图标画在文字左侧，整体（图标 + 文字）仍以按钮中心对齐。
-  fl_font(theme::font_for(theme::kWeightMedium), theme::kFontBody);
+  // 背景先画；「图标 + 文字」作为整体居中，避免文字按全宽居中而与图标重叠。
+  draw_background();
+  const int font_size = theme::kFontBody;
+  fl_font(theme::font_for(theme::kWeightMedium), font_size);
   const int text_w = static_cast<int>(fl_width(label_text().c_str()));
   const int gap = theme::kGapSm;
   const int total = kIconSize + gap + text_w;
   const int start_x = x() + (w() - total) / 2;
   Fl_Color fg = kind() == ButtonKind::kPrimary ? theme::kOnAccent : theme::kText;
   if (kind() == ButtonKind::kGhost) fg = 0xFFFFFF00;
+  if (kind() == ButtonKind::kQuiet) fg = theme::kSecondaryText;
   if (!is_enabled()) fg = theme::kTextFaint;
   draw_icon(icon_, start_x, y() + (h() - kIconSize) / 2, fg);
+  fl_color(fg);
+  fl_font(theme::font_for(theme::kWeightMedium), font_size);
+  fl_draw(label_text().c_str(), start_x + kIconSize + gap, y(), text_w + 8, h(),
+          FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 }
 
 // =====================================================================
