@@ -322,12 +322,14 @@ void MainWindow::show_page(Page page) {
   state_pill_->position(theme::kWinW - theme::kContentPad - 49, footer_y);
   footer_text_->position(theme::kSidebarWidth + theme::kContentPad, footer_y + 2);
   lock_btn_->show();
-  if (chrome) {
+  // 05 号画板：白卡一直延伸到窗口底，设计稿没有页脚行，为按钮让位。
+  const bool footer = chrome && page != Page::kExportKey;
+  if (footer) {
     footer_text_->show();
   } else {
     footer_text_->hide();
   }
-  state_pill_->set_shown(chrome);
+  state_pill_->set_shown(footer);
 
   // 全部页面都是本窗口的子控件，按需显示。
   for (Fl_Group* p : all_pages()) p->hide();

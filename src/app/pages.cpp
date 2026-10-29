@@ -1204,7 +1204,7 @@ ExportKeyPage::ExportKeyPage(MainWindow* host)
     static_cast<ExportKeyPage*>(d)->on_export();
   }, this);
 
-  error_ = new Fl_Box(ix, 882, iw, 19, "");
+  error_ = new Fl_Box(ix, 884, iw, 19, "");
   error_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
   error_->labelsize(theme::kFontSmall);
   error_->labelcolor(theme::kDangerText);
