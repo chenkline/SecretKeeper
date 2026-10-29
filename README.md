@@ -43,12 +43,12 @@ Windows 端五目标自检均已通过，**RSA 路径真实执行、0 跳过**�
 |---|---|
 | crypto（密码学原语） | 43 |
 | serialize（字节级格式） | 43 |
-| store（索引与数据文件） | 84 |
+| store（索引与数据文件） | 89 |
 | service（业务门面） | 93 |
 | UI 纯逻辑 | 29 |
 | 黄金向量（`scripts/verify-vectors.py`） | 91 |
 
-合计 **292 项自检 + 91 项向量 + 57 项一致性探针**。
+合计 **297 项自检 + 91 项向量 + 57 项一致性探针**。
 
 `scripts/check-layering.py` 静态断言分层方向不被回潮；
 `scripts/compare-conformance.py` 逐行比对各平台跑同一份密码学代码产出的

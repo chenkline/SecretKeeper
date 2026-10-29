@@ -402,8 +402,10 @@ std::vector<MasterKeyRow> IndexDb::list_master_keys() const {
   std::vector<MasterKeyRow> out;
   if (handle_ == nullptr) return out;
   sqlite3_stmt* st = nullptr;
+  // 同一毫秒内创建的记录 created_at 相同，此时以 rowid（插入序）决出稳定顺序；
+  // 用随机 id 做 tie-break 会让列表顺序在两次启动间漂移。
   const std::string sql =
-      std::string("SELECT ") + kMasterKeyColumns + " FROM master_keys ORDER BY created_at, master_key_id";
+      std::string("SELECT ") + kMasterKeyColumns + " FROM master_keys ORDER BY created_at, rowid";
   if (sqlite3_prepare_v2(static_cast<sqlite3*>(handle_), sql.c_str(), -1, &st, nullptr) !=
       SQLITE_OK) {
     return out;
@@ -417,8 +419,10 @@ std::vector<SecretRow> IndexDb::list_secrets() const {
   std::vector<SecretRow> out;
   if (handle_ == nullptr) return out;
   sqlite3_stmt* st = nullptr;
+  // 同一毫秒内创建的记录 created_at 相同，此时以 rowid（插入序）决出稳定顺序；
+  // 用随机 id 做 tie-break 会让列表顺序在两次启动间漂移。
   const std::string sql =
-      std::string("SELECT ") + kSecretColumns + " FROM secrets ORDER BY created_at, secret_id";
+      std::string("SELECT ") + kSecretColumns + " FROM secrets ORDER BY created_at, rowid";
   if (sqlite3_prepare_v2(static_cast<sqlite3*>(handle_), sql.c_str(), -1, &st, nullptr) !=
       SQLITE_OK) {
     return out;
@@ -433,7 +437,7 @@ std::vector<SecretRow> IndexDb::list_secrets_by_master_key(std::string_view mast
   if (handle_ == nullptr) return out;
   sqlite3_stmt* st = nullptr;
   const std::string sql = std::string("SELECT ") + kSecretColumns +
-                          " FROM secrets WHERE master_key_id=? ORDER BY created_at, secret_id";
+                          " FROM secrets WHERE master_key_id=? ORDER BY created_at, rowid";
   if (sqlite3_prepare_v2(static_cast<sqlite3*>(handle_), sql.c_str(), -1, &st, nullptr) !=
       SQLITE_OK) {
     return out;

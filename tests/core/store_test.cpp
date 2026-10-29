@@ -202,6 +202,37 @@ void test_index_db(const std::filesystem::path& dir) {
   check(db.delete_secret(secret_id_at(30)) == store::StoreError::kNotFound,
         "deleting missing secret reports not_found");
 
+  // 回归：同一毫秒创建的记录 created_at 相同，顺序必须由插入序（rowid）决定，
+  // 不能落到随机的 secret_id 上——否则列表顺序在两次启动间漂移。
+  // 两条 ID 的字典序与插入序相反，旧的 tie-break 行为会稳定复现错序。
+  store::SecretRow ms_first;
+  ms_first.secret_id = "ffffffffffffffffffffffffffffffff";
+  ms_first.master_key_id = mk.master_key_id;
+  ms_first.created_at = 1234567890123;
+  ms_first.file_path = store::FileStore::secret_rel_path(ms_first.secret_id);
+  check(db.upsert_secret(ms_first) == store::StoreError::kOk,
+        "insert same-millisecond secret with descending id");
+  store::SecretRow ms_second;
+  ms_second.secret_id = "00000000000000000000000000000000";
+  ms_second.master_key_id = mk.master_key_id;
+  ms_second.created_at = 1234567890123;
+  ms_second.file_path = store::FileStore::secret_rel_path(ms_second.secret_id);
+  check(db.upsert_secret(ms_second) == store::StoreError::kOk,
+        "insert same-millisecond secret with ascending id");
+  bool insertion_order_kept = false;
+  for (const auto& s : db.list_secrets()) {
+    if (s.secret_id == ms_first.secret_id) {
+      insertion_order_kept = true;
+      break;
+    }
+    if (s.secret_id == ms_second.secret_id) break;
+  }
+  check(insertion_order_kept, "same-millisecond secrets list in insertion order");
+  check(db.delete_secret(ms_first.secret_id) == store::StoreError::kOk,
+        "clean up same-millisecond secret one");
+  check(db.delete_secret(ms_second.secret_id) == store::StoreError::kOk,
+        "clean up same-millisecond secret two");
+
   // app_meta 往返。
   check(db.set_meta("lock_policy", "300000") == store::StoreError::kOk, "set meta");
   check(db.meta("lock_policy").value_or("") == "300000", "meta roundtrip");
