@@ -1784,61 +1784,68 @@ AddSecretPage::AddSecretPage(MainWindow* host)
   begin();
   layout_header("返回列表");
 
-  const int cw = kWinW - theme::kSidebarWidth - theme::kContentPad * 3;
-  const int cx = theme::kContentPad;
-  new widgets::Card(cx, 104, cw, 600);
+  // 07 号画板：白卡（240,117,928,576 r12）。
+  new widgets::Card(theme::kSidebarWidth + theme::kContentPad, 117, 928, 576);
+  const int ix = 264;
+  const int iw = 880;
 
-  Fl_Box* sel_l = new Fl_Box(cx + theme::kGapXl, 128, 300, 20, "用于加密的主密钥");
-  sel_l->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  sel_l->labelsize(theme::kFontSmall);
-  sel_l->labelcolor(theme::kTextMuted);
-  selector_ = new widgets::KeySelector(cx + theme::kGapXl, 150, cw - theme::kGapXl * 2, 64);
-  selector_->callback([](Fl_Widget*, void* d) {
-    static_cast<AddSecretPage*>(d)->on_pick_key();
+  auto* key_label = new Fl_Box(ix, 147, 400, 17, "用于加密的主密钥");
+  key_label->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  key_label->labelfont(theme::font_for(theme::kWeightRegular));
+  key_label->labelsize(theme::kFontLabel);
+  key_label->labelcolor(theme::kText);
+
+  selector_ = new widgets::KeySelector(ix, 170, iw, 65);
+  selector_->set_placeholder("尚未创建主密钥");
+  selector_->callback([](Fl_Widget*, void* data) {
+    static_cast<AddSecretPage*>(data)->on_pick_key();
   }, this);
 
-  Fl_Box* t_l = new Fl_Box(cx + theme::kGapXl, 232, 300, 20, "标题（可选）");
-  t_l->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  t_l->labelsize(theme::kFontSmall);
-  t_l->labelcolor(theme::kTextMuted);
-  title_ = new widgets::Field(cx + theme::kGapXl, 254, cw - theme::kGapXl * 2, 38);
+  auto* title_label = new Fl_Box(ix, 261, 400, 17, "标题（可选）");
+  title_label->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  title_label->labelfont(theme::font_for(theme::kWeightRegular));
+  title_label->labelsize(theme::kFontLabel);
+  title_label->labelcolor(theme::kText);
+
+  title_ = new widgets::Field(ix, 284, iw, 46);
   title_->set_placeholder("不填写则保留为空");
 
-  Fl_Box* c_l = new Fl_Box(cx + theme::kGapXl, 308, 300, 20, "机密信息");
-  c_l->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  c_l->labelsize(theme::kFontSmall);
-  c_l->labelcolor(theme::kTextMuted);
-  content_ = new widgets::TextArea(cx + theme::kGapXl, 330, cw - theme::kGapXl * 2, 152);
+  auto* content_label = new Fl_Box(ix, 356, 400, 17, "机密信息");
+  content_label->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  content_label->labelfont(theme::font_for(theme::kWeightRegular));
+  content_label->labelsize(theme::kFontLabel);
+  content_label->labelcolor(theme::kText);
 
-  Fl_Box* counter_l = new Fl_Box(cx + theme::kGapXl, 490, 300, 20, "自由文本，最多 150 字符");
-  counter_l->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  counter_l->labelsize(theme::kFontSmall);
-  counter_l->labelcolor(theme::kTextMuted);
-  counter_ = new Fl_Box(cx + cw - theme::kGapXl - 120, 490, 120, 20, "0 / 150");
+  content_ = new widgets::TextArea(ix, 379, iw, 136);
+
+  // 计数行（07 号画板 529）：左侧格式提示，右侧 N / 150。
+  auto* hint = new Fl_Box(ix, 529, 400, 16, "自由文本，最多 150 字符");
+  hint->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  hint->labelsize(theme::kFontSmall);
+  hint->labelcolor(theme::kTextMuted);
+  counter_ = new Fl_Box(ix + 400, 525, iw - 400, 20, "0 / 150");
   counter_->align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
   counter_->labelsize(theme::kFontSmall);
   counter_->labelcolor(theme::kTextMuted);
 
-  info_ = make_notice(cx + theme::kGapXl, 522, cw - theme::kGapXl * 2, widgets::Notice::Tone::kInfo,
-                      "", "使用当前默认主密钥在本机加密，不会上传任何内容。", 46);
+  // 绿色说明（07 号画板 #E8F4F0 562,43）。
+  info_ = make_notice(ix, 562, iw, widgets::Notice::Tone::kSuccess, "",
+                      "使用当前默认主密钥在本机加密，不会上传任何内容。", 43);
 
-  save_ = new widgets::IconButton(cx + theme::kGapXl, 586, 132, 40, Icon::kLock, "保存");
-  auto* cancel = new widgets::Button(cx + theme::kGapXl + 144, 586, 84, 40, "取消",
-                                     ButtonKind::kSecondary);
+  // 按钮（07 号画板 625,44）：保存主色 + 取消白底。
+  save_ = new widgets::IconButton(ix, 625, 132, 44, Icon::kCheck, "保存");
   save_->callback([](Fl_Widget*, void* d) {
     static_cast<AddSecretPage*>(d)->on_save();
   }, this);
+  auto* cancel = new widgets::Button(ix + 144, 625, 64, 44, "取消", ButtonKind::kSecondary);
   cancel->callback([](Fl_Widget*, void* d) {
-    static_cast<PageBase*>(d)->on_back();
+    static_cast<PageBase*>(static_cast<AddSecretPage*>(d))->on_back();
   }, this);
 
-  // 输入时实时更新计数。
-  content_->callback([](Fl_Widget* w, void* d) {
-    auto* self = static_cast<AddSecretPage*>(d);
-    const char* v = static_cast<Fl_Input*>(w)->value();
-    self->counter_->copy_label(char_counter_text(v ? v : "").c_str());
-    self->counter_->redraw();
-  });
+  error_ = new Fl_Box(ix, 679, iw, 19, "");
+  error_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  error_->labelsize(theme::kFontSmall);
+  error_->labelcolor(theme::kDangerText);
   end();
 }
 
@@ -1857,6 +1864,7 @@ void AddSecretPage::reload() {
   save_->set_enabled(!keys.empty());
   const char* v = content_->value();
   counter_->copy_label(char_counter_text(v ? v : "").c_str());
+  error_->copy_label(last_error_.c_str());
   redraw();
 }
 
@@ -1886,6 +1894,7 @@ void AddSecretPage::on_save() {
   last_error_.clear();
   if (key_id_.empty()) {
     last_error_ = "请先选择主密钥";
+    error_->copy_label(last_error_.c_str());
     redraw();
     return;
   }
@@ -1893,6 +1902,7 @@ void AddSecretPage::on_save() {
   const std::string plaintext = raw ? raw : "";
   if (plaintext.empty()) {
     last_error_ = error_text(svc::Error::kEmptySecret);
+    error_->copy_label(last_error_.c_str());
     redraw();
     return;
   }
@@ -1913,6 +1923,7 @@ void AddSecretPage::on_save() {
   title_->value("");
   if (rc != svc::Error::kOk) {
     last_error_ = error_text(rc);
+    error_->copy_label(last_error_.c_str());
     redraw();
     return;
   }
@@ -1927,120 +1938,94 @@ void AddSecretPage::on_save() {
 ImportSecretPage::ImportSecretPage(MainWindow* host)
     : PageBase(host, "导入机密信息", "读取本地加密文件，自动查找它使用的主密钥。") {
   begin();
-  const int cw = kWinW - theme::kSidebarWidth - theme::kContentPad * 3;
-  const int cx = theme::kContentPad;
-  new widgets::Card(cx, 104, cw, 620);
+  layout_header(nullptr);
 
-  // 三段步骤条
-  step1_ = new Fl_Box(cx + theme::kGapXl, 124, 96, 26, "文件已选择");
-  step2_ = new Fl_Box(cx + theme::kGapXl + 116, 124, 96, 26, "验证主密钥");
-  step3_ = new Fl_Box(cx + theme::kGapXl + 232, 124, 96, 26, "保存到本机");
-  for (Fl_Box* b : {step1_, step2_, step3_}) {
-    b->align(FL_ALIGN_CENTER);
-    b->box(FL_FLAT_BOX);
-    b->color(theme::kAccentSoft);
-    b->labelsize(theme::kFontSmall);
-    b->labelcolor(theme::kAccent);
-  }
-  for (int i = 0; i < 2; ++i) {
-    Fl_Box* arrow = new Fl_Box(cx + theme::kGapXl + 96 + i * 116, 130, 20, 14, ">");
-    arrow->align(FL_ALIGN_CENTER);
-    arrow->labelsize(theme::kFontSmall);
-    arrow->labelcolor(theme::kTextFaint);
-  }
+  // 08 号画板：白卡（240,117,928,623 r12）。
+  new widgets::Card(theme::kSidebarWidth + theme::kContentPad, 117, 928, 623);
+  const int ix = 264;
+  const int iw = 880;
 
-  // 文件选择区
-  new widgets::Card(cx + theme::kGapXl, 166, cw - theme::kGapXl * 2, 170, theme::kSubtleBg);
-  file_name_ = new Fl_Box(cx + theme::kGapXl, 244, cw - theme::kGapXl * 2, 26,
-                          "尚未选择文件");
-  file_name_->align(FL_ALIGN_CENTER);
-  file_name_->labelfont(theme::font_for(theme::kWeightBold));
+  // 三段步骤条（08 号画板 141,21）。
+  step1_ = new widgets::Pill(ix, 141, 71, 21, "文件已选择", theme::kAccent,
+                             theme::kAccentSoft);
+  step2_ = new widgets::Pill(ix + 113, 141, 71, 21, "验证主密钥", theme::kAccent,
+                             theme::kAccentSoft);
+  step3_ = new widgets::Pill(ix + 226, 141, 71, 21, "保存到本机", theme::kTextMuted,
+                             theme::kSubtleBg);
+
+  // 文件块（08 号画板 #F8FAFA+描边 182,199 r12），内容水平居中。
+  widgets::Card* fcard = new widgets::Card(ix, 182, iw, 199, theme::kSubtleBg);
+  (void)fcard;
+  file_name_ = new Fl_Box(ix, 261, iw, 21, "尚未选择文件");
+  file_name_->align(FL_ALIGN_CENTER | FL_ALIGN_INSIDE);
+  file_name_->labelfont(theme::font_for(theme::kWeightRegular));
   file_name_->labelsize(theme::kFontBody);
   file_name_->labelcolor(theme::kText);
-  file_sub_ = new Fl_Box(cx + theme::kGapXl, 272, cw - theme::kGapXl * 2, 20, "");
-  file_sub_->align(FL_ALIGN_CENTER);
+  file_sub_ = new Fl_Box(ix, 294, iw, 17, "选择之前导出的 .secret 加密文件");
+  file_sub_->align(FL_ALIGN_CENTER | FL_ALIGN_INSIDE);
   file_sub_->labelsize(theme::kFontSmall);
   file_sub_->labelcolor(theme::kTextMuted);
-  choose_btn_ = new widgets::Button(cx + theme::kGapXl + (cw - theme::kGapXl * 2 - 118) / 2, 296,
-                                    118, 32, "重新选择文件", ButtonKind::kSecondary);
+  choose_btn_ = new widgets::Button(ix + (iw - 96) / 2, 319, 96, 34, "选择文件",
+                                    ButtonKind::kSecondary);
+  choose_btn_->labelsize(theme::kFontSmall);
   choose_btn_->callback([](Fl_Widget*, void* d) {
     static_cast<ImportSecretPage*>(d)->on_choose_file();
   }, this);
 
-  // 匹配到的主密钥区块
-  new widgets::Card(cx + theme::kGapXl, 350, cw - theme::kGapXl * 2, 116, theme::kSubtleBg);
-  match_title_ = new Fl_Box(cx + theme::kGapXl + theme::kGapLg, 364, 200, 22, "匹配的主密钥");
+  // 匹配的主密钥块（08 号画板 #F8FAFA 401,129 r8）。
+  widgets::Card* mcard = new widgets::Card(ix, 401, iw, 129, theme::kSubtleBg);
+  (void)mcard;
+  match_title_ = new Fl_Box(ix + 16, 419, 300, 17, "匹配的主密钥");
   match_title_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  match_title_->labelfont(theme::font_for(theme::kWeightBold));
-  match_title_->labelsize(theme::kFontBody);
+  match_title_->labelfont(theme::font_for(theme::kWeightRegular));
+  match_title_->labelsize(theme::kFontLabel);
   match_title_->labelcolor(theme::kText);
-  match_icon_ = new Fl_Box(cx + cw - theme::kGapXl - 44, 362, 24, 24, "");
-  match_icon_->align(FL_ALIGN_CENTER);
-  match_icon_->box(FL_NO_BOX);
-
-  Fl_Box* mid_l = new Fl_Box(cx + theme::kGapXl + theme::kGapLg, 398, 100, 20, "主密钥 ID");
+  auto* mid_l = new Fl_Box(ix + 16, 453, 98, 17, "主密钥 ID");
   mid_l->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  mid_l->labelsize(theme::kFontSmall);
+  mid_l->labelsize(theme::kFontLabel);
   mid_l->labelcolor(theme::kTextMuted);
-  match_id_ = new Fl_Box(cx + theme::kGapXl + theme::kGapLg + 110, 398, 300, 20, "");
+  match_id_ = new Fl_Box(ix + 114, 452, 400, 17, "");
   match_id_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  match_id_->labelsize(theme::kFontBody);
+  match_id_->labelfont(theme::font_for(theme::kWeightMedium));
+  match_id_->labelsize(theme::kFontLabel);
   match_id_->labelcolor(theme::kText);
-
-  Fl_Box* mname_l = new Fl_Box(cx + theme::kGapXl + theme::kGapLg, 426, 100, 20, "主密钥名称");
+  auto* mname_l = new Fl_Box(ix + 16, 491, 98, 17, "主密钥名称");
   mname_l->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  mname_l->labelsize(theme::kFontSmall);
+  mname_l->labelsize(theme::kFontLabel);
   mname_l->labelcolor(theme::kTextMuted);
-  match_name_ = new Fl_Box(cx + theme::kGapXl + theme::kGapLg + 110, 426, 300, 20, "");
+  match_name_ = new Fl_Box(ix + 114, 489, 400, 19, "");
   match_name_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
   match_name_->labelsize(theme::kFontBody);
   match_name_->labelcolor(theme::kText);
-  match_hint_ = new Fl_Box(cx + theme::kGapXl + theme::kGapLg, 446, 500, 18, "");
+
+  // 密码字段（08 号画板：标签 556、输入 579,46、说明 639）。
+  password_label_ = new Fl_Box(ix, 556, 600, 17, "主密钥密码");
+  password_label_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  password_label_->labelfont(theme::font_for(theme::kWeightRegular));
+  password_label_->labelsize(theme::kFontLabel);
+  password_label_->labelcolor(theme::kText);
+  key_password_ = new widgets::Field(ix, 579, iw, 46);
+  key_password_->type(FL_SECRET_INPUT);
+  match_hint_ = new Fl_Box(ix, 639, iw, 16, "非默认主密钥，需验证其密码后导入。");
   match_hint_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
   match_hint_->labelsize(theme::kFontSmall);
-  match_hint_->labelcolor(theme::kWarningText);
+  match_hint_->labelcolor(theme::kTextMuted);
 
-  // 主密钥密码
-  Fl_Box* kp_l = new Fl_Box(cx + theme::kGapXl, 488, 400, 20, "");
-  kp_l->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  kp_l->labelsize(theme::kFontSmall);
-  kp_l->labelcolor(theme::kTextMuted);
-  key_password_ = new widgets::Field(cx + theme::kGapXl, 510, cw - theme::kGapXl * 2, 38);
-  key_password_->type(FL_SECRET_INPUT);
-  Fl_Box* kp_tip = new Fl_Box(cx + theme::kGapXl, 552, cw - theme::kGapXl * 2, 20,
-                             "非默认主密钥，需验证其密码后导入。");
-  kp_tip->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  kp_tip->labelsize(theme::kFontSmall);
-  kp_tip->labelcolor(theme::kTextMuted);
-
-  import_btn_ = new widgets::IconButton(cx + theme::kGapXl, 586, 132, 40, Icon::kImport, "导入");
-  auto* cancel = new widgets::Button(cx + theme::kGapXl + 144, 586, 84, 40, "取消",
-                                     ButtonKind::kSecondary);
+  // 按钮（08 号画板 672,44）：导入主色 + 取消白底。
+  import_btn_ = new widgets::IconButton(ix, 672, 132, 44, Icon::kImport, "导入");
   import_btn_->callback([](Fl_Widget*, void* d) {
     static_cast<ImportSecretPage*>(d)->on_import();
   }, this);
+  auto* cancel = new widgets::Button(ix + 144, 672, 64, 44, "取消", ButtonKind::kSecondary);
   cancel->callback([](Fl_Widget*, void* d) {
-    static_cast<PageBase*>(d)->on_back();
+    static_cast<PageBase*>(static_cast<ImportSecretPage*>(d))->on_back();
   }, this);
-  end();
-}
 
-void ImportSecretPage::draw() {
-  Fl_Group::draw();
-  const int cw = kWinW - theme::kSidebarWidth - theme::kContentPad * 3;
-  const int cx = theme::kContentPad;
-  // 文件区中央的图标
-  widgets::draw_icon(widgets::Icon::kFile, cx + (cw) / 2 - 16, 200, theme::kAccent);
-  // 匹配状态图标：找到画勾，找不到画叉。
-  if (!key_id_.empty() || path_.empty()) {
-    if (key_found_) {
-      widgets::draw_icon(widgets::Icon::kCheck, cx + cw - theme::kGapXl - 36, 368,
-                         theme::kAccent);
-    } else if (!path_.empty()) {
-      widgets::draw_icon(widgets::Icon::kCross, cx + cw - theme::kGapXl - 36, 368,
-                         theme::kDangerText);
-    }
-  }
+  error_ = new Fl_Box(ix, 726, iw, 19, "");
+  error_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  error_->labelsize(theme::kFontSmall);
+  error_->labelcolor(theme::kDangerText);
+  end();
 }
 
 void ImportSecretPage::reload() {
@@ -2053,7 +2038,7 @@ void ImportSecretPage::reload() {
     match_name_->copy_label("");
     match_hint_->copy_label("");
     key_password_->hide();
-    match_icon_->redraw();
+    error_->copy_label("");
     redraw();
     return;
   }
@@ -2083,6 +2068,9 @@ void ImportSecretPage::reload() {
     match_hint_->copy_label("请先导入主密钥");
   }
   key_password_->show();
+  password_label_->copy_label(
+      key_found_ ? ("主密钥 " + key_id_ + " 的密码").c_str() : "主密钥密码");
+  error_->copy_label(last_error_.c_str());
   redraw();
 }
 
@@ -2134,14 +2122,15 @@ void ImportSecretPage::on_import() {
 SettingsPage::SettingsPage(MainWindow* host)
     : PageBase(host, "安全设置", "减少明文暴露，让每次离开都安心。设置仅保存在本机。") {
   begin();
-  const int cw = kWinW - theme::kSidebarWidth - theme::kContentPad * 3;
-  const int cx = theme::kContentPad;
-  new widgets::Card(cx, 104, cw, 440);
+  // 09 号画板：白卡（240,117,928,453 r12）。
+  const int ix = theme::kSidebarWidth + theme::kContentPad;
+  const int iw = 880;
+  new widgets::Card(ix, 117, iw, 453);
 
-  Fl_Box* title = new Fl_Box(cx + theme::kGapXl, 128, 300, 26, "锁定与隐私");
+  auto* title = new Fl_Box(ix + 24, 149, 300, 24, "锁定与隐私");
   title->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
   title->labelfont(theme::font_for(theme::kWeightBold));
-  title->labelsize(theme::kFontSubheading);
+  title->labelsize(17);
   title->labelcolor(theme::kText);
 
   struct ItemDef {
@@ -2150,57 +2139,87 @@ SettingsPage::SettingsPage(MainWindow* host)
     int y;
   };
   const ItemDef items[3] = {
-      {"闲置自动锁定", "锁定时清空内存密钥缓存，并隐藏明文。", 176},
-      {"剪贴板定时清除", "复制机密信息后，自动清除剪贴板内容。", 260},
-      {"离开窗口隐藏明文", "失焦、最小化或切换界面时，立即重新掩码。", 344},
+      {"闲置自动锁定", "锁定时清空内存密钥缓存，并隐藏明文。", 197},
+      {"剪贴板定时清除", "复制机密信息后，自动清除剪贴板内容。", 293},
+      {"离开窗口隐藏明文", "失焦、最小化或切换界面时，立即重新掩码。", 389},
   };
   for (const ItemDef& item : items) {
-    Fl_Box* l = new Fl_Box(cx + theme::kGapXl, item.y, 400, 22, item.label);
+    Fl_Box* l = new Fl_Box(ix + 24, item.y, 400, 20, item.label);
     l->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
     l->labelsize(theme::kFontBody);
     l->labelcolor(theme::kText);
-    Fl_Box* d = new Fl_Box(cx + theme::kGapXl, item.y + 24, 560, 20, item.desc);
+    Fl_Box* d = new Fl_Box(ix + 24, item.y + 26, 560, 17, item.desc);
     d->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
     d->labelsize(theme::kFontSmall);
     d->labelcolor(theme::kTextMuted);
   }
 
-  idle_value_ = new widgets::Pill(cx + cw - theme::kGapXl - 120, 176, 120, 30, "5 分钟",
-                                   theme::kText, theme::kSubtleBg);
-  clipboard_value_ = new widgets::Pill(cx + cw - theme::kGapXl - 120, 260, 120, 30, "30 秒",
-                                        theme::kText, theme::kSubtleBg);
-  blur_value_ = new widgets::Pill(cx + cw - theme::kGapXl - 120, 344, 120, 30, "已开启",
-                                  theme::kAccent, theme::kAccentSoft);
-
-  // 点击数值区循环切换可选值（1/5/15 分钟、15/30/60 秒、开关两态）。
+  // 数值选择（09 号画板 #F8FAFA 圆角块，点击循环切换）。
+  idle_value_ = new widgets::Pill(1065, 198, 79, 36, "5 分钟", theme::kText,
+                                  theme::kSubtleBg);
+  clipboard_value_ = new widgets::Pill(1071, 294, 73, 36, "30 秒", theme::kText,
+                                       theme::kSubtleBg);
   idle_value_->callback([](Fl_Widget*, void* d) {
     static_cast<SettingsPage*>(d)->on_idle_choice(0);
   }, this);
   clipboard_value_->callback([](Fl_Widget*, void* d) {
     static_cast<SettingsPage*>(d)->on_clipboard_choice(0);
   }, this);
-  blur_value_->callback([](Fl_Widget*, void* d) {
-    static_cast<SettingsPage*>(d)->on_blur_toggle(false);
-  }, this);
 
+  // 行分隔线（09 号画板 263 / 359 / 455）。
   for (int i = 0; i < 3; ++i) {
-    Fl_Box* div = new Fl_Box(cx + theme::kGapXl, 236 + i * 84, cw - theme::kGapXl * 2, 1, "");
+    Fl_Box* div = new Fl_Box(ix + 24, 263 + i * 96, iw - 48, 1, "");
     div->box(FL_FLAT_BOX);
-    div->color(theme::kBorderSubtle);
+    div->color(theme::kBorder);
   }
 
-  Fl_Box* tip = new Fl_Box(cx + theme::kGapXl, 476, cw - theme::kGapXl * 2, 20,
-                           "时长为设计示例，可选：锁定 1 / 5 / 15 分钟；剪贴板 15 / 30 / 60 秒。");
+  auto* tip = new Fl_Box(ix + 24, 469, iw - 48, 15,
+                         "时长为设计示例，可选：锁定 1 / 5 / 15 分钟；剪贴板 15 / 30 / 60 秒。");
   tip->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  tip->labelsize(theme::kFontSmall);
+  tip->labelsize(theme::kFontTiny);
   tip->labelcolor(theme::kTextMuted);
 
-  auto* lock_now = new widgets::IconButton(theme::kContentPad + theme::kGapXl, 512, 148, 40,
-                                           Icon::kLock, "立即锁定密匣", ButtonKind::kSecondary);
+  // 立即锁定（09 号画板白底 502,146x44）。
+  auto* lock_now = new widgets::Button(ix, 502, 146, 44, "立即锁定密匣",
+                                       ButtonKind::kSecondary);
   lock_now->callback([](Fl_Widget*, void* d) {
     static_cast<SettingsPage*>(d)->on_lock_now();
   }, this);
   end();
+}
+
+int SettingsPage::switch_geometry(int* x, int* y, int* w, int* h) const {
+  if (x != nullptr) *x = 1104;
+  if (y != nullptr) *y = 396;
+  if (w != nullptr) *w = 40;
+  if (h != nullptr) *h = 24;
+  return 0;
+}
+
+void SettingsPage::draw() {
+  PageBase::draw();
+  // 拨动开关（09 号画板 40x24 r100，开=主色底白钮，关=灰色底）。
+  int sx, sy, sw, sh;
+  switch_geometry(&sx, &sy, &sw, &sh);
+  const bool on = host()->settings().hide_plaintext_on_blur;
+  theme::fill_rounded(sx, sy, sw, sh, sh / 2, on ? theme::kAccent : theme::kBorder);
+  const int knob = 18;
+  const int kx = on ? (sx + sw - knob - 3) : (sx + 3);
+  theme::fill_rounded(kx, sy + 3, knob, knob, knob / 2, 0xFFFFFF00);
+}
+
+int SettingsPage::handle(int event) {
+  if (event == FL_PUSH) {
+    int sx, sy, sw, sh;
+    switch_geometry(&sx, &sy, &sw, &sh);
+    const int px = Fl::event_x();
+    const int py = Fl::event_y();
+    if (px >= sx - 6 && px <= sx + sw + 6 && py >= sy - 6 && py <= sy + sh + 6) {
+      on_blur_toggle(false);
+      return 1;
+    }
+  }
+  return Fl_Group::handle(event);
 }
 
 void SettingsPage::reload() {
@@ -2208,13 +2227,12 @@ void SettingsPage::reload() {
   idle_value_->copy_label((std::to_string(s.idle_lock_minutes) + " 分钟").c_str());
   clipboard_value_->copy_label((std::to_string(s.clipboard_clear_seconds) + " 秒").c_str());
   if (s.hide_plaintext_on_blur) {
-    blur_value_->copy_label("已开启");
+
   } else {
-    blur_value_->copy_label("已关闭");
+
   }
   idle_value_->redraw();
   clipboard_value_->redraw();
-  blur_value_->redraw();
   redraw();
 }
 

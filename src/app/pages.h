@@ -315,6 +315,7 @@ class AddSecretPage : public PageBase {
   Fl_Box* counter_ = nullptr;
   widgets::Notice* info_ = nullptr;
   widgets::IconButton* save_ = nullptr;
+  Fl_Box* error_ = nullptr;
   std::string key_id_;
   std::string last_error_;
   std::string last_status_;
@@ -333,25 +334,25 @@ class ImportSecretPage : public PageBase {
   std::string status_text() const override;
 
  protected:
-  void draw() override;
 
  private:
   void on_choose_file();
   void on_import();
 
-  Fl_Box* step1_ = nullptr;
-  Fl_Box* step2_ = nullptr;
-  Fl_Box* step3_ = nullptr;
+  widgets::Pill* step1_ = nullptr;
+  widgets::Pill* step2_ = nullptr;
+  widgets::Pill* step3_ = nullptr;
   Fl_Box* file_name_ = nullptr;
   Fl_Box* file_sub_ = nullptr;
   widgets::Button* choose_btn_ = nullptr;
   Fl_Box* match_title_ = nullptr;
-  Fl_Box* match_icon_ = nullptr;
   Fl_Box* match_id_ = nullptr;
   Fl_Box* match_name_ = nullptr;
   Fl_Box* match_hint_ = nullptr;
   widgets::Field* key_password_ = nullptr;
   widgets::IconButton* import_btn_ = nullptr;
+  Fl_Box* password_label_ = nullptr;
+  Fl_Box* error_ = nullptr;
   std::string path_;
   std::string key_id_;
   bool key_found_ = false;
@@ -367,6 +368,10 @@ class SettingsPage : public PageBase {
   void reload() override;
   std::string status_text() const override;
 
+ protected:
+  void draw() override;
+  int handle(int event) override;
+
  private:
   void on_idle_choice(int minutes);
   void on_clipboard_choice(int seconds);
@@ -375,7 +380,8 @@ class SettingsPage : public PageBase {
 
   widgets::Pill* idle_value_ = nullptr;
   widgets::Pill* clipboard_value_ = nullptr;
-  widgets::Pill* blur_value_ = nullptr;
+  // 离开窗口隐藏明文：09 号画板为拨动开关，绘制与命中在页面层。
+  int switch_geometry(int* x, int* y, int* w, int* h) const;
 };
 
 }  // namespace secretkeeper::ui
