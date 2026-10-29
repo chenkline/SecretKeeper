@@ -309,6 +309,12 @@ GCC/Clang 会把它当成链接器输入文件，直接报
 `if(MSVC)` 包住。同理 `FLTK_BUILD_GL` 必须 OFF，否则 Linux 上
 `find_path(OPENGL_INCLUDE_DIR)` 探测失败会让 CMake Generate 阶段中断。
 
+**FLTK 的 RGB 色值是 `0xRRGGBB00`，不是 `0xRRGGBB`**：`fl_rgb_color(r,g,b)`
+返回 `((r<<8|g)<<8|b)<<8`，低 8 位保留。直接写 `0x1D2C31` 会被当成索引色解释成
+`#00172C`——所有颜色整体错位一个字节，界面发暗发灰。`theme.h` 与界面代码里
+所有裸色值都必须写 `0xRRGGBB00` 形式。同理 **`fl_arc` 的角度单位是度**，
+整圆写 `0, 360`，上半弧写 `0, 180`；按弧度制传 `0..2π` 只会画出一条细缝。
+
 **FLTK 1.4 的剪贴板 API 与旧版不同**：只有 `Fl::copy(text, len, destination)`
 与 `Fl::paste(receiver, source)`，没有 `Fl::clipboard_set/paste`。
 `destination` 必须显式传 **1**（系统剪贴板）——默认的 0 是 X11 选择缓冲，
