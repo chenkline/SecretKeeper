@@ -172,8 +172,11 @@ class CreateKeyPage : public PageBase {
   widgets::Field* password_ = nullptr;
   widgets::Field* confirm_ = nullptr;
   widgets::Notice* warning_ = nullptr;
-  widgets::Notice* capacity_ = nullptr;
+  // 容量块（03 号画板 #F8FAFA）：标题「已使用 N / 2 把主密钥」+ 说明。
+  Fl_Box* capacity_title_ = nullptr;
+  Fl_Box* capacity_body_ = nullptr;
   widgets::IconButton* save_ = nullptr;
+  Fl_Box* error_ = nullptr;
   std::string last_error_;
 };
 
@@ -196,6 +199,7 @@ class ImportKeyPage : public PageBase {
   widgets::Field* protection_ = nullptr;
   widgets::Field* new_password_ = nullptr;
   widgets::IconButton* import_btn_ = nullptr;
+  Fl_Box* error_ = nullptr;
   std::string path_;
   std::string last_error_;
 };
@@ -221,8 +225,9 @@ class ExportKeyPage : public PageBase {
   Fl_Box* location_box_ = nullptr;
   widgets::Button* choose_btn_ = nullptr;
   widgets::Notice* warning_ = nullptr;
-  widgets::Notice* info_ = nullptr;
+  Fl_Box* info_ = nullptr;
   widgets::IconButton* export_btn_ = nullptr;
+  Fl_Box* error_ = nullptr;
   std::string key_id_;
   std::string location_;
   std::string last_error_;

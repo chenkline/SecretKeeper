@@ -255,9 +255,13 @@ void PageBase::draw() {
 
 void PageBase::layout_header(const char* back_label) {
   if (back_label != nullptr) {
-    // 返回按钮（03 号画板）：白底描边，右缘与内容区对齐，高 44。
-    back_ = new widgets::Button(0, 40, 110, 44, back_label, ButtonKind::kSecondary);
-    back_->position(kWinW - theme::kContentPad - back_->w(), 40);
+    // 返回按钮（03/04/05 号画板）：白底描边，右缘与内容区对齐，高 44；
+    // 宽度随文案自适应（03 号「返回主密钥管理」134px，04/05 号「返回管理」92px）。
+    fl_font(theme::font_for(theme::kWeightRegular), theme::kFontBody);
+    const int tw = static_cast<int>(fl_width(back_label));
+    const int bw = std::max(92, tw + 36);
+    back_ = new widgets::Button(0, 40, bw, 44, back_label, ButtonKind::kSecondary);
+    back_->position(kWinW - theme::kContentPad - bw, 40);
     back_->callback([](Fl_Widget*, void* data) {
       static_cast<PageBase*>(data)->on_back();
     }, this);
@@ -813,76 +817,100 @@ CreateKeyPage::CreateKeyPage(MainWindow* host)
   begin();
   layout_header("返回主密钥管理");
 
-  const int cw = kWinW - theme::kSidebarWidth - theme::kContentPad * 3;
-  const int cx = theme::kContentPad;
-  new widgets::Card(cx, 104, cw, 620);
+  // 03 号画板：整块内容在一张白卡上（240,117,928,639 r12）。
+  new widgets::Card(theme::kSidebarWidth + theme::kContentPad, 117, 928, 639);
+  const int ix = 264;
+  const int iw = 880;
 
-  Fl_Box title(cx + theme::kGapXl, 128, 300, 26, "新主密钥");
-  title.align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  title.labelfont(theme::font_for(theme::kWeightBold));
-  title.labelsize(theme::kFontSubheading);
-  title.labelcolor(theme::kText);
-  new widgets::Card(cx + cw - theme::kGapXl - 40, 128, 40, 40, theme::kSubtleBg);
+  auto* section = new Fl_Box(296, 149, 400, 24, "新主密钥");
+  section->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  section->labelfont(theme::font_for(theme::kWeightBold));
+  section->labelsize(17);
+  section->labelcolor(theme::kText);
 
-  Fl_Box* name_l = new Fl_Box(cx + theme::kGapXl, 176, 300, 20, "主密钥名称（可选）");
-  name_l->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  name_l->labelsize(theme::kFontSmall);
-  name_l->labelcolor(theme::kTextMuted);
-  name_ = new widgets::Field(cx + theme::kGapXl, 198, cw - theme::kGapXl * 2, 38);
+  auto* name_label = new Fl_Box(ix, 196, 400, 17, "主密钥名称（可选）");
+  name_label->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  name_label->labelfont(theme::font_for(theme::kWeightRegular));
+  name_label->labelsize(theme::kFontLabel);
+  name_label->labelcolor(theme::kText);
+
+  name_ = new widgets::Field(ix, 219, iw, 46);
   name_->set_placeholder("可以留空");
 
-  Fl_Box* name_tip = new Fl_Box(cx + theme::kGapXl, 240, cw - theme::kGapXl * 2, 20,
-                                "名称仅用于辨识，不参与加密。");
-  name_tip->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  name_tip->labelsize(theme::kFontSmall);
-  name_tip->labelcolor(theme::kTextMuted);
+  auto* name_note = new Fl_Box(ix, 279, iw, 16, "名称仅用于辨识，不参与加密。");
+  name_note->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  name_note->labelsize(theme::kFontSmall);
+  name_note->labelcolor(theme::kTextMuted);
 
-  Fl_Box* pwd_l = new Fl_Box(cx + theme::kGapXl, 280, 300, 20, "主密钥密码");
-  pwd_l->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  pwd_l->labelsize(theme::kFontSmall);
-  pwd_l->labelcolor(theme::kTextMuted);
-  password_ = new widgets::Field(cx + theme::kGapXl, 302, cw - theme::kGapXl * 2, 38);
+  auto* pwd_label = new Fl_Box(ix, 320, 400, 17, "主密钥密码");
+  pwd_label->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  pwd_label->labelfont(theme::font_for(theme::kWeightRegular));
+  pwd_label->labelsize(theme::kFontLabel);
+  pwd_label->labelcolor(theme::kText);
+
+  password_ = new widgets::Field(ix, 343, iw, 46);
   password_->type(FL_SECRET_INPUT);
 
-  Fl_Box* cfm_l = new Fl_Box(cx + theme::kGapXl, 358, 300, 20, "确认主密钥密码");
-  cfm_l->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  cfm_l->labelsize(theme::kFontSmall);
-  cfm_l->labelcolor(theme::kTextMuted);
-  confirm_ = new widgets::Field(cx + theme::kGapXl, 380, cw - theme::kGapXl * 2, 38);
+  auto* confirm_label = new Fl_Box(ix, 417, 400, 17, "确认主密钥密码");
+  confirm_label->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  confirm_label->labelfont(theme::font_for(theme::kWeightRegular));
+  confirm_label->labelsize(theme::kFontLabel);
+  confirm_label->labelcolor(theme::kText);
+
+  confirm_ = new widgets::Field(ix, 440, iw, 46);
   confirm_->type(FL_SECRET_INPUT);
 
-  warning_ = make_notice(cx + theme::kGapXl, 436, cw - theme::kGapXl * 2,
-                         widgets::Notice::Tone::kWarning, "请妥善记住主密钥密码",
-                         "密码丢失无法解密，密匣无法为你重置密码。", 74);
-  capacity_ = make_notice(cx + theme::kGapXl, 526, cw - theme::kGapXl * 2,
-                          widgets::Notice::Tone::kInfo, "", "", 60);
+  // 黄色提醒（03 号画板 508,68）。
+  warning_ = make_notice(ix, 508, iw, widgets::Notice::Tone::kWarning,
+                         "请妥善记住主密钥密码",
+                         "密码丢失无法解密，密匣无法为你重置密码。", 68);
 
-  save_ = new widgets::IconButton(cx + theme::kGapXl, 604, 132, 40, Icon::kLock, "保存主密钥");
-  auto* cancel = new widgets::Button(cx + theme::kGapXl + 144, 604, 84, 40, "返回管理",
-                                     ButtonKind::kSecondary);
+  // 容量块（03 号画板 #F8FAFA 598,68）。
+  widgets::Card* cap = new widgets::Card(ix, 598, iw, 68, theme::kSubtleBg);
+  (void)cap;
+  capacity_title_ = new Fl_Box(ix + 40, 606, 400, 21, "已使用 0 / 2 把主密钥");
+  capacity_title_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  capacity_title_->labelfont(theme::font_for(theme::kWeightBold));
+  capacity_title_->labelsize(theme::kFontLabel);
+  capacity_title_->labelcolor(theme::kTextMuted);
+  capacity_body_ = new Fl_Box(ix + 40, 631, iw - 80, 19,
+                              "容量已满。先导出并删除一把主密钥，再继续生成。");
+  capacity_body_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  capacity_body_->labelsize(theme::kFontSmall);
+  capacity_body_->labelcolor(theme::kTextMuted);
+
+  // 底部按钮（03 号画板 688,44）：保存主色（满容时禁用）+ 返回白底。
+  save_ = new widgets::IconButton(ix, 688, 132, 44, Icon::kKey, "保存主密钥");
   save_->callback([](Fl_Widget*, void* d) {
     static_cast<CreateKeyPage*>(d)->on_save();
   }, this);
-  cancel->callback([](Fl_Widget*, void* d) {
-    static_cast<PageBase*>(d)->on_back();
+  auto* back2 = new widgets::Button(ix + 144, 688, 92, 44, "返回管理",
+                                    ButtonKind::kSecondary);
+  back2->callback([](Fl_Widget*, void* d) {
+    static_cast<PageBase*>(static_cast<CreateKeyPage*>(d))->on_back();
   }, this);
+
+  error_ = new Fl_Box(ix, 742, iw, 19, "");
+  error_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  error_->labelsize(theme::kFontSmall);
+  error_->labelcolor(theme::kDangerText);
   end();
 }
 
 void CreateKeyPage::reload() {
   const auto quota = host()->service().quota();
   const bool full = quota.master_keys >= svc::kMaxMasterKeys;
+  capacity_title_->copy_label(
+      ("已使用 " + std::to_string(quota.master_keys) + " / " +
+       std::to_string(svc::kMaxMasterKeys) + " 把主密钥")
+          .c_str());
   if (full) {
-    capacity_->set_content(
-        ("已使用 " + std::to_string(quota.master_keys) + " / " +
-         std::to_string(svc::kMaxMasterKeys) + " 把主密钥")
-            .c_str(),
-        "容量已满。先导出并删除一把主密钥，再继续生成。");
-    capacity_->set_shown(true);
+    capacity_body_->copy_label("容量已满。先导出并删除一把主密钥，再继续生成。");
   } else {
-    capacity_->set_shown(false);
+    capacity_body_->copy_label("还可继续添加；上限由基础版限额决定。");
   }
   save_->set_enabled(!full);
+  error_->copy_label(last_error_.c_str());
   redraw();
 }
 
@@ -894,12 +922,14 @@ void CreateKeyPage::on_save() {
   const std::string cfm = confirm_->value() ? confirm_->value() : "";
   if (pwd.empty()) {
     last_error_ = "请输入主密钥密码";
+    error_->copy_label(last_error_.c_str());
     password_->take_focus();
     redraw();
     return;
   }
   if (pwd != cfm) {
     last_error_ = "两次输入的密码不一致";
+    error_->copy_label(last_error_.c_str());
     redraw();
     return;
   }
@@ -913,6 +943,7 @@ void CreateKeyPage::on_save() {
 
   if (rc != svc::Error::kOk) {
     last_error_ = error_text(rc);
+    error_->copy_label(last_error_.c_str());
     redraw();
     return;
   }
@@ -925,72 +956,83 @@ void CreateKeyPage::on_save() {
 // 04 导入主密钥
 // =====================================================================
 ImportKeyPage::ImportKeyPage(MainWindow* host)
-    : PageBase(host, "导入主密钥", "从之前导出的备份文件恢复主密钥，导入后作为保存。") {
+    : PageBase(host, "导入主密钥", "从之前导出的备份文件恢复主密钥，导入后作为备选保存。") {
   begin();
-  layout_header("返回主密钥管理");
+  layout_header(nullptr);
 
-  const int cw = kWinW - theme::kSidebarWidth - theme::kContentPad * 3;
-  const int cx = theme::kContentPad;
-  new widgets::Card(cx, 104, cw, 460);
+  // 04 号画板：白卡（240,117,928,460 r12），无头部返回钮。
+  new widgets::Card(theme::kSidebarWidth + theme::kContentPad, 117, 928, 460);
+  const int ix = 264;
+  const int iw = 880;
 
-  // 文件选择块
-  new widgets::Card(cx + theme::kGapXl, 128, cw - theme::kGapXl * 2, 84, theme::kSubtleBg);
-  file_name_ = new Fl_Box(cx + theme::kGapXl + theme::kGapLg, 146, 400, 24, "尚未选择文件");
+  // 文件块（04 号画板 #F3F5F6 141,96 r12）。
+  widgets::Card* fcard = new widgets::Card(ix, 141, iw, 96, theme::kContentBg);
+  (void)fcard;
+  file_name_ = new Fl_Box(ix + 16, 169, 600, 21, "尚未选择文件");
   file_name_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  file_name_->labelfont(theme::font_for(theme::kWeightBold));
+  file_name_->labelfont(theme::font_for(theme::kWeightRegular));
   file_name_->labelsize(theme::kFontBody);
   file_name_->labelcolor(theme::kText);
-  file_sub_ = new Fl_Box(cx + theme::kGapXl + theme::kGapLg, 172, 400, 20,
-                          "选择之前导出的 .smkexp 文件");
+  file_sub_ = new Fl_Box(ix + 16, 197, 600, 17, "选择之前导出的 .smkexp 备份文件");
   file_sub_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
   file_sub_->labelsize(theme::kFontSmall);
   file_sub_->labelcolor(theme::kTextMuted);
-  choose_btn_ = new widgets::Button(cx + cw - theme::kGapXl - 132, 152, 118, 34, "重新选择文件",
+  choose_btn_ = new widgets::Button(ix + iw - 16 - 96, 172, 96, 34, "选择文件",
                                     ButtonKind::kSecondary);
   choose_btn_->callback([](Fl_Widget*, void* d) {
     static_cast<ImportKeyPage*>(d)->on_choose_file();
   }, this);
 
-  Fl_Box* p_l = new Fl_Box(cx + theme::kGapXl, 236, 300, 20, "文件保护密码");
-  p_l->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  p_l->labelsize(theme::kFontSmall);
-  p_l->labelcolor(theme::kTextMuted);
-  protection_ = new widgets::Field(cx + theme::kGapXl, 258, cw - theme::kGapXl * 2, 38);
+  auto* prot_label = new Fl_Box(ix, 261, 400, 17, "文件保护密码");
+  prot_label->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  prot_label->labelfont(theme::font_for(theme::kWeightRegular));
+  prot_label->labelsize(theme::kFontLabel);
+  prot_label->labelcolor(theme::kText);
+
+  protection_ = new widgets::Field(ix, 285, iw, 46);
   protection_->type(FL_SECRET_INPUT);
-  Fl_Box* p_tip = new Fl_Box(cx + theme::kGapXl, 300, cw - theme::kGapXl * 2, 20,
-                             "导出时为这份备份设定的密码。");
-  p_tip->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  p_tip->labelsize(theme::kFontSmall);
-  p_tip->labelcolor(theme::kTextMuted);
 
-  Fl_Box* n_l = new Fl_Box(cx + theme::kGapXl, 340, 300, 20, "新的主密钥密码");
-  n_l->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  n_l->labelsize(theme::kFontSmall);
-  n_l->labelcolor(theme::kTextMuted);
-  new_password_ = new widgets::Field(cx + theme::kGapXl, 362, cw - theme::kGapXl * 2, 38);
+  auto* prot_note = new Fl_Box(ix, 345, iw, 16, "导出时为这份备份设定的密码。");
+  prot_note->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  prot_note->labelsize(theme::kFontSmall);
+  prot_note->labelcolor(theme::kTextMuted);
+
+  auto* new_label = new Fl_Box(ix, 385, 400, 17, "新的主密钥密码");
+  new_label->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  new_label->labelfont(theme::font_for(theme::kWeightRegular));
+  new_label->labelsize(theme::kFontLabel);
+  new_label->labelcolor(theme::kText);
+
+  new_password_ = new widgets::Field(ix, 409, iw, 46);
   new_password_->type(FL_SECRET_INPUT);
-  Fl_Box* n_tip = new Fl_Box(cx + theme::kGapXl, 404, cw - theme::kGapXl * 2, 20,
-                             "为本机保存的主密钥新设密码。");
-  n_tip->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  n_tip->labelsize(theme::kFontSmall);
-  n_tip->labelcolor(theme::kTextMuted);
 
-  import_btn_ = new widgets::IconButton(cx + theme::kGapXl, 448, 132, 40, Icon::kImport,
-                                        "导入主密钥");
-  auto* cancel = new widgets::Button(cx + theme::kGapXl + 144, 448, 84, 40, "返回管理",
-                                     ButtonKind::kSecondary);
+  auto* new_note = new Fl_Box(ix, 469, iw, 16, "为本机保存的主密钥新设密码。");
+  new_note->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  new_note->labelsize(theme::kFontSmall);
+  new_note->labelcolor(theme::kTextMuted);
+
+  // 按钮（04 号画板 509,44）：导入主色 + 返回白底。
+  import_btn_ = new widgets::IconButton(ix, 509, 168, 44, Icon::kImport, "导入主密钥");
   import_btn_->callback([](Fl_Widget*, void* d) {
     static_cast<ImportKeyPage*>(d)->on_import();
   }, this);
-  cancel->callback([](Fl_Widget*, void* d) {
-    static_cast<PageBase*>(d)->on_back();
+  auto* back2 = new widgets::Button(ix + 180, 509, 106, 44, "返回管理",
+                                    ButtonKind::kSecondary);
+  back2->callback([](Fl_Widget*, void* d) {
+    static_cast<PageBase*>(static_cast<ImportKeyPage*>(d))->on_back();
   }, this);
+
+  error_ = new Fl_Box(ix, 561, iw, 19, "");
+  error_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  error_->labelsize(theme::kFontSmall);
+  error_->labelcolor(theme::kDangerText);
   end();
 }
 
 void ImportKeyPage::reload() {
   const bool full = host()->service().quota().master_keys >= svc::kMaxMasterKeys;
   import_btn_->set_enabled(!full && !path_.empty());
+  error_->copy_label(last_error_.c_str());
   redraw();
 }
 
@@ -1057,90 +1099,109 @@ void ImportKeyPage::on_import() {
 ExportKeyPage::ExportKeyPage(MainWindow* host)
     : PageBase(host, "导出主密钥", "为导出文件新设保护密码，并将备份保存在你信任的位置。") {
   begin();
-  layout_header("返回主密钥管理");
+  layout_header(nullptr);
 
-  const int cw = kWinW - theme::kSidebarWidth - theme::kContentPad * 3;
-  const int cx = theme::kContentPad;
-  new widgets::Card(cx, 104, cw, 660);
+  // 05 号画板：白卡（240,117,928,829 r12），页面客户区高 905。
+  new widgets::Card(theme::kSidebarWidth + theme::kContentPad, 117, 928, 829);
+  const int ix = 264;
+  const int iw = 880;
 
-  // 目标主密钥信息块
-  new widgets::Card(cx + theme::kGapXl, 128, cw - theme::kGapXl * 2, 76, theme::kSubtleBg);
-  widgets::draw_icon(widgets::Icon::kKey, cx + theme::kGapXl + theme::kGapLg, 152,
-                     theme::kAccent);
-  key_name_box_ = new Fl_Box(cx + theme::kGapXl + theme::kGapLg + 32, 142, 300, 24, "");
+  // 密钥摘要块（05 号画板 #F8FAFA 141,94 r8）。
+  widgets::Card* scard = new widgets::Card(ix, 141, iw, 94, theme::kSubtleBg);
+  (void)scard;
+  key_name_box_ = new Fl_Box(ix + 48, 164, 500, 21, "");
   key_name_box_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
   key_name_box_->labelfont(theme::font_for(theme::kWeightBold));
   key_name_box_->labelsize(theme::kFontBody);
   key_name_box_->labelcolor(theme::kText);
-  Fl_Box* id_l = new Fl_Box(cx + theme::kGapXl + theme::kGapLg + 32, 170, 110, 20, "主密钥 ID");
-  id_l->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  id_l->labelsize(theme::kFontSmall);
-  id_l->labelcolor(theme::kTextMuted);
-  key_id_box_ = new Fl_Box(cx + theme::kGapXl + theme::kGapLg + 148, 170, 200, 20, "");
+  auto* id_label = new Fl_Box(ix + 16, 198, 90, 17, "主密钥 ID");
+  id_label->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  id_label->labelsize(theme::kFontLabel);
+  id_label->labelcolor(theme::kTextMuted);
+  key_id_box_ = new Fl_Box(ix + 114, 197, 400, 17, "");
   key_id_box_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  key_id_box_->labelsize(theme::kFontSmall);
+  key_id_box_->labelfont(theme::font_for(theme::kWeightMedium));
+  key_id_box_->labelsize(theme::kFontLabel);
   key_id_box_->labelcolor(theme::kText);
 
-  // 三段密码：原密码（验证）+ 文件保护密码 + 确认
-  const int labels_y[3] = {232, 316, 400};
-  const char* labels[3] = {"主密钥原密码", "导出文件保护密码", "确认保护密码"};
-  const char* tips[3] = {"验证这把主密钥的当前密码；错误时导出不会开始。",
-                         "为这份备份新设密码；导入该文件时使用。", ""};
-  widgets::Field* fields[3] = {
-      new widgets::Field(cx + theme::kGapXl, labels_y[0] + 22, cw - theme::kGapXl * 2, 38),
-      new widgets::Field(cx + theme::kGapXl, labels_y[1] + 22, cw - theme::kGapXl * 2, 38),
-      new widgets::Field(cx + theme::kGapXl, labels_y[2] + 22, cw - theme::kGapXl * 2, 38)};
-  for (int i = 0; i < 3; ++i) {
-    fields[i]->type(FL_SECRET_INPUT);
-    Fl_Box* l = new Fl_Box(cx + theme::kGapXl, labels_y[i], 300, 20, labels[i]);
-    l->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-    l->labelsize(theme::kFontSmall);
-    l->labelcolor(theme::kTextMuted);
-    if (tips[i][0] != '\0') {
-      Fl_Box* t = new Fl_Box(cx + theme::kGapXl, labels_y[i] + 62, cw - theme::kGapXl * 2, 20,
-                             tips[i]);
-      t->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-      t->labelsize(theme::kFontSmall);
-      t->labelcolor(theme::kTextMuted);
-    }
-  }
-  original_ = fields[0];
-  protection_ = fields[1];
-  confirm_ = fields[2];
+  auto* orig_label = new Fl_Box(ix, 261, 400, 17, "主密钥原密码");
+  orig_label->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  orig_label->labelfont(theme::font_for(theme::kWeightRegular));
+  orig_label->labelsize(theme::kFontLabel);
+  orig_label->labelcolor(theme::kText);
 
-  // 保存位置
-  Fl_Box* loc_l = new Fl_Box(cx + theme::kGapXl, 466, 300, 20, "保存位置");
-  loc_l->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  loc_l->labelsize(theme::kFontSmall);
-  loc_l->labelcolor(theme::kTextMuted);
-  new widgets::Card(cx + theme::kGapXl, 488, cw - theme::kGapXl * 2, 56, theme::kSubtleBg);
-  location_box_ = new Fl_Box(cx + theme::kGapXl + theme::kGapLg + 32, 504, 600, 24, "本机 / 密匣备份 / ");
+  original_ = new widgets::Field(ix, 284, iw, 46);
+  original_->type(FL_SECRET_INPUT);
+
+  auto* orig_note = new Fl_Box(ix, 342, iw, 16, "验证这把主密钥的当前密码；错误时导出不会开始。");
+  orig_note->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  orig_note->labelsize(theme::kFontSmall);
+  orig_note->labelcolor(theme::kTextMuted);
+
+  auto* prot_label = new Fl_Box(ix, 383, 400, 17, "导出文件保护密码");
+  prot_label->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  prot_label->labelfont(theme::font_for(theme::kWeightRegular));
+  prot_label->labelsize(theme::kFontLabel);
+  prot_label->labelcolor(theme::kText);
+
+  protection_ = new widgets::Field(ix, 406, iw, 46);
+  protection_->type(FL_SECRET_INPUT);
+
+  auto* prot_note = new Fl_Box(ix, 466, iw, 16, "为这份备份新设密码；导入该文件时使用。");
+  prot_note->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  prot_note->labelsize(theme::kFontSmall);
+  prot_note->labelcolor(theme::kTextMuted);
+
+  auto* confirm_label = new Fl_Box(ix, 505, 400, 17, "确认保护密码");
+  confirm_label->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  confirm_label->labelfont(theme::font_for(theme::kWeightRegular));
+  confirm_label->labelsize(theme::kFontLabel);
+  confirm_label->labelcolor(theme::kText);
+
+  confirm_ = new widgets::Field(ix, 528, iw, 46);
+  confirm_->type(FL_SECRET_INPUT);
+
+  // 保存位置（05 号画板：标签 600、块 623,58、选择位置钮 635,72x34）。
+  auto* loc_label = new Fl_Box(ix, 600, 200, 17, "保存位置");
+  loc_label->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  loc_label->labelfont(theme::font_for(theme::kWeightRegular));
+  loc_label->labelsize(theme::kFontLabel);
+  loc_label->labelcolor(theme::kText);
+  widgets::Card* lcard = new widgets::Card(ix, 623, iw, 58, theme::kSubtleBg);
+  (void)lcard;
+  location_box_ = new Fl_Box(ix + 16, 641, iw - 130, 21, "尚未选择位置");
   location_box_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  location_box_->labelsize(theme::kFontBody);
+  location_box_->labelsize(theme::kFontLabel);
   location_box_->labelcolor(theme::kText);
-  choose_btn_ = new widgets::Button(cx + cw - theme::kGapXl - 116, 500, 100, 32, "选择位置",
+  choose_btn_ = new widgets::Button(ix + iw - 88, 635, 72, 34, "选择位置",
                                     ButtonKind::kSecondary);
   choose_btn_->callback([](Fl_Widget*, void* d) {
     static_cast<ExportKeyPage*>(d)->on_choose_location();
   }, this);
 
-  warning_ = make_notice(cx + theme::kGapXl, 560, cw - theme::kGapXl * 2,
-                         widgets::Notice::Tone::kWarning, "",
+  // 黄色提醒（05 号画板 701,43，单行）。
+  warning_ = make_notice(ix, 701, iw, widgets::Notice::Tone::kWarning, "",
                          "保护密码丢失后，这份主密钥备份无法导入。请将文件与密码分开妥善保存。",
-                         54);
-  info_ = make_notice(cx + theme::kGapXl, 624, cw - theme::kGapXl * 2,
-                      widgets::Notice::Tone::kInfo, "", "导出不会删除本机的主密钥。", 52);
+                         43);
 
-  export_btn_ = new widgets::IconButton(cx + theme::kGapXl, 692, 132, 40, Icon::kExport,
-                                        "导出主密钥");
-  auto* cancel = new widgets::Button(cx + theme::kGapXl + 144, 692, 84, 40, "返回管理",
-                                     ButtonKind::kSecondary);
+  // 绿色说明块（05 号画板 #E6F6F1 764,50）。
+  widgets::Card* gcard = new widgets::Card(ix, 764, iw, 50, 0xE6F6F100);
+  (void)gcard;
+  info_ = new Fl_Box(ix + 40, 780, iw - 80, 20, "导出不会删除本机的主密钥。");
+  info_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  info_->labelsize(theme::kFontLabel);
+  info_->labelcolor(theme::kText);
+
+  // 最终稿没有导出按钮；导出动作是功能必需，补在说明块下方。
+  export_btn_ = new widgets::IconButton(ix, 830, 168, 44, Icon::kExport, "导出主密钥");
   export_btn_->callback([](Fl_Widget*, void* d) {
     static_cast<ExportKeyPage*>(d)->on_export();
   }, this);
-  cancel->callback([](Fl_Widget*, void* d) {
-    static_cast<PageBase*>(d)->on_back();
-  }, this);
+
+  error_ = new Fl_Box(ix, 882, iw, 19, "");
+  error_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  error_->labelsize(theme::kFontSmall);
+  error_->labelcolor(theme::kDangerText);
   end();
 }
 
@@ -1152,6 +1213,7 @@ void ExportKeyPage::reload() {
   }
   key_name_box_->copy_label(name.empty() ? "(未命名主密钥)" : name.c_str());
   key_id_box_->copy_label(key_id_.c_str());
+  error_->copy_label(last_error_.c_str());
   redraw();
 }
 
@@ -1170,6 +1232,7 @@ void ExportKeyPage::on_export() {
   last_error_.clear();
   if (key_id_.empty()) {
     last_error_ = "请先在主密钥管理中选择要导出的主密钥";
+    error_->copy_label(last_error_.c_str());
     redraw();
     return;
   }
@@ -1178,16 +1241,19 @@ void ExportKeyPage::on_export() {
   const std::string cfm = confirm_->value() ? confirm_->value() : "";
   if (orig.empty()) {
     last_error_ = "请输入主密钥原密码";
+    error_->copy_label(last_error_.c_str());
     redraw();
     return;
   }
   if (prot.empty()) {
     last_error_ = "请输入导出文件保护密码";
+    error_->copy_label(last_error_.c_str());
     redraw();
     return;
   }
   if (prot != cfm) {
     last_error_ = "两次输入的密码不一致";
+    error_->copy_label(last_error_.c_str());
     redraw();
     return;
   }
@@ -1211,11 +1277,13 @@ void ExportKeyPage::on_export() {
 
   if (rc != svc::Error::kOk) {
     last_error_ = error_text(rc);
+    error_->copy_label(last_error_.c_str());
     redraw();
     return;
   }
   if (!write_bytes(location_, bytes)) {
     last_error_ = "文件读写失败";
+    error_->copy_label(last_error_.c_str());
     redraw();
     return;
   }
