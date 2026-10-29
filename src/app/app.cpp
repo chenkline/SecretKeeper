@@ -15,12 +15,14 @@
 
 #include <FL/Fl.H>
 #include <FL/Fl_Image_Surface.H>
+#include <FL/Fl_Input.H>
 #include <FL/fl_draw.H>
 
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -96,9 +98,13 @@ int main(int argc, char** argv) {
   secretkeeper::ui::install_crash_dumper();
 
   std::vector<int> shots;
+  bool fill_inputs = false;
   for (int i = 1; i < argc; ++i) {
     if (std::strncmp(argv[i], "--screenshot=", 13) == 0) {
       shots = parse_screenshot_arg(argv[i] + 13);
+    } else if (std::strncmp(argv[i], "--screenshot-fill", 17) == 0) {
+      // 截图前把可见输入框预填文本，用于核对输入回显渲染。
+      fill_inputs = true;
     }
   }
 
@@ -122,11 +128,26 @@ int main(int argc, char** argv) {
       "09-settings",
   };
   std::filesystem::create_directories("build/ui-shots");
+
+  // 递归把可见输入框预填文本（回显渲染核对用）。
+  std::function<void(Fl_Group*)> fill;
+  fill = [&fill](Fl_Group* grp) {
+    for (int i = 0; i < grp->children(); ++i) {
+      Fl_Widget* w = grp->child(i);
+      if (Fl_Input* in = dynamic_cast<Fl_Input*>(w)) {
+        in->value("预输入文本 ABC123");
+      } else if (Fl_Group* sub = dynamic_cast<Fl_Group*>(w)) {
+        fill(sub);
+      }
+    }
+  };
+
   for (int n : shots) {
     window.show();
     Fl::wait(0.1);
     window.navigate(kPages[n - 1]);
     Fl::wait(0.05);
+    if (fill_inputs) fill(&window);
     // 离屏渲染：Fl_Double_Window 的 draw() 会拷贝自己的 backing store
     //（真实屏幕绘制的陈旧残留），因此这里绕开它——先铺窗口底色，
     // 再逐个绘制可见子控件，最后用 surface.image() 取像素。

@@ -139,6 +139,7 @@ class Field : public Fl_Input {
  private:
   std::string label_;
   std::string placeholder_;
+  int frame_w_ = 0;  // 可见边框宽度（控件本身左右各缩进 12px 作为文字留白）。
 };
 
 // ---- 多行文本域 ----
@@ -147,6 +148,9 @@ class TextArea : public Fl_Input {
  public:
   TextArea(int x, int y, int w, int h);
   void draw() override;
+
+ private:
+  int frame_w_ = 0;  // 可见边框宽度（控件本身左右各缩进 12px 作为文字留白）。
 };
 
 // ---- 列表 ----

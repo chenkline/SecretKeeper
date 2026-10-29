@@ -262,7 +262,7 @@ void Notice::draw() {
 
 // =====================================================================
 Field::Field(int x, int y, int w, int h, std::string_view label)
-    : Fl_Input(x, y, w, h, 0) {
+    : Fl_Input(x + 12, y, std::max(1, w - 24), h, 0), frame_w_(w) {
   label_.assign(label);
   box(FL_NO_BOX);
   labelsize(theme::kFontBody);
@@ -280,22 +280,28 @@ void Field::set_label_text(std::string_view text) {
 }
 
 void Field::draw() {
-  theme::fill_rounded(x(), y(), w(), h(), theme::kRadiusField, theme::kFieldBg);
-  theme::stroke_rounded(x(), y(), w(), h(), theme::kRadiusField, theme::kBorder);
+  // 可见边框在原设计位置；控件矩形已左右缩进 12px 作为文字内边距。
+  theme::fill_rounded(x() - 12, y(), frame_w_, h(), theme::kRadiusField, theme::kFieldBg);
+  theme::stroke_rounded(x() - 12, y(), frame_w_, h(), theme::kRadiusField, theme::kBorder);
 
-  // 内容区左侧留 12px 内边距，右侧留 12px（给眼睛图标留位）。
+  // 文本与光标交给 Fl_Input 自己画（box 已是 FL_NO_BOX，不会重画背景）。
+  // 此前这里只画背景与占位符、从不画已输入文本，导致「输入有效但无回显」。
   Fl_Input::box(FL_NO_BOX);
-  Fl_Input::labelsize(theme::kFontBody);
+  textcolor(theme::kText);
+  cursor_color(theme::kText);
+  selection_color(theme::kAccentSoft);
+  textfont(theme::font_for(theme::kWeightRegular));
+  textsize(theme::kFontBody);
+  Fl_Input::draw();
 
   const char* value = Fl_Input::value();
   const bool empty = value == nullptr || value[0] == '\0';
   if (empty && !placeholder_.empty()) {
     fl_color(theme::kTextFaint);
     fl_font(theme::font_for(theme::kWeightRegular), theme::kFontBody);
-    fl_draw(placeholder_.c_str(), x() + theme::kGapMd, y(), w() - theme::kGapMd * 2, h(),
+    fl_draw(placeholder_.c_str(), x(), y(), w(), h(),
             FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
   }
-
 }
 
 int Field::handle(int event) {
@@ -303,7 +309,8 @@ int Field::handle(int event) {
 }
 
 // =====================================================================
-TextArea::TextArea(int x, int y, int w, int h) : Fl_Input(x, y, w, h, 0) {
+TextArea::TextArea(int x, int y, int w, int h)
+    : Fl_Input(x + 12, y, std::max(1, w - 24), h, 0), frame_w_(w) {
   box(FL_NO_BOX);
   textfont(theme::font_for(theme::kWeightRegular));
   textsize(theme::kFontBody);
@@ -314,10 +321,14 @@ TextArea::TextArea(int x, int y, int w, int h) : Fl_Input(x, y, w, h, 0) {
 }
 
 void TextArea::draw() {
-  theme::fill_rounded(x(), y(), w(), h(), theme::kRadiusField, theme::kFieldBg);
-  theme::stroke_rounded(x(), y(), w(), h(), theme::kRadiusField, theme::kBorder);
-  // 让 Fl_Input 绘制实际文本，偏移 8px 内边距。
+  theme::fill_rounded(x() - 12, y(), frame_w_, h(), theme::kRadiusField, theme::kFieldBg);
+  theme::stroke_rounded(x() - 12, y(), frame_w_, h(), theme::kRadiusField, theme::kBorder);
+  // 让 Fl_Input 绘制实际文本与光标（box 已是 FL_NO_BOX）。
   Fl_Input::box(FL_NO_BOX);
+  textcolor(theme::kText);
+  cursor_color(theme::kText);
+  selection_color(theme::kAccentSoft);
+  Fl_Input::draw();
 }
 
 // =====================================================================
