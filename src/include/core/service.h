@@ -93,6 +93,8 @@ struct MasterKeyListItem {
   std::string name;           // 可为空，且为空**不代表**该密钥不存在
   bool is_default = false;
   std::size_t secret_count = 0;
+  // Unix 毫秒时间戳，来自索引库；界面显示「生成/导入」日期（02 号画板）。
+  std::int64_t created_at = 0;
 };
 
 struct SecretListItem {

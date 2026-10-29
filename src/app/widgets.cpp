@@ -507,41 +507,40 @@ int KeySelector::handle(int event) {
 
 void KeySelector::draw() {
   const bool empty = name_.empty() && id_.empty();
-  // 设计稿 01 号：默认主密钥是 #F8FAFA 圆角卡，无图标无箭头。
-  theme::fill_rounded(x(), y(), w(), h(), theme::kRadiusCard, theme::kSubtleBg);
+  // 01 号画板最终稿：白底 + 主色描边圆角卡，钥匙图标 + 名称/ID 两行 + 默认胶囊。
+  theme::fill_rounded(x(), y(), w(), h(), theme::kRadiusField, theme::kFieldBg);
+  theme::stroke_rounded(x(), y(), w(), h(), theme::kRadiusField, theme::kAccent);
 
   const int pad = theme::kGapLg;
-  const int inner_w = w() - pad * 2;
 
   if (empty) {
     fl_color(theme::kTextMuted);
     fl_font(theme::font_for(theme::kWeightRegular), theme::kFontBody);
-    fl_draw(placeholder_.c_str(), x() + pad, y(), inner_w, h(),
+    fl_draw(placeholder_.c_str(), x() + pad, y(), w() - pad * 2, h(),
             FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
     return;
   }
 
-  // 第一行：固定标签「默认主密钥」。
-  fl_color(theme::kTextMuted);
-  fl_font(theme::font_for(theme::kWeightRegular), theme::kFontSmall);
-  fl_draw("默认主密钥", x() + pad, y() + 16 - theme::kFontSmall, inner_w, h(),
-          FL_ALIGN_LEFT | FL_ALIGN_TOP | FL_ALIGN_INSIDE);
+  draw_icon(Icon::kKey, x() + 16, y() + (h() - kIconSize) / 2, theme::kAccent);
 
-  // 第二行：密钥名 + 右侧 ID（fs13 fw500）。
+  // 名称 fs14 与 ID fs13 fw500 纵向两行（x=+44）。
   fl_color(theme::kText);
   fl_font(theme::font_for(theme::kWeightRegular), theme::kFontBody);
-  fl_draw(name_.c_str(), x() + pad, y() + 22, inner_w, h() - 22,
-          FL_ALIGN_LEFT | FL_ALIGN_TOP | FL_ALIGN_INSIDE);
+  fl_draw(name_.c_str(), x() + 44, y() + 15, w() - 44 - 80, 22,
+          FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
   fl_font(theme::font_for(theme::kWeightMedium), theme::kFontLabel);
-  const int id_w = static_cast<int>(fl_width(id_.c_str()));
-  fl_draw(id_.c_str(), x() + w() - pad - id_w, y() + 25, id_w, h() - 25,
-          FL_ALIGN_LEFT | FL_ALIGN_TOP | FL_ALIGN_INSIDE);
+  fl_draw(id_.c_str(), x() + 44, y() + 36, w() - 44 - 80, 17,
+          FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 
+  if (is_default_) {
+    theme::draw_pill(x() + w() - 20 - 38, y() + (h() - 21) / 2, 38, 21, "默认",
+                     theme::kAccent, theme::kAccentSoft);
+  }
   if (switchable_) {
     fl_color(theme::kTextFaint);
     fl_font(theme::font_for(theme::kWeightRegular), theme::kFontTiny);
-    fl_draw("点按切换", x() + pad, y() + 25, inner_w - id_w - theme::kGapMd, h() - 25,
-            FL_ALIGN_RIGHT | FL_ALIGN_TOP | FL_ALIGN_INSIDE);
+    fl_draw("点按切换", x() + 44, y() + 36, w() - 44 - 110, 17,
+            FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
   }
 }
 
@@ -562,7 +561,7 @@ void stroke_path(const int* pts, int count, Fl_Color c) {
 void circle(int cx, int cy, int r, Fl_Color c) {
   fl_color(c);
   fl_line_style(FL_SOLID, 1);
-  fl_arc(cx, cy, r, 0, 2 * 3.14159265f);
+  fl_arc(cx, cy, r, 0, 360);  // fl_arc 用角度制
   fl_line_style(FL_SOLID, 0);
 }
 
@@ -636,7 +635,7 @@ void draw_icon(Icon icon, int x, int y, Fl_Color color) {
       fl_color(color);
       fl_line_style(FL_SOLID, 1);
       fl_rect(x + 4, y + 9, 13, 9);
-      fl_arc(x + 10, y + 9, 4, 0.0f, 3.14159265f);
+      fl_arc(x + 10, y + 9, 4, 0, 180);
       fl_line(x + 6, y + 9, x + 6, y + 13);
       fl_line(x + 15, y + 9, x + 15, y + 13);
       fl_line_style(FL_SOLID, 0);
@@ -646,7 +645,7 @@ void draw_icon(Icon icon, int x, int y, Fl_Color color) {
     case Icon::kEyeOff: {
       fl_color(color);
       fl_line_style(FL_SOLID, 1);
-      fl_arc(cx, cy, 8, 0.0f, 3.14159265f);
+      fl_arc(cx, cy, 8, 0, 180);
       fl_line(x + 2, cy, x + 18, cy);
       fl_arc(cx, cy, 8, 3.14159265f, 2 * 3.14159265f);
       circle(cx, cy, 2, color);

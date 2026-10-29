@@ -98,16 +98,16 @@ class MainWindow : public Fl_Double_Window {
   std::unique_ptr<ImportSecretPage> import_secret_;
 
   // ---- 侧栏 chrome（02-09 号画板公共，解锁页整体隐藏）----
-  static constexpr int kNavCount = 5;
+  static constexpr int kNavCount = 3;
   MenuTarget menu_targets_[kNavCount];
   widgets::IconButton* menu_items_[kNavCount] = {};
   widgets::Button* lock_btn_ = nullptr;
   Fl_Box* quota_version_ = nullptr;
   Fl_Box* quota_secrets_ = nullptr;
   Fl_Box* quota_keys_ = nullptr;
-  Fl_Box* offline_line_ = nullptr;
   Fl_Box* status_ = nullptr;
   // 内容页页脚（本机加密保存 · 无网络连接 · 无云同步 + 锁定状态胶囊）。
+  Fl_Box* footer_text_ = nullptr;
   widgets::Pill* state_pill_ = nullptr;
 
   double quota_secret_ratio_ = 0.0;

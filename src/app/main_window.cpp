@@ -32,20 +32,21 @@ using Clock = std::chrono::steady_clock;
 // KEK 轮换间隔固定 30 秒（需求 2.7），不随安全设置变化。
 constexpr double kKekRotateSeconds = 30.0;
 
-// 侧栏导航项（02 号画板）：x=20 w=168 h=44，从客户区 y=99 起，间距 52。
+// 侧栏导航项（02 号画板最终稿）：三项，x=20 w=168 h=44，
+// 客户区 y=99 起，间距 52。文件导入/导出入口在各管理页内（用户定稿）。
 constexpr int kNavX = 20;
 constexpr int kNavW = 168;
 constexpr int kNavH = 44;
 constexpr int kNavTop = 99;
 constexpr int kNavStep = 52;
 
-// 侧栏底部：锁定按钮距底 89，离线行距底 33（02 号画板实测）。
-constexpr int kLockFromBottom = 89;
-constexpr int kOfflineFromBottom = 33;
+// 侧栏底部：锁定按钮距底 60（01/02/03 号画板一致）。
+constexpr int kLockFromBottom = 60;
+constexpr int kStatusFromBottom = 33;
 
-// 容量卡（02 号画板）：x=20 y=383 w=168 h=108。
+// 容量卡（02 号画板最终稿）：x=20 y=279 w=168 h=108，仅机密信息一根进度条。
 constexpr int kQuotaCardX = 20;
-constexpr int kQuotaCardY = 383;
+constexpr int kQuotaCardY = 279;
 constexpr int kQuotaCardW = 168;
 constexpr int kQuotaCardH = 108;
 
@@ -135,18 +136,16 @@ std::array<Fl_Group*, 9> MainWindow::all_pages() const {
 }
 
 void MainWindow::build_chrome() {
-  // 导航五项（02 号画板）：机密信息 / 主密钥管理 / 文件导入 / 文件导出 / 安全设置。
-  // 「文件导出」没有独立落地页，导出入口在机密信息管理页内。
+  // 导航三项（02 号画板最终稿，顺序为用户定稿）：
+  // 主密钥管理 -> 机密信息管理 -> 安全设置。
   struct NavDef {
     Page page;
     const char* label;
     widgets::Icon icon;
   };
   static const NavDef kNav[kNavCount] = {
-      {Page::kSecrets, "机密信息", widgets::Icon::kFile},
       {Page::kMasterKeys, "主密钥管理", widgets::Icon::kKey},
-      {Page::kImportSecret, "文件导入", widgets::Icon::kImport},
-      {Page::kSecrets, "文件导出", widgets::Icon::kExport},
+      {Page::kSecrets, "机密信息管理", widgets::Icon::kFile},
       {Page::kSettings, "安全设置", widgets::Icon::kSettings},
   };
   for (int i = 0; i < kNavCount; ++i) {
@@ -166,7 +165,7 @@ void MainWindow::build_chrome() {
   quota_version_->labelsize(theme::kFontTiny);
   quota_version_->labelcolor(theme::kSidebarIcon);
 
-  quota_secrets_ = new Fl_Box(kQuotaCardX + 12, kQuotaCardY + 61, 144, 16, "机密信息 0 / 15");
+  quota_secrets_ = new Fl_Box(kQuotaCardX + 12, kQuotaCardY + 37, 144, 16, "机密信息 0 / 15");
   quota_secrets_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
   quota_secrets_->labelsize(theme::kFontSmall);
   quota_secrets_->labelcolor(0xFFFFFF00);
@@ -184,12 +183,7 @@ void MainWindow::build_chrome() {
     static_cast<MainWindow*>(data)->lock_now();
   }, this);
 
-  offline_line_ = new Fl_Box(kNavX, 0, kNavW, 14, "● 完全离线　 v0.0.1");
-  offline_line_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  offline_line_->labelsize(theme::kFontTiny);
-  offline_line_->labelcolor(theme::kSidebarIcon);
-
-  // 瞬时状态消息：有内容时盖在离线行上（两者互斥显示）。
+  // 瞬时状态消息（最终稿侧栏底部没有常驻离线行）：默认隐藏。
   status_ = new Fl_Box(kNavX, 0, kNavW, 14, "");
   status_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
   status_->labelsize(theme::kFontTiny);
@@ -200,6 +194,14 @@ void MainWindow::build_chrome() {
   state_pill_ = new widgets::Pill(theme::kWinW - theme::kContentPad - 49, 0, 49, 21,
                                   "已锁定", theme::kAccent, theme::kAccentSoft);
   state_pill_->set_shown(false);
+
+  // 页脚安全状态行（02 号画板）：盾标 + 固定文案，右侧是上面的胶囊。
+  footer_text_ = new Fl_Box(theme::kSidebarWidth + theme::kContentPad, 0, 700, 21,
+                            "本机加密保存 · 无网络连接 · 无云同步");
+  footer_text_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  footer_text_->labelsize(theme::kFontTiny);
+  footer_text_->labelcolor(theme::kTextMuted);
+  footer_text_->hide();
 }
 
 void MainWindow::on_menu_cb(Fl_Widget*, void* data) {
@@ -245,7 +247,7 @@ void MainWindow::paint_sidebar_decor() {
   fl_font(theme::font_for(theme::kWeightRegular), 10);
   fl_draw("SecretKeeper", 60, 55, 130, 13, FL_ALIGN_LEFT);
 
-  // 容量卡：描边框 + 两条进度条。
+  // 容量卡：描边框 + 机密信息进度条（02 号画板最终稿只有一根）。
   theme::stroke_rounded(kQuotaCardX, kQuotaCardY, kQuotaCardW, kQuotaCardH, 8,
                         theme::kSidebarBorder);
   const int track_x = kQuotaCardX + 12;
@@ -253,11 +255,6 @@ void MainWindow::paint_sidebar_decor() {
   const int fill1 = static_cast<int>(144 * std::clamp(quota_secret_ratio_, 0.0, 1.0));
   if (fill1 > 0) {
     theme::fill_rounded(track_x, kQuotaCardY + 65, fill1, 3, 2, theme::kSidebarActiveText);
-  }
-  theme::fill_rounded(track_x, kQuotaCardY + 84, 144, 3, 2, theme::kProgressTrack);
-  const int fill2 = static_cast<int>(144 * std::clamp(quota_key_ratio_, 0.0, 1.0));
-  if (fill2 > 0) {
-    theme::fill_rounded(track_x, kQuotaCardY + 84, fill2, 3, 2, theme::kSidebarActiveText);
   }
 }
 
@@ -319,14 +316,17 @@ void MainWindow::show_page(Page page) {
 
   const bool chrome = page != Page::kUnlock;
   const int lock_y = h - kLockFromBottom;
-  const int offline_y = h - kOfflineFromBottom;
   const int footer_y = h - kFooterFromBottom;
   lock_btn_->position(kNavX, lock_y);
-  offline_line_->position(kNavX, offline_y);
-  status_->position(kNavX, offline_y);
+  status_->position(kNavX, h - kStatusFromBottom);
   state_pill_->position(theme::kWinW - theme::kContentPad - 49, footer_y);
+  footer_text_->position(theme::kSidebarWidth + theme::kContentPad, footer_y + 2);
   lock_btn_->show();
-  offline_line_->show();
+  if (chrome) {
+    footer_text_->show();
+  } else {
+    footer_text_->hide();
+  }
   state_pill_->set_shown(chrome);
 
   // 全部页面都是本窗口的子控件，按需显示。
@@ -367,8 +367,7 @@ void MainWindow::show_page(Page page) {
     } else {
       menu_items_[i]->hide();
     }
-    // 第 3 项「文件导出」是机密信息页的别名入口，永不单独高亮。
-    menu_items_[i]->set_selected(menu_targets_[i].page == menu_page && i != 3);
+    menu_items_[i]->set_selected(menu_targets_[i].page == menu_page);
     menu_items_[i]->redraw();
   }
   if (chrome) {
@@ -377,7 +376,6 @@ void MainWindow::show_page(Page page) {
     quota_keys_->show();
   } else {
     lock_btn_->hide();
-    offline_line_->hide();
     status_->hide();
     quota_version_->hide();
     quota_secrets_->hide();
@@ -427,10 +425,8 @@ void MainWindow::set_status(const std::string& text) {
   if (status_ == nullptr) return;
   if (text.empty()) {
     status_->hide();
-    offline_line_->show();
   } else {
     status_->copy_label(text.c_str());
-    offline_line_->hide();
     status_->show();
   }
   status_->redraw();

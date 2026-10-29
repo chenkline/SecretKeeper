@@ -110,7 +110,7 @@ inline constexpr int kImportSecretH = 817;  // 08 导入机密信息与密码验
 inline constexpr int kSettingsH = 784;      // 09 安全设置（820）
 
 // 列表与详情两栏的宽度（设计稿 02 / 06 号）。
-inline constexpr int kListColumnWidth = 380;
+inline constexpr int kListColumnWidth = 384;
 inline constexpr int kDetailColumnWidth = 440;
 
 // ---- 绘制助手 ----

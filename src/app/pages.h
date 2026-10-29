@@ -123,6 +123,7 @@ class MasterKeysPage : public PageBase {
 
  protected:
   void draw() override;
+  int handle(int event) override;
 
  private:
   void build_key_cards();
@@ -132,8 +133,11 @@ class MasterKeysPage : public PageBase {
   void on_export();
   void on_delete();
   void on_switch_default();
+  // 卡片高度随内容变化：名称未填写的多一行提示（02 号画板）。
+  int card_height(std::size_t index) const;
 
   widgets::Notice* quota_notice_ = nullptr;
+  Fl_Box* list_label_ = nullptr;
   Fl_Box* card_box_ = nullptr;
   Fl_Group* card_group_ = nullptr;
   widgets::IconButton* gen_btn_ = nullptr;

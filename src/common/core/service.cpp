@@ -238,6 +238,7 @@ std::vector<MasterKeyListItem> Service::list_master_keys() const {
     item.name = row.name;
     item.is_default = row.is_default || impl_->is_default(row.master_key_id);
     item.secret_count = impl_->db.count_secrets_for_master_key(row.master_key_id);
+    item.created_at = row.created_at;
     out.push_back(std::move(item));
   }
   return out;
