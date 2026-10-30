@@ -3,8 +3,9 @@
 # 可能含内存小对象与密码学中间状态，绝不得提交。
 *.dmp
 *.crash.txt
-core
-core.*
+# 崩溃转储锚定在仓库根：裸 core 会误伤 android/.../core/ 源码包目录
+/core
+/core.*
 
 # ---- 机密：绝不入库 ----
 .local/
