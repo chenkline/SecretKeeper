@@ -99,12 +99,15 @@ int main(int argc, char** argv) {
 
   std::vector<int> shots;
   bool fill_inputs = false;
+  int shot_w = 0, shot_h = 0;  // --screenshot-size=WxH：以指定窗口尺寸出图
   for (int i = 1; i < argc; ++i) {
     if (std::strncmp(argv[i], "--screenshot=", 13) == 0) {
       shots = parse_screenshot_arg(argv[i] + 13);
     } else if (std::strncmp(argv[i], "--screenshot-fill", 17) == 0) {
       // 截图前把可见输入框预填文本，用于核对输入回显渲染。
       fill_inputs = true;
+    } else if (std::strncmp(argv[i], "--screenshot-size=", 18) == 0) {
+      std::sscanf(argv[i] + 18, "%dx%d", &shot_w, &shot_h);
     }
   }
 
@@ -146,6 +149,7 @@ int main(int argc, char** argv) {
     window.show();
     Fl::wait(0.1);
     window.navigate(kPages[n - 1]);
+    if (shot_w > 0 && shot_h > 0) window.resize(window.x(), window.y(), shot_w, shot_h);
     Fl::wait(0.05);
     if (fill_inputs) fill(&window);
     // 离屏渲染：Fl_Double_Window 的 draw() 会拷贝自己的 backing store

@@ -60,6 +60,8 @@ class MainWindow : public Fl_Double_Window {
   void on_unlocked();
   void lock_now();
   void arm_clipboard_clear();
+  // 窗口尺寸变化时同步各页 body 视口与 chrome 位置。
+  void resize(int X, int Y, int W, int H) override;
 
   // 绘制 02-09 号画板公共的侧栏装饰（底色、品牌、容量卡框与进度条）。
   // 各内容页在自己的 draw() 最开头调用，保证装饰位于页面内容之下、
@@ -74,6 +76,8 @@ class MainWindow : public Fl_Double_Window {
   void build_chrome();
   void show_page(Page page);
   void refresh_chrome();
+  // 侧栏底部与页脚 chrome 随窗口尺寸摆放（show_page 与 resize 共用）。
+  void layout_chrome(int win_w, int win_h);
   // 全部九个页面，按构造顺序。
   std::array<Fl_Group*, 9> all_pages() const;
   static void on_menu_cb(Fl_Widget*, void* data);
@@ -116,6 +120,9 @@ class MainWindow : public Fl_Double_Window {
   std::string export_target_;
   std::string status_text_;
   bool clipboard_armed_ = false;
+  bool initialized_ = false;   // 构造完成前忽略 resize 同步
+  bool resizing_for_page_ = false;  // show_page 内部的整窗调整不算用户缩放
+  bool user_resized_ = false;  // 用户手动调整过窗口后不再按页改窗口高度
   Clock::time_point last_activity_ = Clock::now();
 };
 

@@ -124,6 +124,7 @@ MainWindow::MainWindow()
 
   Fl::add_timeout(kKekRotateSeconds, on_rotate_tick, this);
   Fl::repeat_timeout(1.0, on_idle_tick, this);
+  initialized_ = true;  // 之后的 resize 才允许同步 body 视口与 chrome
 }
 
 MainWindow::~MainWindow() {
@@ -310,21 +311,44 @@ void MainWindow::go_back() {
   }
 }
 
+void MainWindow::layout_chrome(int win_w, int win_h) {
+  const int footer_y = win_h - kFooterFromBottom;
+  lock_btn_->position(kNavX, win_h - kLockFromBottom);
+  status_->position(kNavX, win_h - kStatusFromBottom);
+  state_pill_->position(win_w - theme::kContentPad - 49, footer_y);
+  footer_text_->position(theme::kSidebarWidth + theme::kContentPad, footer_y + 2);
+}
+
+void MainWindow::resize(int X, int Y, int W, int H) {
+  Fl_Double_Window::resize(X, Y, W, H);
+  if (!initialized_) return;
+  if (!resizing_for_page_) user_resized_ = true;
+  layout_chrome(W, H);
+  keys_->resize_body(W, H);
+  secrets_->resize_body(W, H);
+  settings_page_->resize_body(W, H);
+  create_key_->resize_body(W, H);
+  import_key_->resize_body(W, H);
+  export_key_->resize_body(W, H);
+  add_secret_->resize_body(W, H);
+  import_secret_->resize_body(W, H);
+  unlock_->resize_body(W, H);
+}
+
 void MainWindow::show_page(Page page) {
   current_ = page;
 
-  // 窗口高度随页面切换（各画板高度不同），侧栏装饰与 chrome 位置随之摆放。
-  const int w = theme::kWinW;
-  const int h = page_height(page);
-  if (w != this->w() || h != this->h()) resize(x(), y(), w, h);
-
+  // 窗口高度随页面切换（各画板高度不同），但不超出屏幕；用户手动
+  // 调整过窗口后保持其尺寸，不足部分由 body 滚动视口消化。
+  const int w = std::min(theme::kWinW, Fl::w() - 12);
+  const int h = std::min(page_height(page), Fl::h() - 48);
+  if (!user_resized_ && (w != this->w() || h != this->h())) {
+    resizing_for_page_ = true;
+    resize(x(), y(), w, h);
+    resizing_for_page_ = false;
+  }
+  layout_chrome(this->w(), this->h());
   const bool chrome = page != Page::kUnlock;
-  const int lock_y = h - kLockFromBottom;
-  const int footer_y = h - kFooterFromBottom;
-  lock_btn_->position(kNavX, lock_y);
-  status_->position(kNavX, h - kStatusFromBottom);
-  state_pill_->position(theme::kWinW - theme::kContentPad - 49, footer_y);
-  footer_text_->position(theme::kSidebarWidth + theme::kContentPad, footer_y + 2);
   lock_btn_->show();
   // 05 号画板：白卡一直延伸到窗口底，设计稿没有页脚行，为按钮让位。
   const bool footer = chrome && page != Page::kExportKey;
@@ -422,6 +446,16 @@ void MainWindow::show_page(Page page) {
       import_secret_->reload();
       break;
   }
+
+  keys_->resize_body(this->w(), this->h());
+  secrets_->resize_body(this->w(), this->h());
+  settings_page_->resize_body(this->w(), this->h());
+  create_key_->resize_body(this->w(), this->h());
+  import_key_->resize_body(this->w(), this->h());
+  export_key_->resize_body(this->w(), this->h());
+  add_secret_->resize_body(this->w(), this->h());
+  import_secret_->resize_body(this->w(), this->h());
+  unlock_->resize_body(this->w(), this->h());
 
   redraw();
 }

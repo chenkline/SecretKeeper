@@ -226,12 +226,28 @@ void ask_password(const char* title, const char* body, const char* first_label,
 // =====================================================================
 // PageBase
 // =====================================================================
-PageBase::PageBase(MainWindow* host, const char* title, const char* subtitle)
-    : Fl_Group(0, 0, kWinW, kWinH), host_(host),
+PageBase::PageBase(MainWindow* host, const char* title, const char* subtitle,
+                   int content_h)
+    : Fl_Group(0, 0, kWinW, content_h), host_(host),
       subtitle_(subtitle ? subtitle : "") {
   box(FL_NO_BOX);
   color(theme::kContentBg);
   back_ = nullptr;
+  // body 滚动视口：子控件保持设计稿绝对坐标（Fl_Scroll 只按滚动位
+  // 移平移），高度预留页脚行；先创建使其位于最底层。
+  body_ = new Fl_Scroll(theme::kSidebarWidth, 0, kWinW - theme::kSidebarWidth,
+                        std::max(1, content_h - footer_reserve_));
+  body_->box(FL_NO_BOX);
+  body_->color(theme::kContentBg);
+  body_->scrollbar_size(12);
+  body_->scrollbar.color(theme::kSubtleBg, theme::kBorder);
+  body_->hscrollbar.color(theme::kSubtleBg, theme::kBorder);
+
+  // 页头不透明遮罩：盖住滚动内容滑过页头的部分；标题/说明在其上。
+  header_mask_ = new Fl_Box(theme::kSidebarWidth, 0, kWinW - theme::kSidebarWidth, 117);
+  header_mask_->box(FL_FLAT_BOX);
+  header_mask_->color(theme::kContentBg);
+
   // 页头（02/03 号画板）：内容区 x=208+32=240，标题 fs24、说明 fs13。
   title_box_ = new Fl_Box(theme::kSidebarWidth + theme::kContentPad, 32, 656, 33, title);
   title_box_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
@@ -244,7 +260,7 @@ PageBase::PageBase(MainWindow* host, const char* title, const char* subtitle)
   subtitle_box_->labelfont(theme::font_for(theme::kWeightRegular));
   subtitle_box_->labelsize(theme::kFontLabel);
   subtitle_box_->labelcolor(theme::kTextMuted);
-  end();
+  body_->begin();  // 之后页面构造函数创建的内容控件落入 body_
 }
 
 void PageBase::draw() {
@@ -259,6 +275,13 @@ void PageBase::set_subtitle(const std::string& text) {
   subtitle_box_->redraw();
 }
 
+void PageBase::resize_body(int win_w, int win_h) {
+  if (body_ == nullptr) return;
+  body_->resize(theme::kSidebarWidth, 0, std::max(1, win_w - theme::kSidebarWidth),
+                std::max(1, win_h - footer_reserve_));
+  layout_header_buttons(win_w);
+}
+
 void PageBase::layout_header(const char* back_label) {
   if (back_label != nullptr) {
     // 返回按钮（03/04/05 号画板）：白底描边，右缘与内容区对齐，高 44；
@@ -268,6 +291,7 @@ void PageBase::layout_header(const char* back_label) {
     const int bw = std::max(92, tw + 36);
     back_ = new widgets::Button(0, 40, bw, 44, back_label, ButtonKind::kSecondary);
     back_->position(kWinW - theme::kContentPad - bw, 40);
+    add(back_);  // 返回钮固定在页头，不随 body 滚动
     back_->callback([](Fl_Widget*, void* data) {
       static_cast<PageBase*>(data)->on_back();
     }, this);
@@ -284,7 +308,16 @@ UnlockPage::UnlockPage(MainWindow* host) : Fl_Group(0, 0, kWinW, theme::kUnlockH
   box(FL_NO_BOX);
   color(theme::kBrandBg);
 
-  // ---- 解锁区（01 号画板最终稿 x=568 w=520）----
+  // ---- 表单滚动视口（01 号画板 x=456 起，品牌区固定不滚动）----
+  body_ = new Fl_Scroll(456, 0, kWinW - 456, theme::kUnlockH);
+  body_->box(FL_NO_BOX);
+  body_->color(theme::kFieldBg);
+  body_->scrollbar_size(12);
+  body_->scrollbar.color(theme::kSubtleBg, theme::kBorder);
+  body_->hscrollbar.color(theme::kSubtleBg, theme::kBorder);
+  body_->begin();
+
+  // ---- 解锁区（01 号画板最终稿 x=568 w=520；Fl_Scroll 子控件用绝对坐标）----
   const int form_x = 568;
   const int form_w = 520;
 
@@ -347,7 +380,13 @@ UnlockPage::UnlockPage(MainWindow* host) : Fl_Group(0, 0, kWinW, theme::kUnlockH
   error_->labelfont(theme::font_for(theme::kWeightRegular));
   error_->labelsize(theme::kFontSmall);
   error_->labelcolor(theme::kTextMuted);
+  body_->end();
   end();
+}
+
+void UnlockPage::resize_body(int win_w, int win_h) {
+  if (body_ == nullptr) return;
+  body_->resize(456, 0, std::max(1, win_w - 456), std::max(1, win_h));
 }
 
 void UnlockPage::draw() {
@@ -355,6 +394,12 @@ void UnlockPage::draw() {
   fl_color(theme::kFieldBg);
   fl_rectf(0, 0, w(), h());
   Fl_Group::draw();
+  // 表单区右上角的锁图标随视口滚动，画进视口坐标。
+  {
+    Fl_Scroll* b = body_;
+    widgets::draw_icon(Icon::kLock, 1068 - 456 - b->xposition(), 64 - b->yposition(),
+                       theme::kTextMuted);
+  }
 
   // ---- 左侧品牌区（01 号画板 x=0..456，#172C31）----
   const int side_w = 456;
@@ -501,8 +546,8 @@ void UnlockPage::on_unlock() {
 // 02 主密钥管理
 // =====================================================================
 MasterKeysPage::MasterKeysPage(MainWindow* host)
-    : PageBase(host, "主密钥管理", "主密钥用于加密信息；密码仅用于解开本机保存的主密钥。") {
-  begin();
+    : PageBase(host, "主密钥管理", "主密钥用于加密信息；密码仅用于解开本机保存的主密钥。",
+               theme::kKeysH) {
   layout_header(nullptr);
 
   // 页头右侧入口（02 号画板）：安静样式，右缘与内容区对齐。
@@ -516,6 +561,8 @@ MasterKeysPage::MasterKeysPage(MainWindow* host)
   gen_btn_->callback([](Fl_Widget*, void* d) {
     static_cast<MasterKeysPage*>(d)->on_generate();
   }, this);
+  add(imp_btn_);  // 页头按钮固定不滚动
+  add(gen_btn_);
 
   // 容量已满提示（02 号画板 y=117，黄底 r8）。
   quota_notice_ = make_notice(theme::kSidebarWidth + theme::kContentPad, 117,
@@ -613,16 +660,21 @@ MasterKeysPage::MasterKeysPage(MainWindow* host)
   tip3->labelcolor(theme::kTextMuted);
   tip3->labelsize(theme::kFontSmall);
   end();
+  end();
 }
 
 void MasterKeysPage::draw() {
   PageBase::draw();
 
-  // 左列主密钥卡片（02 号画板）：选中 #E8F4F0 + 主色描边，未选中白底灰描边。
+  // 左列主密钥卡片：自绘内容不在 body 子控件里，按滚动偏移平移并裁剪。
+  Fl_Scroll* vp = body();
+  const int ox = vp->xposition();
+  const int oy = vp->yposition();
+  fl_push_clip(vp->x(), vp->y(), vp->w() - 12, vp->h() - 12);
   const auto keys = host()->service().list_master_keys();
-  const int cx = theme::kSidebarWidth + theme::kContentPad;
+  const int cx = theme::kSidebarWidth + theme::kContentPad - ox;
   const int cw = theme::kListColumnWidth;
-  int y = 240;
+  int y = 240 - oy;
   for (std::size_t i = 0; i < keys.size(); ++i) {
     const auto& item = keys[i];
     const bool is_selected = static_cast<int>(i) == selected_;
@@ -659,6 +711,15 @@ void MasterKeysPage::draw() {
     }
     y += ch + 12;
   }
+  fl_pop_clip();
+}
+
+void MasterKeysPage::layout_header_buttons(int win_w) {
+  std::printf("[lhb] win=%d gen=%d imp=%d%c", win_w,
+              win_w - theme::kContentPad - 132,
+              win_w - theme::kContentPad - 242, 10);
+  gen_btn_->position(win_w - theme::kContentPad - 132, 40);
+  imp_btn_->position(win_w - theme::kContentPad - 132 - 10 - 106, 40);
 }
 
 int MasterKeysPage::card_height(std::size_t index) const {
@@ -727,8 +788,9 @@ int MasterKeysPage::handle(int event) {
   // 左列卡片无子控件，命中检测在页面层完成（02 号画板）。
   if (event == FL_PUSH) {
     const auto keys = host()->service().list_master_keys();
-    const int px = Fl::event_x();
-    const int py = Fl::event_y();
+    Fl_Scroll* vp = body();
+    const int px = Fl::event_x() + vp->xposition();
+    const int py = Fl::event_y() + vp->yposition();
     const int cx = theme::kSidebarWidth + theme::kContentPad;
     if (px >= cx && px <= cx + theme::kListColumnWidth) {
       int y = 240;
@@ -819,8 +881,8 @@ void MasterKeysPage::on_switch_default() {
 // 03 生成主密钥
 // =====================================================================
 CreateKeyPage::CreateKeyPage(MainWindow* host)
-    : PageBase(host, "生成主密钥", "为本机创建一把随机 RSA-2048 主密钥。") {
-  begin();
+    : PageBase(host, "生成主密钥", "为本机创建一把随机 RSA-2048 主密钥。",
+               theme::kCreateKeyH) {
   layout_header("返回主密钥管理");
 
   // 03 号画板：整块内容在一张白卡上（240,117,928,639 r12）。
@@ -901,6 +963,7 @@ CreateKeyPage::CreateKeyPage(MainWindow* host)
   error_->labelsize(theme::kFontSmall);
   error_->labelcolor(theme::kDangerText);
   end();
+  end();
 }
 
 void CreateKeyPage::reload() {
@@ -962,8 +1025,8 @@ void CreateKeyPage::on_save() {
 // 04 导入主密钥
 // =====================================================================
 ImportKeyPage::ImportKeyPage(MainWindow* host)
-    : PageBase(host, "导入主密钥", "从之前导出的备份文件恢复主密钥，导入后作为备选保存。") {
-  begin();
+    : PageBase(host, "导入主密钥", "从之前导出的备份文件恢复主密钥，导入后作为备选保存。",
+               theme::kImportKeyH) {
   layout_header(nullptr);
 
   // 04 号画板：白卡（240,117,928,460 r12），无头部返回钮。
@@ -1032,6 +1095,7 @@ ImportKeyPage::ImportKeyPage(MainWindow* host)
   error_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
   error_->labelsize(theme::kFontSmall);
   error_->labelcolor(theme::kDangerText);
+  end();
   end();
 }
 
@@ -1103,9 +1167,10 @@ void ImportKeyPage::on_import() {
 // 05 导出主密钥
 // =====================================================================
 ExportKeyPage::ExportKeyPage(MainWindow* host)
-    : PageBase(host, "导出主密钥", "为导出文件新设保护密码，并将备份保存在你信任的位置。") {
-  begin();
+    : PageBase(host, "导出主密钥", "为导出文件新设保护密码，并将备份保存在你信任的位置。",
+               theme::kExportKeyH) {
   layout_header(nullptr);
+  set_footer_reserve(0);  // 05 号画板无页脚行，body 视口延伸到窗口底
 
   // 05 号画板：白卡（240,117,928,829 r12），页面客户区高 905。
   new widgets::Card(theme::kSidebarWidth + theme::kContentPad, 117, 928, 829);
@@ -1209,6 +1274,7 @@ ExportKeyPage::ExportKeyPage(MainWindow* host)
   error_->labelsize(theme::kFontSmall);
   error_->labelcolor(theme::kDangerText);
   end();
+  end();
 }
 
 void ExportKeyPage::reload() {
@@ -1303,8 +1369,7 @@ void ExportKeyPage::on_export() {
 // 06 机密信息管理
 // =====================================================================
 SecretsPage::SecretsPage(MainWindow* host)
-    : PageBase(host, "机密信息管理", "所有内容只保存在本机。") {
-  begin();
+    : PageBase(host, "机密信息管理", "所有内容只保存在本机。", theme::kSecretsH) {
   // 页头右侧动作（06 号画板）：导入白底 72x34 + 新增主色 146x44。
   imp_btn_ = new widgets::IconButton(kWinW - theme::kContentPad - 146 - 12 - 72, 44, 72, 34,
                                      Icon::kImport, "导入", ButtonKind::kSecondary);
@@ -1317,6 +1382,8 @@ SecretsPage::SecretsPage(MainWindow* host)
   add_btn_->callback([](Fl_Widget*, void* d) {
     static_cast<SecretsPage*>(d)->on_add();
   }, this);
+  add(imp_btn_);  // 页头按钮固定不滚动
+  add(add_btn_);
 
   // 左列卡片（06 号画板 240,117,530,571 r12），搜索框嵌在卡片顶部。
   const int lx = theme::kSidebarWidth + theme::kContentPad;
@@ -1445,13 +1512,24 @@ SecretsPage::SecretsPage(MainWindow* host)
   missing_label_->labelsize(theme::kFontTiny);
   missing_label_->labelcolor(theme::kTextMuted);
 
-  // 页脚说明（06 号画板 board 804 → 客户区 768）。
-  Fl_Box* foot = new Fl_Box(theme::kSidebarWidth + theme::kContentPad, 768, 700, 19,
+  // 页脚说明（06 号画板 board 804 → 客户区 760）。
+  Fl_Box* foot = new Fl_Box(theme::kSidebarWidth + theme::kContentPad, 760, 700, 19,
                             "ID 后的黄色 ? 表示主密钥缺失；名称为空不代表缺失。");
   foot->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
   foot->labelsize(theme::kFontSmall);
   foot->labelcolor(theme::kTextMuted);
+
+  // 滚动范围修正：行是自绘内容，Fl_Scroll 感知不到；用隐形盒把
+  // 可滚动下界撑到行区末尾（行数变化时在 reload 中调整）。
+  list_extent_ = new Fl_Box(theme::kSidebarWidth, 190, lw, 52, "");
+  list_extent_->box(FL_NO_BOX);
   end();
+  end();
+}
+
+void SecretsPage::layout_header_buttons(int win_w) {
+  add_btn_->position(win_w - theme::kContentPad - 146, 40);
+  imp_btn_->position(win_w - theme::kContentPad - 146 - 12 - 72, 44);
 }
 
 void SecretsPage::reload() {
@@ -1483,6 +1561,8 @@ void SecretsPage::reload() {
       (std::to_string(items.size()) + " / " + std::to_string(svc::kMaxSecrets) + " 条" +
        (missing > 0 ? "　·　" : ""))
           .c_str());
+  list_extent_->resize(theme::kSidebarWidth, 190, 530,
+                       52 * static_cast<int>(rows.size()) + 90);
   set_subtitle("所有内容只保存在本机。共 " + std::to_string(items.size()) + " 条，基础版最多 " +
                std::to_string(svc::kMaxSecrets) + " 条。");
   missing_label_->copy_label(missing > 0
@@ -1712,13 +1792,19 @@ void SecretsPage::hide_plaintext() {
 void SecretsPage::draw() {
   PageBase::draw();
 
-  const int lx = theme::kSidebarWidth + theme::kContentPad;
+  // 行区是自绘内容：按滚动偏移平移并裁剪到视口。
+  Fl_Scroll* vp = body();
+  const int ox = vp->xposition();
+  const int oy = vp->yposition();
+  fl_push_clip(vp->x(), vp->y(), vp->w() - 12, vp->h() - 12);
+
+  const int lx = theme::kSidebarWidth + theme::kContentPad - ox;
   const int lw = 530;
   // 搜索框左侧的放大镜
   widgets::draw_icon(widgets::Icon::kSearch, lx + 26, 125, theme::kTextFaint);
 
   // 表头行（06 号画板 #F8FAFA，三列）。
-  const int head_y = 153;
+  const int head_y = 153 - oy;
   fl_color(theme::kSubtleBg);
   fl_rectf(lx + 1, head_y, lw - 2, 37);
   fl_color(theme::kTextMuted);
@@ -1728,7 +1814,7 @@ void SecretsPage::draw() {
   fl_draw("主密钥名称", lx + 340, head_y, 174, 37, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 
   // 数据行：行高 52，选中 #E8F4F0 + 主色描边。
-  int y = 190;
+  int y = 190 - oy;
   for (int r = 0; r < static_cast<int>(rows_.size()); ++r) {
     const widgets::ListRow& row = rows_[static_cast<std::size_t>(r)];
     const bool sel = r == selected_row_;
@@ -1752,13 +1838,15 @@ void SecretsPage::draw() {
     fl_draw(row.c2.c_str(), lx + 340, y, 174, 52, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
     y += 52;
   }
+  fl_pop_clip();
 }
 
 int SecretsPage::handle(int event) {
-  // 左列行无子控件，命中检测在页面层完成（06 号画板）。
+  // 左列行无子控件，命中检测在页面层完成（06 号画板），含滚动偏移。
   if (event == FL_PUSH) {
-    const int px = Fl::event_x();
-    const int py = Fl::event_y();
+    Fl_Scroll* vp = body();
+    const int px = Fl::event_x() + vp->xposition();
+    const int py = Fl::event_y() + vp->yposition();
     const int lx = theme::kSidebarWidth + theme::kContentPad;
     if (px >= lx && px <= lx + 530 && py >= 190) {
       const int row = (py - 190) / 52;
@@ -1780,8 +1868,8 @@ void SecretsPage::on_import() { host()->navigate(Page::kImportSecret); }
 // 07 新增机密信息
 // =====================================================================
 AddSecretPage::AddSecretPage(MainWindow* host)
-    : PageBase(host, "新增机密信息", "保存任何你需要保密的文字，不限定内容格式。") {
-  begin();
+    : PageBase(host, "新增机密信息", "保存任何你需要保密的文字，不限定内容格式。",
+               theme::kAddSecretH) {
   layout_header("返回列表");
 
   // 07 号画板：白卡（240,117,928,576 r12）。
@@ -1846,6 +1934,7 @@ AddSecretPage::AddSecretPage(MainWindow* host)
   error_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
   error_->labelsize(theme::kFontSmall);
   error_->labelcolor(theme::kDangerText);
+  end();
   end();
 }
 
@@ -1936,8 +2025,8 @@ void AddSecretPage::on_save() {
 // 08 导入机密信息
 // =====================================================================
 ImportSecretPage::ImportSecretPage(MainWindow* host)
-    : PageBase(host, "导入机密信息", "读取本地加密文件，自动查找它使用的主密钥。") {
-  begin();
+    : PageBase(host, "导入机密信息", "读取本地加密文件，自动查找它使用的主密钥。",
+               theme::kImportSecretH) {
   layout_header(nullptr);
 
   // 08 号画板：白卡（240,117,928,623 r12）。
@@ -2025,6 +2114,7 @@ ImportSecretPage::ImportSecretPage(MainWindow* host)
   error_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
   error_->labelsize(theme::kFontSmall);
   error_->labelcolor(theme::kDangerText);
+  end();
   end();
 }
 
@@ -2120,8 +2210,8 @@ void ImportSecretPage::on_import() {
 // 09 安全设置
 // =====================================================================
 SettingsPage::SettingsPage(MainWindow* host)
-    : PageBase(host, "安全设置", "减少明文暴露，让每次离开都安心。设置仅保存在本机。") {
-  begin();
+    : PageBase(host, "安全设置", "减少明文暴露，让每次离开都安心。设置仅保存在本机。",
+               theme::kSettingsH) {
   // 09 号画板：白卡（240,117,928,453 r12）。
   const int ix = theme::kSidebarWidth + theme::kContentPad;
   const int iw = 880;
@@ -2186,6 +2276,7 @@ SettingsPage::SettingsPage(MainWindow* host)
     static_cast<SettingsPage*>(d)->on_lock_now();
   }, this);
   end();
+  end();
 }
 
 int SettingsPage::switch_geometry(int* x, int* y, int* w, int* h) const {
@@ -2199,21 +2290,32 @@ int SettingsPage::switch_geometry(int* x, int* y, int* w, int* h) const {
 void SettingsPage::draw() {
   PageBase::draw();
   // 拨动开关（09 号画板 40x24 r100，开=主色底白钮，关=灰色底）。
+  // 自绘内容不在 body 子控件里，按滚动偏移平移并裁剪。
+  Fl_Scroll* vp = body();
+  const int ox = vp->xposition();
+  const int oy = vp->yposition();
+  fl_push_clip(vp->x(), vp->y(), vp->w() - 12, vp->h() - 12);
   int sx, sy, sw, sh;
   switch_geometry(&sx, &sy, &sw, &sh);
+  sx -= ox;
+  sy -= oy;
   const bool on = host()->settings().hide_plaintext_on_blur;
   theme::fill_rounded(sx, sy, sw, sh, sh / 2, on ? theme::kAccent : theme::kBorder);
   const int knob = 18;
   const int kx = on ? (sx + sw - knob - 3) : (sx + 3);
   theme::fill_rounded(kx, sy + 3, knob, knob, knob / 2, 0xFFFFFF00);
+  fl_pop_clip();
 }
 
 int SettingsPage::handle(int event) {
   if (event == FL_PUSH) {
+    Fl_Scroll* vp = body();
     int sx, sy, sw, sh;
     switch_geometry(&sx, &sy, &sw, &sh);
-    const int px = Fl::event_x();
-    const int py = Fl::event_y();
+    sx -= vp->xposition();
+    sy -= vp->yposition();
+    const int px = Fl::event_x() + vp->xposition();
+    const int py = Fl::event_y() + vp->yposition();
     if (px >= sx - 6 && px <= sx + sw + 6 && py >= sy - 6 && py <= sy + sh + 6) {
       on_blur_toggle(false);
       return 1;

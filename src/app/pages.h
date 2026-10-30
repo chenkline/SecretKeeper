@@ -47,9 +47,14 @@ struct SecuritySettings {
 class MainWindow;
 
 // ---- 单个页面基类 ----
+//
+// 页面结构（02-09 号画板）：页头（标题/说明/返回钮）固定不滚动；
+// 页头以下（客户区 y>=117）是 body 滚动视口，页面构造函数创建的
+// 内容控件都在其中，窗口高度不足时出现双向滚动条。
 class PageBase : public Fl_Group {
  public:
-  PageBase(MainWindow* host, const char* title, const char* subtitle);
+  PageBase(MainWindow* host, const char* title, const char* subtitle,
+           int content_h);
   ~PageBase() override = default;
 
   // 页面需要重新读取 service 数据时调用（切换到该页、切默认、增删改之后）。
@@ -59,9 +64,12 @@ class PageBase : public Fl_Group {
   // 「返回」按钮的统一处理：回到该子页面所属的管理页。
   void on_back();
 
+  // 窗口尺寸变化时同步 body 视口（由 MainWindow 在 show_page/resize 调用）。
+  void resize_body(int win_w, int win_h);
+
  protected:
   void draw() override;
-  // 顶部大标题 + 副标题的公共外壳。调用方在其下方继续摆内容；
+  // 顶部大标题 + 副标题的公共外壳（固定在页头，不随 body 滚动）。
   // back_label 非空时在页头右侧放「返回」按钮（03 号画板样式）。
   void layout_header(const char* back_label);
 
@@ -70,6 +78,15 @@ class PageBase : public Fl_Group {
   MainWindow* host_window() const { return host_; }
   // 更新页头副标题（06 号的「共 N 条」随数据刷新）。
   void set_subtitle(const std::string& text);
+  // body 滚动视口（内容控件在其中，坐标为视口相对坐标）。
+  Fl_Scroll* body() { return body_; }
+  // 无页脚行的页面（05 号）由构造函数置 0，body 视口可延伸到窗口底。
+  void set_footer_reserve(int px) { footer_reserve_ = px; }
+
+ protected:
+  // 页头右侧的动作按钮（02 的生成/导入、06 的新增/导入）固定在页头，
+  // 窗口变宽时随右缘重排；默认无，需要者覆写。
+  virtual void layout_header_buttons(int win_w) {}
 
  private:
   MainWindow* host_ = nullptr;
@@ -77,6 +94,9 @@ class PageBase : public Fl_Group {
   Fl_Box* title_box_ = nullptr;
   Fl_Box* subtitle_box_ = nullptr;
   widgets::Button* back_ = nullptr;
+  Fl_Scroll* body_ = nullptr;
+  Fl_Box* header_mask_ = nullptr;  // 页头不透明遮罩：滚动内容从其下滑过
+  int footer_reserve_ = 56;        // 页脚行高度预留（含间距）
 };
 
 // =====================================================================
@@ -91,6 +111,8 @@ class UnlockPage : public Fl_Group {
   // 解锁页不使用 PageBase 的标题外壳，故不写 override。
   void reload();
   std::string status_text() const;
+  // 窗口尺寸变化时同步表单滚动视口。
+  void resize_body(int win_w, int win_h);
 
  protected:
   void draw() override;
@@ -101,6 +123,7 @@ class UnlockPage : public Fl_Group {
   void on_pick_key();
 
   MainWindow* host_;
+  Fl_Scroll* body_ = nullptr;  // 表单滚动视口（x>=456）
   widgets::Pill* state_pill_ = nullptr;
   widgets::KeySelector* selector_ = nullptr;
   widgets::Field* password_ = nullptr;
@@ -126,6 +149,7 @@ class MasterKeysPage : public PageBase {
  protected:
   void draw() override;
   int handle(int event) override;
+  void layout_header_buttons(int win_w) override;
 
  private:
   void build_key_cards();
@@ -253,6 +277,7 @@ class SecretsPage : public PageBase {
  protected:
   void draw() override;
   int handle(int event) override;
+  void layout_header_buttons(int win_w) override;
 
  private:
   void on_row_select();
@@ -271,6 +296,7 @@ class SecretsPage : public PageBase {
   Fl_Box* count_label_ = nullptr;
   Fl_Box* sort_label_ = nullptr;
   Fl_Box* missing_label_ = nullptr;
+  Fl_Box* list_extent_ = nullptr;  // 隐形盒：把可滚动下界撑到自绘行区末尾
   widgets::Field* search_ = nullptr;
   std::vector<widgets::ListRow> rows_;
   Fl_Box* detail_title_ = nullptr;
