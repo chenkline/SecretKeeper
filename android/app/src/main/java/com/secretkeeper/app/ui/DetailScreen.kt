@@ -159,7 +159,14 @@ fun DetailScreen(
                     )
                     if (!d.plaintextMasked) {
                         TextButton(onClick = { state.maskDetail() }) {
-                            Text("🙈 隐藏", color = SkColors.TextSub, fontSize = 12.sp)
+                            androidx.compose.material3.Icon(
+                                SkIcons.EyeOff,
+                                contentDescription = null,
+                                tint = SkColors.TextSub,
+                                modifier = Modifier.width(16.dp),
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text("隐藏", color = SkColors.TextSub, fontSize = 12.sp)
                         }
                     }
                 }
@@ -194,13 +201,13 @@ fun DetailScreen(
                             containerColor = SkColors.Primary,
                             disabledContainerColor = SkColors.PillBg,
                         ),
-                    ) { Text("📋 复制") }
+                    ) { Text("复制") }
                     OutlinedButton(
                         onClick = { showExportConfirm = true },
                         enabled = !d.plaintextMasked,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(8.dp),
-                    ) { Text("📄 导出") }
+                    ) { Text("导出") }
                 }
             }
 

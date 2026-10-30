@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -45,6 +46,8 @@ fun KeysScreen(
 ) {
     // 导出主密钥：先弹保护密码对话框（画板 05/19 语义），再 CreateDocument 落盘
     var exportTarget by remember { mutableStateOf<MasterKeyListItem?>(null) }
+    var switchTargetId by remember { mutableStateOf<String?>(null) }
+    var deleteTargetId by remember { mutableStateOf<String?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream"),
@@ -83,7 +86,7 @@ fun KeysScreen(
                 onClick = onOpenImportKey,
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(8.dp),
-            ) { Text("📥 导入主密钥") }
+            ) { Text("导入主密钥") }
         }
         Spacer(Modifier.height(18.dp))
 
@@ -103,10 +106,15 @@ fun KeysScreen(
         Spacer(Modifier.height(10.dp))
 
         state.masterKeys.forEach { item ->
-            MasterKeyCard(item, onExport = {
-                state.pendingExportKey = item.masterKeyId
-                exportTarget = item
-            })
+            MasterKeyCard(
+                item,
+                onExport = {
+                    state.pendingExportKey = item.masterKeyId
+                    exportTarget = item
+                },
+                onSwitchDefault = { switchTargetId = item.masterKeyId },
+                onDelete = { deleteTargetId = item.masterKeyId },
+            )
             Spacer(Modifier.height(12.dp))
         }
 
@@ -122,6 +130,32 @@ fun KeysScreen(
                     exportTarget = null
                     state.exportProtectionPw = ""
                 },
+            )
+        }
+
+        if (switchTargetId != null) {
+            SwitchDefaultDialog(
+                state = state,
+                targetId = switchTargetId!!,
+                onConfirm = { curPw, newPw ->
+                    if (state.switchDefault(switchTargetId!!, curPw, newPw)) {
+                        switchTargetId = null
+                    }
+                },
+                onDismiss = { switchTargetId = null },
+            )
+        }
+
+        if (deleteTargetId != null) {
+            DeleteKeyDialog(
+                state = state,
+                targetId = deleteTargetId!!,
+                onConfirm = { pw ->
+                    if (state.deleteMasterKey(deleteTargetId!!, pw)) {
+                        deleteTargetId = null
+                    }
+                },
+                onDismiss = { deleteTargetId = null },
             )
         }
 
@@ -144,7 +178,12 @@ fun KeysScreen(
 }
 
 @Composable
-private fun MasterKeyCard(item: MasterKeyListItem, onExport: () -> Unit) {
+private fun MasterKeyCard(
+    item: MasterKeyListItem,
+    onExport: () -> Unit,
+    onSwitchDefault: () -> Unit = {},
+    onDelete: () -> Unit = {},
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -152,7 +191,12 @@ private fun MasterKeyCard(item: MasterKeyListItem, onExport: () -> Unit) {
             .padding(16.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(text = "🔑", fontSize = 15.sp)
+            androidx.compose.material3.Icon(
+                SkIcons.Key,
+                contentDescription = null,
+                tint = SkColors.Primary,
+                modifier = Modifier.size(18.dp),
+            )
             Spacer(Modifier.width(8.dp))
             Text(
                 text = item.name.ifEmpty { shortId(item.masterKeyId) },
@@ -197,7 +241,7 @@ private fun MasterKeyCard(item: MasterKeyListItem, onExport: () -> Unit) {
                 shape = RoundedCornerShape(8.dp),
             ) { Text("导出主密钥") }
             Button(
-                onClick = { /* TODO(H2): 设为默认（switchDefaultMasterKey） */ },
+                onClick = onSwitchDefault,
                 enabled = !item.isDefault,
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(
@@ -206,7 +250,7 @@ private fun MasterKeyCard(item: MasterKeyListItem, onExport: () -> Unit) {
                 ),
             ) { Text("设为默认") }
             TextButton(
-                onClick = { /* TODO(H2): 删除确认（默认主密钥禁止删除） */ },
+                onClick = onDelete,
                 enabled = !item.isDefault,
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.textButtonColors(
@@ -252,6 +296,100 @@ private fun ExportProtectionDialog(
                 onClick = onConfirm,
                 enabled = state.exportProtectionPw.isNotEmpty(),
             ) { androidx.compose.material3.Text("选择保存位置") }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                androidx.compose.material3.Text("取消") }
+        },
+    )
+}
+
+
+@Composable
+private fun SwitchDefaultDialog(
+    state: AppViewModel,
+    targetId: String,
+    onConfirm: (String, String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val current = state.masterKeys.firstOrNull { it.isDefault }
+    var curPw by remember { mutableStateOf("") }
+    var newPw by remember { mutableStateOf("") }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { androidx.compose.material3.Text("切换默认主密钥") },
+        text = {
+            androidx.compose.foundation.layout.Column {
+                androidx.compose.material3.Text(
+                    "「${current?.name ?: "当前默认"}」→「" +
+                        (state.masterKeys.firstOrNull { it.masterKeyId == targetId }?.name
+                            ?: shortId(targetId)) + "」",
+                    fontSize = 13.sp, color = SkColors.TextSub,
+                )
+                Spacer(Modifier.height(10.dp))
+                // 需求 2.5：两把密钥的密码都必须验证；已解锁时可留空用缓存 KEK
+                androidx.compose.material3.Text(
+                    if (state.unlocked) "已解锁：两把密钥的密码均可留空，用已解锁的密钥缓存校验。"
+                    else "需分别输入两把密钥的密码验证。",
+                    fontSize = 12.sp, color = SkColors.TextSub,
+                )
+                Spacer(Modifier.height(8.dp))
+                FormLabel("原默认主密钥密码")
+                SkPasswordField(curPw, { curPw = it }, "可留空（已解锁时）")
+                Spacer(Modifier.height(8.dp))
+                FormLabel("新默认主密钥密码")
+                SkPasswordField(newPw, { newPw = it }, "可留空（已解锁时）")
+                state.formError?.let {
+                    Spacer(Modifier.height(8.dp))
+                    androidx.compose.material3.Text(it, color = SkColors.DangerText, fontSize = 12.sp)
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(
+                onClick = { onConfirm(curPw, newPw) },
+            ) { androidx.compose.material3.Text("切换") }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                androidx.compose.material3.Text("取消") }
+        },
+    )
+}
+
+@Composable
+private fun DeleteKeyDialog(
+    state: AppViewModel,
+    targetId: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var pw by remember { mutableStateOf("") }
+    val target = state.masterKeys.firstOrNull { it.masterKeyId == targetId }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { androidx.compose.material3.Text("删除主密钥") },
+        text = {
+            androidx.compose.foundation.layout.Column {
+                androidx.compose.material3.Text(
+                    "删除「${target?.name ?: shortId(targetId)}」。其加密的机密信息会保留" +
+                        "（显示黄色问号），删除前建议先导出备份。",
+                    fontSize = 13.sp, color = SkColors.TextSub,
+                )
+                Spacer(Modifier.height(10.dp))
+                FormLabel("该主密钥的密码")
+                SkPasswordField(pw, { pw = it }, "输入主密钥密码")
+                state.formError?.let {
+                    Spacer(Modifier.height(8.dp))
+                    androidx.compose.material3.Text(it, color = SkColors.DangerText, fontSize = 12.sp)
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(
+                onClick = { onConfirm(pw) },
+                enabled = pw.isNotEmpty(),
+            ) { androidx.compose.material3.Text("删除", color = SkColors.DangerText) }
         },
         dismissButton = {
             androidx.compose.material3.TextButton(onClick = onDismiss) {

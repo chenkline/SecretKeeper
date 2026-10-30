@@ -305,7 +305,7 @@ private fun AddSecretForm(state: AppViewModel, onBack: () -> Unit) {
                 disabledContainerColor = SkColors.PillBg,
                 disabledContentColor = SkColors.TextSub,
             ),
-        ) { Text("🔒 保存") }
+        ) { Text("保存") }
         Spacer(Modifier.height(8.dp))
         Text(
             text = "AES-256-GCM 加密内容；RSA-OAEP-SHA256 保护数据密钥。",

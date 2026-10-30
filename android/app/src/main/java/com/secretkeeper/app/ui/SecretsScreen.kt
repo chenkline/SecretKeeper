@@ -56,7 +56,12 @@ fun SecretsScreen(
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f),
             )
-            Text(text = "🔒", fontSize = 18.sp)
+            androidx.compose.material3.Icon(
+                SkIcons.Lock,
+                contentDescription = null,
+                tint = SkColors.Primary,
+                modifier = Modifier.width(22.dp),
+            )
         }
         Spacer(Modifier.height(14.dp))
 

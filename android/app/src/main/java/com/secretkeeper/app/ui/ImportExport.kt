@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -57,7 +58,10 @@ fun ImportKeyForm(state: AppViewModel, onBack: () -> Unit) {
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(text = "🔐", fontSize = 34.sp)
+            androidx.compose.material3.Icon(
+                SkIcons.Key, contentDescription = null,
+                tint = SkColors.Primary, modifier = Modifier.width(34.dp),
+            )
             Spacer(Modifier.height(8.dp))
             Text(
                 text = fileName.ifEmpty { "未选择文件" },
@@ -124,7 +128,7 @@ fun ImportKeyForm(state: AppViewModel, onBack: () -> Unit) {
                 disabledContainerColor = SkColors.PillBg,
                 disabledContentColor = SkColors.TextSub,
             ),
-        ) { Text("🔑 导入主密钥") }
+        ) { Text("导入主密钥") }
         Spacer(Modifier.height(8.dp))
         Text(
             text = "主密钥密码丢失无法解密。名称来自文件，可保留为空；第一把主密钥自动设为默认。",
@@ -156,7 +160,10 @@ fun ImportSecretForm(state: AppViewModel, onBack: () -> Unit) {
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(text = "📄", fontSize = 34.sp)
+            androidx.compose.material3.Icon(
+                SkIcons.Lock, contentDescription = null,
+                tint = SkColors.Primary, modifier = Modifier.width(34.dp),
+            )
             Spacer(Modifier.height(8.dp))
             Text(
                 text = fileName.ifEmpty { "未选择文件" },

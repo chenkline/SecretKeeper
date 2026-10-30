@@ -167,6 +167,32 @@ class AppViewModel(dataDir: File) {
         return false
     }
 
+    // ------------------------------------------ 主密钥操作（需求 2.5/2.6）
+
+    /**
+     * 切换默认主密钥（需求 2.5：原默认与新默认两把密钥的密码都必须验证；
+     * 已解锁时缓存 KEK 可作会话凭证，两个密码都可留空）。
+     */
+    fun switchDefault(targetId: String, currentPw: String, newPw: String): Boolean {
+        val e = service.switchDefaultMasterKey(targetId,
+            currentPw.toByteArray(), newPw.toByteArray())
+        formError = if (e == SvcError.OK) null else SvcMessages.message(e)
+        if (e == SvcError.OK) {
+            // 切换后缓存已清（service 内部语义），回解锁页重新解锁
+            unlocked = false
+            refreshLists()
+        }
+        return e == SvcError.OK
+    }
+
+    /** 删除非默认主密钥（默认禁止删除由 service 判定；需该密钥密码）。 */
+    fun deleteMasterKey(masterKeyId: String, password: String): Boolean {
+        val e = service.deleteMasterKey(masterKeyId, password.toByteArray())
+        formError = if (e == SvcError.OK) null else SvcMessages.message(e)
+        if (e == SvcError.OK) refreshLists()
+        return e == SvcError.OK
+    }
+
     // ------------------------------------------------ 导入导出（画板 13/18/19）
 
     /** 详情页导出请求：MainActivity 观察后触发 SAF 保存对话框。 */

@@ -66,10 +66,13 @@ fun UnlockScreen(
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(Modifier.height(72.dp))
-            Text(
-                text = "🛡",
-                fontSize = 44.sp,
-                modifier = Modifier.align(Alignment.CenterHorizontally),
+            Icon(
+                imageVector = SkIcons.ShieldCheck,
+                contentDescription = null,
+                tint = SkColors.PrimarySoft,
+                modifier = Modifier
+                    .size(60.dp)
+                    .align(Alignment.CenterHorizontally),
             )
             Spacer(Modifier.height(12.dp))
             Text(
@@ -141,9 +144,11 @@ fun UnlockScreen(
                 ),
                 trailingIcon = {
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Text(
-                            text = if (passwordVisible) "🙈" else "👁",
-                            fontSize = 16.sp,
+                        Icon(
+                            imageVector = if (passwordVisible) SkIcons.EyeOff else SkIcons.Eye,
+                            contentDescription = null,
+                            tint = SkColors.TextSub,
+                            modifier = Modifier.size(20.dp),
                         )
                     }
                 },

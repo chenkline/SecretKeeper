@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -11,6 +12,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
@@ -18,10 +21,10 @@ import androidx.compose.ui.unit.sp
  * 图标用 Emoji 占位（v0.0.1 不引入 material-icons-extended 大依赖，
  * TODO(H3)：换自绘矢量图标与桌面端 draw_icon 同源）。
  */
-enum class SkTab(val label: String, val glyph: String) {
-    SECRETS("机密信息", "🔐"),
-    KEYS("主密钥", "🔑"),
-    SETTINGS("安全设置", "⚙"),
+enum class SkTab(val label: String, val icon: ImageVector) {
+    SECRETS("机密信息", SkIcons.Lock),
+    KEYS("主密钥", SkIcons.Key),
+    SETTINGS("安全设置", SkIcons.Gear),
 }
 
 /** 主界面骨架：顶部内容区 + 底部三 tab 导航（锁定时整页回解锁屏）。 */
@@ -42,7 +45,12 @@ fun MainScaffold(
                     NavigationBarItem(
                         selected = t == tab,
                         onClick = { onTabChange(t) },
-                        icon = { Text(t.glyph, fontSize = 18.sp) },
+                        icon = {
+                            androidx.compose.material3.Icon(
+                                t.icon, contentDescription = t.label,
+                                modifier = Modifier.size(22.dp),
+                            )
+                        },
                         label = { Text(t.label, fontSize = 12.sp) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = SkColors.Primary,
