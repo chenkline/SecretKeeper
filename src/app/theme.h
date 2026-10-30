@@ -99,6 +99,11 @@ inline constexpr int kWinW = 1200;          // 全部桌面画板统一宽度
 inline constexpr int kSidebarWidth = 208;   // 侧栏宽（02-09 号画板公共）
 inline constexpr int kContentPad = 32;      // 主内容区四周留白
 
+// 用户可调窗口的下限。size_range 的 min 以下拖不动；max 传 0（无上限）
+// 才会让 FLTK 在 Windows 上给窗口加 WS_THICKFRAME 与最大化按钮。
+inline constexpr int kMinWinW = 760;
+inline constexpr int kMinWinH = 520;
+
 inline constexpr int kUnlockH = 784;        // 01 解锁与锁定（820）
 inline constexpr int kKeysH = 839;          // 02 主密钥管理与详情（875）
 inline constexpr int kCreateKeyH = 833;     // 03 生成主密钥（869）

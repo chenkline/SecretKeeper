@@ -100,6 +100,14 @@ MainWindow::MainWindow()
 
   end();
 
+  // 允许用户拖拽缩放与最大化。FLTK 在 Windows 上只有 size_range 的
+  // min != max 时才给窗口 WS_THICKFRAME + WS_MAXIMIZEBOX（见
+  // Fl_Window::is_resizable 与 Fl_win32.cxx 的 wintype 判定），
+  // 不调它窗口就是固定尺寸。max 传 0 表示无上限。
+  // 注意不设 resizable(this)：页面尺寸由 resize() 覆写手动同步
+  // （resize_body / layout_chrome），让 Fl_Group 自动传播反而错位。
+  size_range(theme::kMinWinW, theme::kMinWinH, 0, 0);
+
   // 打开数据目录并初始化 service。
   std::error_code ec;
   const std::filesystem::path dir = data_directory();
