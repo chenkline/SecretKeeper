@@ -34,9 +34,17 @@ object Crypto {
     const val WRAPPED_LEN = 256
     const val MAX_OAEP_PLAINTEXT = 190 // 256 - 2*32 - 2
 
+    // KDF 参数与桌面端 crypto::kKdf* 常量一致（docs/02-crypto）。
+    const val KDF_MEMORY_KIB = 10240
+    const val KDF_ITERATIONS = 3
+    const val KDF_PARALLELISM = 1
+
     private val random = SecureRandom()
 
     fun randomBytes(n: Int): ByteArray = ByteArray(n).also { random.nextBytes(it) }
+
+    /** 生成 16 字节随机 ID（对应桌面 crypto::generate_id）。 */
+    fun generateId(): ByteArray = randomBytes(16)
 
     fun hex(bytes: ByteArray): String = buildString(bytes.size * 2) {
         for (b in bytes) {

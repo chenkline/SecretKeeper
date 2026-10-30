@@ -46,5 +46,7 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     // 单测解析黄金向量 JSON（Android 单测里 org.json 是 stub，需引入真实现）
     testImplementation("org.json:json:20240303")
+    // 单测跑真 SQLite（store 层 SqlDb 的 JDBC 适配器；运行时用 framework SQLite）
+    testImplementation("org.xerial:sqlite-jdbc:3.45.1.0")
 }
 
