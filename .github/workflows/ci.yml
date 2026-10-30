@@ -399,12 +399,15 @@ jobs:
         run: python scripts/verify-vectors.py
       - name: 分层依赖门禁
         run: python scripts/check-layering.py
-      - name: 构建并测试（未签名）
+      - name: 核心四层 swift test（macOS 上跑同一份黄金向量）
+        if: hashFiles('ios/Package.swift') != ''
+        run: swift test -c release --package-path ios
+      - name: 构建 iOS 应用（未签名，Xcode 工程就绪后生效）
         run: |
-          if [ -d ios ]; then
+          if [ -d ios/ios.xcodeproj ]; then
             xcodebuild build -project ios/ios.xcodeproj -scheme ios \\
               -destination "generic/platform=iOS" -configuration Release \\
               CODE_SIGNING_ALLOWED=NO
           else
-            echo "::notice::ios 工程尚未创建，跳过构建"
+            echo "::notice::ios Xcode 工程尚未创建（UI 壳待后续阶段），跳过构建"
           fi
