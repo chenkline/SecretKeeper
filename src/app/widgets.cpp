@@ -265,6 +265,7 @@ Field::Field(int x, int y, int w, int h, std::string_view label)
     : Fl_Input(x + 12, y, std::max(1, w - 24), h, 0), frame_w_(w) {
   label_.assign(label);
   box(FL_NO_BOX);
+  color(theme::kFieldBg);  // 最小更新路径的擦除底色须与自绘背景一致
   labelsize(theme::kFontBody);
   Fl_Input::type(FL_NORMAL_INPUT);
 }
@@ -305,13 +306,23 @@ void Field::draw() {
 }
 
 int Field::handle(int event) {
-  return Fl_Input::handle(event);
+  const int rc = Fl_Input::handle(event);
+  // Fl_Input_ 的最小更新路径假设「背景由 draw_box 每次维护」，与自绘外框
+  // 不符：按键后只重画光标附近的一小条，其余文字区域被擦除底色盖住
+  // （表现为只剩最后几个字符可见）。凡输入框报告处理过事件，强制下次
+  // 整框完整重绘，让 drawtext 走全量路径。
+  if (rc && event != FL_MOVE && event != FL_ENTER && event != FL_LEAVE &&
+      event != FL_MOUSEWHEEL) {
+    damage(FL_DAMAGE_ALL);
+  }
+  return rc;
 }
 
 // =====================================================================
 TextArea::TextArea(int x, int y, int w, int h)
     : Fl_Input(x + 12, y, std::max(1, w - 24), h, 0), frame_w_(w) {
   box(FL_NO_BOX);
+  color(theme::kFieldBg);
   textfont(theme::font_for(theme::kWeightRegular));
   textsize(theme::kFontBody);
   align(FL_ALIGN_TOP | FL_ALIGN_LEFT);
@@ -329,6 +340,15 @@ void TextArea::draw() {
   cursor_color(theme::kText);
   selection_color(theme::kAccentSoft);
   Fl_Input::draw();
+}
+
+int TextArea::handle(int event) {
+  const int rc = Fl_Input::handle(event);
+  if (rc && event != FL_MOVE && event != FL_ENTER && event != FL_LEAVE &&
+      event != FL_MOUSEWHEEL) {
+    damage(FL_DAMAGE_ALL);  // 同 Field：改动性事件后强制全量重绘
+  }
+  return rc;
 }
 
 // =====================================================================

@@ -148,6 +148,7 @@ class TextArea : public Fl_Input {
  public:
   TextArea(int x, int y, int w, int h);
   void draw() override;
+  int handle(int event) override;
 
  private:
   int frame_w_ = 0;  // 可见边框宽度（控件本身左右各缩进 12px 作为文字留白）。
