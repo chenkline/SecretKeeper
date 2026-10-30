@@ -1,5 +1,7 @@
 package com.secretkeeper.app.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,6 +21,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -32,7 +38,27 @@ import com.secretkeeper.app.core.MasterKeyListItem
  * 配额提示条（限额是业务规则：2 把，达上限时黄色提示条）。
  */
 @Composable
-fun KeysScreen(state: AppViewModel, onOpenCreateKey: () -> Unit = {}) {
+fun KeysScreen(
+    state: AppViewModel,
+    onOpenCreateKey: () -> Unit = {},
+    onOpenImportKey: () -> Unit = {},
+) {
+    // 导出主密钥：先弹保护密码对话框（画板 05/19 语义），再 CreateDocument 落盘
+    var exportTarget by remember { mutableStateOf<MasterKeyListItem?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream"),
+    ) { uri ->
+        val target = exportTarget
+        if (uri != null && target != null) {
+            val (e, bytes) = state.exportMasterKey(target.masterKeyId, state.exportProtectionPw)
+            if (e == com.secretkeeper.app.core.SvcError.OK && bytes != null) {
+                context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+            }
+        }
+        exportTarget = null
+        state.exportProtectionPw = ""
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -54,7 +80,7 @@ fun KeysScreen(state: AppViewModel, onOpenCreateKey: () -> Unit = {}) {
                 shape = RoundedCornerShape(8.dp),
             ) { Text("生成主密钥") }
             OutlinedButton(
-                onClick = { /* TODO(H2): 导入主密钥表单（画板 13） */ },
+                onClick = onOpenImportKey,
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(8.dp),
             ) { Text("📥 导入主密钥") }
@@ -77,11 +103,28 @@ fun KeysScreen(state: AppViewModel, onOpenCreateKey: () -> Unit = {}) {
         Spacer(Modifier.height(10.dp))
 
         state.masterKeys.forEach { item ->
-            MasterKeyCard(item, isDefaultLocked = item.isDefault)
+            MasterKeyCard(item, onExport = {
+                state.pendingExportKey = item.masterKeyId
+                exportTarget = item
+            })
             Spacer(Modifier.height(12.dp))
         }
 
         // 配额达上限提示条（业务规则在 service，UI 如实展示固定文案）
+        if (exportTarget != null) {
+            ExportProtectionDialog(
+                state = state,
+                onConfirm = {
+                    exportLauncher.launch("masterkey-" +
+                        (state.pendingExportKey ?: "key").takeLast(8) + ".smk")
+                },
+                onDismiss = {
+                    exportTarget = null
+                    state.exportProtectionPw = ""
+                },
+            )
+        }
+
         if (state.masterKeys.size >= 2) {
             Row(
                 modifier = Modifier
@@ -101,7 +144,7 @@ fun KeysScreen(state: AppViewModel, onOpenCreateKey: () -> Unit = {}) {
 }
 
 @Composable
-private fun MasterKeyCard(item: MasterKeyListItem, isDefaultLocked: Boolean) {
+private fun MasterKeyCard(item: MasterKeyListItem, onExport: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -150,7 +193,7 @@ private fun MasterKeyCard(item: MasterKeyListItem, isDefaultLocked: Boolean) {
 
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedButton(
-                onClick = { /* TODO(H2): 导出主密钥（画板 19/05） */ },
+                onClick = onExport,
                 shape = RoundedCornerShape(8.dp),
             ) { Text("导出主密钥") }
             Button(
@@ -182,4 +225,37 @@ private fun MasterKeyCard(item: MasterKeyListItem, isDefaultLocked: Boolean) {
             )
         }
     }
+}
+
+@Composable
+private fun ExportProtectionDialog(
+    state: AppViewModel,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { androidx.compose.material3.Text("设置导出保护密码") },
+        text = {
+            androidx.compose.foundation.layout.Column {
+                androidx.compose.material3.Text(
+                    "保护密码用于加密导出的文件，与主密钥密码相互独立。",
+                    fontSize = 13.sp, color = SkColors.TextSub,
+                )
+                Spacer(Modifier.height(10.dp))
+                SkPasswordField(state.exportProtectionPw, { state.exportProtectionPw = it },
+                    "输入保护密码（不可为空）")
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(
+                onClick = onConfirm,
+                enabled = state.exportProtectionPw.isNotEmpty(),
+            ) { androidx.compose.material3.Text("选择保存位置") }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                androidx.compose.material3.Text("取消") }
+        },
+    )
 }

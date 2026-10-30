@@ -117,6 +117,94 @@ class AppViewModel(dataDir: File) {
         service.notifyActivity()
     }
 
+    // ------------------------------------------------ 详情页（画板 15/16）
+
+    var detail by mutableStateOf<com.secretkeeper.app.core.SecretDetail?>(null)
+        private set
+
+    var detailError by mutableStateOf<String?>(null)
+        private set
+
+    private var detailPassword by mutableStateOf("")
+
+    /**
+     * 加载详情。masterPassword 为空时返回掩码态（不报错，需求 3.5：
+     * UI 先展示再决定是否索要密码）。
+     */
+    fun loadDetail(secretId: String, masterPassword: String = "") {
+        detailPassword = masterPassword
+        val (e, d) = service.getSecretDetail(secretId, masterPassword.toByteArray())
+        detailError = if (e == SvcError.OK) null else SvcMessages.message(e)
+        detail = d
+    }
+
+    /** 「查看」：非默认密钥带密码重新取明文；失败文案写 detailError。 */
+    fun revealDetail(secretId: String, password: String) {
+        detailPassword = password
+        val (e, plain) = service.revealSecretPlaintext(secretId, password.toByteArray())
+        if (e == SvcError.OK) {
+            detailError = null
+            detail = detail?.copy(plaintextMasked = false, plaintext = plain ?: "")
+        } else {
+            detailError = SvcMessages.message(e)
+        }
+    }
+
+    /** 切换界面 / 进入后台立即隐藏明文（需求 3.5 的固定行为）。 */
+    fun maskDetail() {
+        detail = detail?.copy(plaintextMasked = true, plaintext = "")
+    }
+
+    /** 删除机密信息。主密钥缺失时跳过密码校验（与桌面一致）。 */
+    fun deleteSecret(secretId: String, password: String): Boolean {
+        val e = service.deleteSecret(secretId, password.toByteArray())
+        if (e == SvcError.OK) {
+            refreshLists()
+            detail = null
+            return true
+        }
+        detailError = SvcMessages.message(e)
+        return false
+    }
+
+    // ------------------------------------------------ 导入导出（画板 13/18/19）
+
+    /** 详情页导出请求：MainActivity 观察后触发 SAF 保存对话框。 */
+    var requestSecretExport by mutableStateOf<String?>(null)
+
+    /** 主密钥导出的保护密码（对话框临时输入，用后清空）。 */
+    var exportProtectionPw by mutableStateOf("")
+    var pendingExportKey by mutableStateOf<String?>(null)
+
+    fun isDefaultKey(masterKeyId: String): Boolean =
+        service.defaultMasterKeyId() == masterKeyId
+
+    /** 导出主密钥字节流（保护密码新设，不能与主密钥密码混用）。 */
+    fun exportMasterKey(masterKeyId: String, protectionPassword: String): Pair<SvcError, ByteArray?> =
+        service.exportMasterKey(masterKeyId, detailPassword.toByteArray(),
+            protectionPassword.toByteArray())
+
+    /** 导出机密信息：与数据文件逐字节相同，不需要密码（需求 3.3）。 */
+    fun exportSecret(secretId: String): Pair<SvcError, ByteArray?> =
+        service.exportSecret(secretId, ByteArray(0))
+
+    /** 导入主密钥：protectionPassword 解文件，newPassword 重加密保存。 */
+    fun importMasterKey(bytes: ByteArray, protectionPassword: String, newPassword: String): Boolean {
+        val e = service.importMasterKey(bytes, protectionPassword.toByteArray(),
+            newPassword.toByteArray())
+        formError = if (e == SvcError.OK) null else SvcMessages.message(e)
+        if (e == SvcError.OK) refreshLists()
+        return e == SvcError.OK
+    }
+
+    /** 导入机密信息：校验能解开才入库。 */
+    fun importSecret(bytes: ByteArray, masterPassword: String): Boolean {
+        val e = service.importSecret(bytes, ByteArray(0), masterPassword.toByteArray())
+        formError = if (e == SvcError.OK) null else SvcMessages.message(e)
+        if (e == SvcError.OK) refreshLists()
+        return e == SvcError.OK
+    }
+
     /** 需求：锁定态下每 30 秒轮换一次 KEK（需求 2.7）。 */
     fun rotateKekTick(): Boolean =
         service.rotateKek() == SvcError.OK

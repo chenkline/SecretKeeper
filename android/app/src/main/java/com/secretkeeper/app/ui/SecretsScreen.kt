@@ -1,6 +1,7 @@
 package com.secretkeeper.app.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -38,7 +39,12 @@ import com.secretkeeper.app.core.SecretListItem
  * 黄色问号：悬空引用（密钥缺失）显示「MK-XXXX?」——与名称为空无关（需求 3.5）。
  */
 @Composable
-fun SecretsScreen(state: AppViewModel, onOpenAddSecret: () -> Unit = {}) {
+fun SecretsScreen(
+    state: AppViewModel,
+    onOpenAddSecret: () -> Unit = {},
+    onOpenImportSecret: () -> Unit = {},
+    onOpenDetail: (String) -> Unit = {},
+) {
     var query by remember { mutableStateOf("") }
 
     Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
@@ -62,7 +68,7 @@ fun SecretsScreen(state: AppViewModel, onOpenAddSecret: () -> Unit = {}) {
                 modifier = Modifier.weight(1f),
             )
             OutlinedButton(
-                onClick = { /* TODO(H2): 导入机密信息（画板 18） */ },
+                onClick = onOpenImportSecret,
                 shape = RoundedCornerShape(8.dp),
             ) { Text("📥 导入") }
             Spacer(Modifier.width(8.dp))
@@ -116,7 +122,7 @@ fun SecretsScreen(state: AppViewModel, onOpenAddSecret: () -> Unit = {}) {
 
         LazyColumn(modifier = Modifier.weight(1f)) {
             items(filtered, key = { it.secretId }) { item ->
-                SecretRow(item)
+                SecretRow(item, onClick = { onOpenDetail(item.secretId) })
             }
         }
 
@@ -131,13 +137,15 @@ fun SecretsScreen(state: AppViewModel, onOpenAddSecret: () -> Unit = {}) {
 }
 
 @Composable
-private fun SecretRow(item: SecretListItem) {
+private fun SecretRow(item: SecretListItem, onClick: () -> Unit = {}) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { onClick() }
             .background(SkColors.CardBg, RoundedCornerShape(8.dp))
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
+
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 // 空标题与空名称保持留白（需求 3.1），不显示占位符

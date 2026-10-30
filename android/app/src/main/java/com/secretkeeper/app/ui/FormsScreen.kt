@@ -47,7 +47,7 @@ import com.secretkeeper.app.core.ServiceLimits
 /**
  * 画板 12/17：生成主密钥与新增机密信息表单。表单页从列表页以覆盖路由打开。
  */
-enum class SkForm { CREATE_KEY, ADD_SECRET }
+enum class SkForm { CREATE_KEY, ADD_SECRET, IMPORT_KEY, IMPORT_SECRET }
 
 @Composable
 fun FormScaffold(
@@ -68,7 +68,12 @@ fun FormScaffold(
                 )
             }
             Text(
-                text = if (form == SkForm.CREATE_KEY) "生成主密钥" else "新增机密信息",
+                text = when (form) {
+                    SkForm.CREATE_KEY -> "生成主密钥"
+                    SkForm.ADD_SECRET -> "新增机密信息"
+                    SkForm.IMPORT_KEY -> "导入主密钥"
+                    SkForm.IMPORT_SECRET -> "导入机密信息"
+                },
                 color = SkColors.TextMain,
                 fontSize = 17.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -77,6 +82,8 @@ fun FormScaffold(
         when (form) {
             SkForm.CREATE_KEY -> CreateKeyForm(state, onBack)
             SkForm.ADD_SECRET -> AddSecretForm(state, onBack)
+            SkForm.IMPORT_KEY -> ImportKeyForm(state, onBack)
+            SkForm.IMPORT_SECRET -> ImportSecretForm(state, onBack)
         }
     }
 }

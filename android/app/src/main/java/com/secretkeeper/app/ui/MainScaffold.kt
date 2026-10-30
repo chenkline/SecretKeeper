@@ -32,6 +32,7 @@ fun MainScaffold(
     onTabChange: (SkTab) -> Unit,
     onLock: () -> Unit,
     onOpenForm: (SkForm) -> Unit = {},
+    onOpenDetail: (String) -> Unit = {},
 ) {
     Scaffold(
         containerColor = SkColors.PageBg,
@@ -62,8 +63,17 @@ fun MainScaffold(
                 .padding(padding),
         ) {
             when (tab) {
-                SkTab.SECRETS -> SecretsScreen(state, onOpenAddSecret = { onOpenForm(SkForm.ADD_SECRET) })
-                SkTab.KEYS -> KeysScreen(state, onOpenCreateKey = { onOpenForm(SkForm.CREATE_KEY) })
+                SkTab.SECRETS -> SecretsScreen(
+                    state,
+                    onOpenAddSecret = { onOpenForm(SkForm.ADD_SECRET) },
+                    onOpenImportSecret = { onOpenForm(SkForm.IMPORT_SECRET) },
+                    onOpenDetail = onOpenDetail,
+                )
+                SkTab.KEYS -> KeysScreen(
+                    state,
+                    onOpenCreateKey = { onOpenForm(SkForm.CREATE_KEY) },
+                    onOpenImportKey = { onOpenForm(SkForm.IMPORT_KEY) },
+                )
                 SkTab.SETTINGS -> SettingsScreen(state, onLock)
             }
         }
