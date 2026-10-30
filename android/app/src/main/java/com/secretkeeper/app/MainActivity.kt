@@ -8,7 +8,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.secretkeeper.app.ui.AppViewModel
+import com.secretkeeper.app.ui.FormScaffold
 import com.secretkeeper.app.ui.MainScaffold
+import com.secretkeeper.app.ui.SkForm
 import com.secretkeeper.app.ui.SkTab
 import com.secretkeeper.app.ui.SkTheme
 import com.secretkeeper.app.ui.UnlockScreen
@@ -26,7 +28,10 @@ class MainActivity : ComponentActivity() {
                 // 数据目录：/data/data/<pkg>/files（docs/03-data §6.1 的 Android 行）
                 val state = remember { AppViewModel(getExternalFilesDir(null) ?: filesDir) }
                 var tab by remember { mutableStateOf(SkTab.SECRETS) }
-                if (state.unlocked) {
+                var form by remember { mutableStateOf<SkForm?>(null) }
+                if (state.unlocked && form != null) {
+                    FormScaffold(state, form!!, onBack = { form = null })
+                } else if (state.unlocked) {
                     MainScaffold(
                         state = state,
                         tab = tab,
@@ -35,6 +40,7 @@ class MainActivity : ComponentActivity() {
                             state.notifyActivity()
                         },
                         onLock = state::lock,
+                        onOpenForm = { form = it },
                     )
                 } else {
                     UnlockScreen(state)

@@ -32,7 +32,7 @@ import com.secretkeeper.app.core.MasterKeyListItem
  * 配额提示条（限额是业务规则：2 把，达上限时黄色提示条）。
  */
 @Composable
-fun KeysScreen(state: AppViewModel) {
+fun KeysScreen(state: AppViewModel, onOpenCreateKey: () -> Unit = {}) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -49,7 +49,7 @@ fun KeysScreen(state: AppViewModel) {
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedButton(
-                onClick = { /* TODO(H2): 生成主密钥表单（画板 12） */ },
+                onClick = onOpenCreateKey,
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(8.dp),
             ) { Text("生成主密钥") }

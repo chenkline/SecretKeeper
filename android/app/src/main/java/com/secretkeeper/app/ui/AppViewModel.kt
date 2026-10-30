@@ -9,6 +9,7 @@ import com.secretkeeper.app.core.IndexDb
 import com.secretkeeper.app.core.MasterKeyListItem
 import com.secretkeeper.app.core.SecretListItem
 import com.secretkeeper.app.core.Service
+import com.secretkeeper.app.core.SvcMessages
 import com.secretkeeper.app.core.SvcError
 import java.io.File
 
@@ -90,6 +91,26 @@ class AppViewModel(dataDir: File) {
         service.lock()
         unlocked = false
         refreshLists()
+    }
+
+    /** 表单页错误文案（需求固定文案）。 */
+    var formError by mutableStateOf<String?>(null)
+        private set
+
+    /** 生成主密钥。成功返回 true（UI 返回列表页并刷新）。 */
+    fun createMasterKey(name: String, pw: CharArray): Boolean {
+        val err = service.createMasterKey(name, pw.toStringByteArray())
+        formError = if (err == SvcError.OK) null else SvcMessages.message(err)
+        if (err == SvcError.OK) refreshLists()
+        return err == SvcError.OK
+    }
+
+    /** 新增机密信息。成功返回 true。 */
+    fun addSecret(title: String, content: String, mkId: String, pw: CharArray): Boolean {
+        val err = service.addSecret(title, content, mkId, pw.toStringByteArray())
+        formError = if (err == SvcError.OK) null else SvcMessages.message(err)
+        if (err == SvcError.OK) refreshLists()
+        return err == SvcError.OK
     }
 
     fun notifyActivity() {

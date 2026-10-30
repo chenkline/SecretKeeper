@@ -38,7 +38,7 @@ import com.secretkeeper.app.core.SecretListItem
  * 黄色问号：悬空引用（密钥缺失）显示「MK-XXXX?」——与名称为空无关（需求 3.5）。
  */
 @Composable
-fun SecretsScreen(state: AppViewModel) {
+fun SecretsScreen(state: AppViewModel, onOpenAddSecret: () -> Unit = {}) {
     var query by remember { mutableStateOf("") }
 
     Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
@@ -67,7 +67,7 @@ fun SecretsScreen(state: AppViewModel) {
             ) { Text("📥 导入") }
             Spacer(Modifier.width(8.dp))
             Button(
-                onClick = { /* TODO(H2): 新增机密信息（画板 17） */ },
+                onClick = onOpenAddSecret,
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = SkColors.Primary),
             ) {
