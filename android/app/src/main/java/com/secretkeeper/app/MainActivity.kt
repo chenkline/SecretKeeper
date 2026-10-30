@@ -3,38 +3,43 @@ package com.secretkeeper.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.secretkeeper.app.ui.AppViewModel
+import com.secretkeeper.app.ui.MainScaffold
+import com.secretkeeper.app.ui.SkTab
+import com.secretkeeper.app.ui.SkTheme
+import com.secretkeeper.app.ui.UnlockScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // FLAG_SECURE：最近任务与截屏不显示内容（离线机密应用的基本防护）
         window.setFlags(
             android.view.WindowManager.LayoutParams.FLAG_SECURE,
             android.view.WindowManager.LayoutParams.FLAG_SECURE,
         )
         setContent {
-            MaterialTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    Column(
-                        modifier = Modifier.fillMaxSize().padding(24.dp),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Text(text = "密匣", style = MaterialTheme.typography.headlineMedium)
-                        Text(text = "v0.0.1 · 完全离线", style = MaterialTheme.typography.bodyMedium)
-                    }
+            SkTheme {
+                // 数据目录：/data/data/<pkg>/files（docs/03-data §6.1 的 Android 行）
+                val state = remember { AppViewModel(getExternalFilesDir(null) ?: filesDir) }
+                var tab by remember { mutableStateOf(SkTab.SECRETS) }
+                if (state.unlocked) {
+                    MainScaffold(
+                        state = state,
+                        tab = tab,
+                        onTabChange = {
+                            tab = it
+                            state.notifyActivity()
+                        },
+                        onLock = state::lock,
+                    )
+                } else {
+                    UnlockScreen(state)
                 }
             }
         }
     }
 }
-
