@@ -132,6 +132,8 @@ class Field : public Fl_Input {
   void set_placeholder(std::string_view text);
   void set_label_text(std::string_view text);
   std::string label_text() const { return label_; }
+  // 增大文字左内边距（内嵌放大镜图标等场景）；外框位置与宽度不变。
+  void set_text_inset(int left);
 
  protected:
   int handle(int event) override;
@@ -140,7 +142,9 @@ class Field : public Fl_Input {
   std::string label_;
   std::string placeholder_;
   int frame_w_ = 0;  // 可见边框宽度（控件本身左右各缩进 12px 作为文字留白）。
+  int outer_dx_ = 0; // 文字区右移后，外框相对 x() 的左偏移。
 };
+
 
 // ---- 多行文本域 ----
 // 机密信息内容用。带边框圆角，高度固定，内部可滚动。
@@ -205,6 +209,18 @@ void draw_icon(Icon icon, int x, int y, Fl_Color color);
 
 // 图标实际占用的边长（当前所有图标统一 20）。
 constexpr int kIconSize = 20;
+
+// ---- 纯图标盒 ----
+// 不可交互，仅把 draw_icon 画在给定位置（搜索框内放大镜等）。
+class IconBox : public Fl_Widget {
+ public:
+  IconBox(int x, int y, Icon icon, Fl_Color color);
+  void draw() override;
+
+ private:
+  Icon icon_;
+  Fl_Color color_;
+};
 
 // ---- 带图标的按钮 ----
 // 设计稿的主按钮左侧带图标（如「保存」「导出主密钥」）。

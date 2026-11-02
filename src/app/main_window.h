@@ -94,6 +94,12 @@ class MainWindow : public Fl_Double_Window {
   std::unique_ptr<UnlockPage> unlock_;
   std::unique_ptr<MasterKeysPage> keys_;
   std::unique_ptr<SecretsPage> secrets_;
+
+ public:
+  // 诊断专用（--check-style）：body 子控件边界 dump。
+  SecretsPage* secrets_page() { return secrets_.get(); }
+
+ private:
   std::unique_ptr<SettingsPage> settings_page_;
   std::unique_ptr<CreateKeyPage> create_key_;
   std::unique_ptr<ImportKeyPage> import_key_;
@@ -121,6 +127,8 @@ class MainWindow : public Fl_Double_Window {
   std::string status_text_;
   bool clipboard_armed_ = false;
   bool initialized_ = false;   // 构造完成前忽略 resize 同步
+  void sync_active_body(int W, int H);  // 只同步当前可见页的视口
+
   bool resizing_for_page_ = false;  // show_page 内部的整窗调整不算用户缩放
   bool user_resized_ = false;  // 用户手动调整过窗口后不再按页改窗口高度
   Clock::time_point last_activity_ = Clock::now();

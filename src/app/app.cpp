@@ -17,6 +17,9 @@
 #include <FL/Fl_Image_Surface.H>
 #include <FL/Fl_Input.H>
 #include <FL/fl_draw.H>
+#ifdef _WIN32
+#include <FL/platform.H>
+#endif
 
 #include <cstdint>
 #include <cstring>
@@ -100,8 +103,14 @@ int main(int argc, char** argv) {
   std::vector<int> shots;
   bool fill_inputs = false;
   int shot_w = 0, shot_h = 0;  // --screenshot-size=WxH：以指定窗口尺寸出图
+  bool check_style = false;
+  int start_page = 0;  // --page=N：启动后直接落到第 N 页（1..9），滚轮测试用
   for (int i = 1; i < argc; ++i) {
-    if (std::strncmp(argv[i], "--screenshot=", 13) == 0) {
+    if (std::strncmp(argv[i], "--check-style", 13) == 0) {
+      check_style = true;
+    } else if (std::strncmp(argv[i], "--page=", 7) == 0) {
+      std::sscanf(argv[i] + 7, "%d", &start_page);
+    } else if (std::strncmp(argv[i], "--screenshot=", 13) == 0) {
       shots = parse_screenshot_arg(argv[i] + 13);
     } else if (std::strncmp(argv[i], "--screenshot-fill", 17) == 0) {
       // 截图前把可见输入框预填文本，用于核对输入回显渲染。
@@ -113,6 +122,56 @@ int main(int argc, char** argv) {
 
   Fl::visual(FL_RGB);
   secretkeeper::ui::MainWindow window;
+
+  // 窗口样式诊断：show 后用 Win32 API 查实际样式位，验证
+  // size_range 是否真的带来 WS_THICKFRAME / WS_MAXIMIZEBOX。
+  // 用法：SecretKeeper.exe --check-style  （输出一行 JSON 式结果后退出）
+#ifdef _WIN32
+  if (check_style) {
+    // GUI 子系统下 stdout 句柄无效，诊断结果直接写文件。
+    std::ofstream out("check-style.log"); // 直接落当前目录，避免子目录不存在
+    out << "[check-style] entered\n";
+    out.flush();
+    window.show();
+    Fl::wait(0.3);
+    out << "[check-style] after wait\n";
+    HWND hwnd = fl_win32_xid(&window);
+    DWORD style = (DWORD)GetWindowLongW(hwnd, GWL_STYLE);
+    int mnw = 0, mnh = 0, mxw = 0, mxh = 0;
+    uchar srset = window.get_size_range(&mnw, &mnh, &mxw, &mxh,
+                                        nullptr, nullptr, nullptr);
+    out << "[check-style] style=0x" << std::hex << style << std::dec
+        << " THICKFRAME=" << ((style & WS_THICKFRAME) != 0)
+        << " MAXIMIZEBOX=" << ((style & WS_MAXIMIZEBOX) != 0)
+        << " CAPTION=" << ((style & WS_CAPTION) != 0)
+        << " SYSMENU=" << ((style & WS_SYSMENU) != 0) << "\n";
+    out << "[check-style] size_range set=" << (int)srset
+        << " min=" << mnw << "," << mnh << " max=" << mxw << "," << mxh << "\n";
+    // 06 页 body 子控件边界 dump（水平溢出定位）
+    window.navigate(secretkeeper::ui::Page::kSecrets);
+    Fl::wait(0.2);
+    out << "[body-children] x y w h\n";
+    for (int i = 0; i < window.secrets_page()->body_for_diag()->children(); ++i) {
+      Fl_Widget* c = window.secrets_page()->body_for_diag()->child(i);
+      out << "  " << c->x() << " " << c->y() << " " << c->w() << " " << c->h()
+          << "  (right=" << c->x() + c->w() << ")\n";
+    }
+    out.flush();
+    out.close();
+    ::exit(0); // 直接终止：绕开窗口/超时回调和静态析构的潜在阻塞
+  }
+#endif
+
+  // --page=N：滚轮/交互测试用，启动后直接落到第 N 页（绕过解锁路由）。
+  if (start_page >= 1 && start_page <= 9) {
+    using secretkeeper::ui::Page;
+    static const Page kPages[9] = {
+        Page::kUnlock,      Page::kMasterKeys,   Page::kCreateKey,
+        Page::kImportKey,   Page::kExportKey,    Page::kSecrets,
+        Page::kAddSecret,   Page::kImportSecret, Page::kSettings,
+    };
+    window.navigate(kPages[start_page - 1]);
+  }
 
   if (shots.empty()) {
     return Fl::run();

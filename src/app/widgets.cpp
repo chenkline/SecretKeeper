@@ -280,10 +280,19 @@ void Field::set_label_text(std::string_view text) {
   redraw();
 }
 
+void Field::set_text_inset(int left) {
+  const int dx = left - 12; // 构造默认文字缩进 12
+  if (dx == 0) return;
+  Fl_Input::resize(x() + dx, y(), std::max(1, w() - dx), h());
+  outer_dx_ = dx;
+}
+
 void Field::draw() {
   // 可见边框在原设计位置；控件矩形已左右缩进 12px 作为文字内边距。
-  theme::fill_rounded(x() - 12, y(), frame_w_, h(), theme::kRadiusField, theme::kFieldBg);
-  theme::stroke_rounded(x() - 12, y(), frame_w_, h(), theme::kRadiusField, theme::kBorder);
+  theme::fill_rounded(x() - 12 - outer_dx_, y(), frame_w_, h(), theme::kRadiusField,
+                      theme::kFieldBg);
+  theme::stroke_rounded(x() - 12 - outer_dx_, y(), frame_w_, h(), theme::kRadiusField,
+                        theme::kBorder);
 
   // 文本与光标交给 Fl_Input 自己画（box 已是 FL_NO_BOX，不会重画背景）。
   // 此前这里只画背景与占位符、从不画已输入文本，导致「输入有效但无回显」。
@@ -769,4 +778,12 @@ void draw_icon(Icon icon, int x, int y, Fl_Color color) {
   }
 }
 
+
+// ---- IconBox ----
+IconBox::IconBox(int x, int y, Icon icon, Fl_Color color)
+    : Fl_Widget(x, y, kIconSize, kIconSize), icon_(icon), color_(color) {}
+
+void IconBox::draw() {
+  draw_icon(icon_, x(), y(), color_);
+}
 }  // namespace secretkeeper::ui::widgets

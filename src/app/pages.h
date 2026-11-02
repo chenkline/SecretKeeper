@@ -67,6 +67,11 @@ class PageBase : public Fl_Group {
   // 窗口尺寸变化时同步 body 视口（由 MainWindow 在 show_page/resize 调用）。
   void resize_body(int win_w, int win_h);
 
+  // 诊断专用（--check-style）：body 子控件边界 dump。
+  Fl_Scroll* body_for_diag() { return body_; }
+  // 把误落 body 的页头控件移回页面级（绘制在遮罩之上）。
+  void add_header_widget(Fl_Widget* w);
+
  protected:
   void draw() override;
   // 顶部大标题 + 副标题的公共外壳（固定在页头，不随 body 滚动）。
@@ -275,8 +280,6 @@ class SecretsPage : public PageBase {
   void hide_plaintext();
 
  protected:
-  void draw() override;
-  int handle(int event) override;
   void layout_header_buttons(int win_w) override;
 
  private:
@@ -290,14 +293,13 @@ class SecretsPage : public PageBase {
   void on_toggle_reveal();
   void refresh_detail();
   void refresh_meta();
-  // 06 号画板：行高 52，行数随过滤结果变化。
-  int list_row_height() const { return 52; }
 
   Fl_Box* count_label_ = nullptr;
   Fl_Box* sort_label_ = nullptr;
   Fl_Box* missing_label_ = nullptr;
-  Fl_Box* list_extent_ = nullptr;  // 隐形盒：把可滚动下界撑到自绘行区末尾
   widgets::Field* search_ = nullptr;
+  widgets::IconBox* search_icon_ = nullptr;
+  widgets::List* list_ = nullptr;  // 行列表：真实子控件，滚动无残影
   std::vector<widgets::ListRow> rows_;
   Fl_Box* detail_title_ = nullptr;
   widgets::Pill* verified_ = nullptr;

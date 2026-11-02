@@ -327,20 +327,29 @@ void MainWindow::layout_chrome(int win_w, int win_h) {
   footer_text_->position(theme::kSidebarWidth + theme::kContentPad, footer_y + 2);
 }
 
+// 只同步当前可见页的滚动视口与页头按钮：拖拽 resizing 是高频事件，
+// 9 个页面全量重排是纯浪费——隐藏页用户看不到，切页时 show_page
+// 会对新页补一次同步。解锁页独立类（非 PageBase），switch 分发。
+void MainWindow::sync_active_body(int W, int H) {
+  switch (current_) {
+    case Page::kUnlock: unlock_->resize_body(W, H); break;
+    case Page::kMasterKeys: keys_->resize_body(W, H); break;
+    case Page::kSecrets: secrets_->resize_body(W, H); break;
+    case Page::kSettings: settings_page_->resize_body(W, H); break;
+    case Page::kCreateKey: create_key_->resize_body(W, H); break;
+    case Page::kImportKey: import_key_->resize_body(W, H); break;
+    case Page::kExportKey: export_key_->resize_body(W, H); break;
+    case Page::kAddSecret: add_secret_->resize_body(W, H); break;
+    case Page::kImportSecret: import_secret_->resize_body(W, H); break;
+  }
+}
+
 void MainWindow::resize(int X, int Y, int W, int H) {
   Fl_Double_Window::resize(X, Y, W, H);
   if (!initialized_) return;
   if (!resizing_for_page_) user_resized_ = true;
   layout_chrome(W, H);
-  keys_->resize_body(W, H);
-  secrets_->resize_body(W, H);
-  settings_page_->resize_body(W, H);
-  create_key_->resize_body(W, H);
-  import_key_->resize_body(W, H);
-  export_key_->resize_body(W, H);
-  add_secret_->resize_body(W, H);
-  import_secret_->resize_body(W, H);
-  unlock_->resize_body(W, H);
+  sync_active_body(W, H);
 }
 
 void MainWindow::show_page(Page page) {
@@ -421,6 +430,8 @@ void MainWindow::show_page(Page page) {
   }
   refresh_chrome();
 
+  // 新页可能从未按当前窗口尺寸排过（resize 只同步可见页），先补。
+  sync_active_body(this->w(), this->h());
   active->show();
   active->redraw();
 

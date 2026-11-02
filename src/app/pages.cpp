@@ -239,14 +239,19 @@ PageBase::PageBase(MainWindow* host, const char* title, const char* subtitle,
                         std::max(1, content_h - footer_reserve_));
   body_->box(FL_NO_BOX);
   body_->color(theme::kContentBg);
-  body_->scrollbar_size(12);
+  body_->scrollbar_size(14);
   body_->scrollbar.color(theme::kSubtleBg, theme::kBorder);
   body_->hscrollbar.color(theme::kSubtleBg, theme::kBorder);
 
   // 页头不透明遮罩：盖住滚动内容滑过页头的部分；标题/说明在其上。
+  // 注意：new Fl_Box 时 current 组是 body_（Fl_Scroll 构造切组），会误挂
+  // 进 body 并把 Fl_Scroll 的内容宽度撑出 14px（恰一个滚动条宽），导致
+  // 常驻水平滚动条；这里显式移回页面级，并插到 body 之后（z 序盖住它）。
   header_mask_ = new Fl_Box(theme::kSidebarWidth, 0, kWinW - theme::kSidebarWidth, 117);
   header_mask_->box(FL_FLAT_BOX);
   header_mask_->color(theme::kContentBg);
+  add(header_mask_);
+  insert(*header_mask_, find(body_) + 1);
 
   // 页头（02/03 号画板）：内容区 x=208+32=240，标题 fs24、说明 fs13。
   title_box_ = new Fl_Box(theme::kSidebarWidth + theme::kContentPad, 32, 656, 33, title);
@@ -260,6 +265,10 @@ PageBase::PageBase(MainWindow* host, const char* title, const char* subtitle,
   subtitle_box_->labelfont(theme::font_for(theme::kWeightRegular));
   subtitle_box_->labelsize(theme::kFontLabel);
   subtitle_box_->labelcolor(theme::kTextMuted);
+  // title/subtitle 同样误入 body（随滚动跑出页头），移回页面级；
+  // 追加到 children 尾 = 绘制在 mask 之上。
+  add(title_box_);
+  add(subtitle_box_);
   body_->begin();  // 之后页面构造函数创建的内容控件落入 body_
 }
 
@@ -267,6 +276,12 @@ void PageBase::draw() {
   // 先画 02-09 号画板公共的侧栏装饰，再画本页子控件。
   host_->paint_sidebar_decor();
   Fl_Group::draw();
+}
+
+void PageBase::add_header_widget(Fl_Widget* w) {
+  // 各页构造函数在 body_->begin() 之后创建页头按钮会误落 body（随滚动
+  // 跑出页头）；这里移回页面级并追加到 children 尾（z 序在 mask 上）。
+  add(w);
 }
 
 void PageBase::set_subtitle(const std::string& text) {
@@ -279,6 +294,10 @@ void PageBase::resize_body(int win_w, int win_h) {
   if (body_ == nullptr) return;
   body_->resize(theme::kSidebarWidth, 0, std::max(1, win_w - theme::kSidebarWidth),
                 std::max(1, win_h - footer_reserve_));
+  // 遮罩跟随 body 宽度（窗口变宽后右缘不留缝）。
+  if (header_mask_ != nullptr) {
+    header_mask_->size(std::max(1, win_w - theme::kSidebarWidth), header_mask_->h());
+  }
   layout_header_buttons(win_w);
 }
 
@@ -312,7 +331,7 @@ UnlockPage::UnlockPage(MainWindow* host) : Fl_Group(0, 0, kWinW, theme::kUnlockH
   body_ = new Fl_Scroll(456, 0, kWinW - 456, theme::kUnlockH);
   body_->box(FL_NO_BOX);
   body_->color(theme::kFieldBg);
-  body_->scrollbar_size(12);
+  body_->scrollbar_size(14);
   body_->scrollbar.color(theme::kSubtleBg, theme::kBorder);
   body_->hscrollbar.color(theme::kSubtleBg, theme::kBorder);
   body_->begin();
@@ -561,8 +580,8 @@ MasterKeysPage::MasterKeysPage(MainWindow* host)
   gen_btn_->callback([](Fl_Widget*, void* d) {
     static_cast<MasterKeysPage*>(d)->on_generate();
   }, this);
-  add(imp_btn_);  // 页头按钮固定不滚动
-  add(gen_btn_);
+  add_header_widget(imp_btn_);  // 页头按钮固定不滚动
+  add_header_widget(gen_btn_);
 
   // 容量已满提示（02 号画板 y=117，黄底 r8）。
   quota_notice_ = make_notice(theme::kSidebarWidth + theme::kContentPad, 117,
@@ -715,9 +734,6 @@ void MasterKeysPage::draw() {
 }
 
 void MasterKeysPage::layout_header_buttons(int win_w) {
-  std::printf("[lhb] win=%d gen=%d imp=%d%c", win_w,
-              win_w - theme::kContentPad - 132,
-              win_w - theme::kContentPad - 242, 10);
   gen_btn_->position(win_w - theme::kContentPad - 132, 40);
   imp_btn_->position(win_w - theme::kContentPad - 132 - 10 - 106, 40);
 }
@@ -1382,8 +1398,8 @@ SecretsPage::SecretsPage(MainWindow* host)
   add_btn_->callback([](Fl_Widget*, void* d) {
     static_cast<SecretsPage*>(d)->on_add();
   }, this);
-  add(imp_btn_);  // 页头按钮固定不滚动
-  add(add_btn_);
+  add_header_widget(imp_btn_);  // 页头按钮固定不滚动
+  add_header_widget(add_btn_);
 
   // 左列卡片（06 号画板 240,117,530,571 r12），搜索框嵌在卡片顶部。
   const int lx = theme::kSidebarWidth + theme::kContentPad;
@@ -1391,11 +1407,21 @@ SecretsPage::SecretsPage(MainWindow* host)
   new widgets::Card(lx, 117, lw, 571);
   search_ = new widgets::Field(lx + 16, 117, lw - 32, 36);
   search_->set_placeholder("搜索标题或主密钥 ID");
+  search_->set_text_inset(32); // 左侧让位给放大镜
   search_->callback([](Fl_Widget*, void* d) {
     static_cast<SecretsPage*>(d)->reload();
   }, this);
+  search_icon_ = new widgets::IconBox(lx + 28, 125, widgets::Icon::kSearch,
+                                      theme::kTextFaint);
 
-  // 行在 draw() 里绘制（行高 52，选中 #E8F4F0），点击命中在 handle()。
+  // 行列表（06 号画板 153 起，表头 36 + 行高 44）：真实子控件交给
+  // Fl_Scroll 平移，滚动时由 FLTK 裁剪重绘——此前自绘行与滚动位移
+  // 不同步，滚动后留下残影。
+  list_ = new widgets::List(lx, 153, lw, 36 + 44 * 2 + 24);
+  list_->set_columns({"标题（可选）", "主密钥 ID", "主密钥名称"});
+  list_->callback([](Fl_Widget*, void* d) {
+    static_cast<SecretsPage*>(d)->on_row_select();
+  }, this);
 
   // 右列详情卡片（06 号画板 790,117,378,621 r12）。
   const int dx = 790;
@@ -1519,10 +1545,6 @@ SecretsPage::SecretsPage(MainWindow* host)
   foot->labelsize(theme::kFontSmall);
   foot->labelcolor(theme::kTextMuted);
 
-  // 滚动范围修正：行是自绘内容，Fl_Scroll 感知不到；用隐形盒把
-  // 可滚动下界撑到行区末尾（行数变化时在 reload 中调整）。
-  list_extent_ = new Fl_Box(theme::kSidebarWidth, 190, lw, 52, "");
-  list_extent_->box(FL_NO_BOX);
   end();
   end();
 }
@@ -1556,13 +1578,14 @@ void SecretsPage::reload() {
     if (!item.master_key_found) ++missing;
   }
   rows_ = rows;
+  list_->set_rows(rows_);
+  // 列表高度随行数变化：Fl_Scroll 由子控件实际大小感知滚动范围。
+  list_->size(list_->w(), 36 + 44 * std::max<std::size_t>(1, rows.size()) + 24);
 
   count_label_->copy_label(
       (std::to_string(items.size()) + " / " + std::to_string(svc::kMaxSecrets) + " 条" +
        (missing > 0 ? "　·　" : ""))
           .c_str());
-  list_extent_->resize(theme::kSidebarWidth, 190, 530,
-                       52 * static_cast<int>(rows.size()) + 90);
   set_subtitle("所有内容只保存在本机。共 " + std::to_string(items.size()) + " 条，基础版最多 " +
                std::to_string(svc::kMaxSecrets) + " 条。");
   missing_label_->copy_label(missing > 0
@@ -1584,13 +1607,14 @@ void SecretsPage::reload() {
   } else {
     selected_id_.clear();
   }
+  list_->select(target);
   refresh_detail();
   redraw();
 }
 
 std::string SecretsPage::status_text() const { return last_error_; }
 
-void SecretsPage::on_row_select() { on_row_click(selected_row_); }
+void SecretsPage::on_row_select() { on_row_click(list_->selected()); }
 
 void SecretsPage::on_row_click(int row) {
   if (row < 0 || row >= static_cast<int>(ids_.size())) {
@@ -1787,76 +1811,6 @@ void SecretsPage::hide_plaintext() {
   reveal_btn_->copy_label("隐藏");
   reveal_btn_->redraw();
   refresh_meta();
-}
-
-void SecretsPage::draw() {
-  PageBase::draw();
-
-  // 行区是自绘内容：按滚动偏移平移并裁剪到视口。
-  Fl_Scroll* vp = body();
-  const int ox = vp->xposition();
-  const int oy = vp->yposition();
-  fl_push_clip(vp->x(), vp->y(), vp->w() - 12, vp->h() - 12);
-
-  const int lx = theme::kSidebarWidth + theme::kContentPad - ox;
-  const int lw = 530;
-  // 搜索框左侧的放大镜
-  widgets::draw_icon(widgets::Icon::kSearch, lx + 26, 125, theme::kTextFaint);
-
-  // 表头行（06 号画板 #F8FAFA，三列）。
-  const int head_y = 153 - oy;
-  fl_color(theme::kSubtleBg);
-  fl_rectf(lx + 1, head_y, lw - 2, 37);
-  fl_color(theme::kTextMuted);
-  fl_font(theme::font_for(theme::kWeightRegular), theme::kFontTiny);
-  fl_draw("标题（可选）", lx + 16, head_y, 200, 37, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  fl_draw("主密钥 ID", lx + 216, head_y, 124, 37, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  fl_draw("主密钥名称", lx + 340, head_y, 174, 37, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-
-  // 数据行：行高 52，选中 #E8F4F0 + 主色描边。
-  int y = 190 - oy;
-  for (int r = 0; r < static_cast<int>(rows_.size()); ++r) {
-    const widgets::ListRow& row = rows_[static_cast<std::size_t>(r)];
-    const bool sel = r == selected_row_;
-    theme::fill_rounded(lx, y, lw, 52, 0, sel ? theme::kAccentSoft : theme::kCardBg);
-    theme::stroke_rounded(lx, y, lw, 52, 0, sel ? theme::kAccent : theme::kBorder);
-    fl_color(sel ? theme::kAccent : theme::kText);
-    fl_font(theme::font_for(theme::kWeightRegular), theme::kFontLabel);
-    fl_draw(row.c0.c_str(), lx + 16, y, 200, 52, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-    fl_color(theme::kText);
-    fl_font(theme::font_for(theme::kWeightMedium), theme::kFontSmall);
-    fl_draw(row.c1.c_str(), lx + 216, y, 110, 52, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-    if (row.show_question_mark) {
-      // 黄色问号紧贴 ID（需求 3.1 / 3.5）。
-      fl_color(theme::kWarningBorder);
-      fl_font(theme::font_for(theme::kWeightBold), theme::kFontSmall);
-      fl_draw("?", lx + 216 + static_cast<int>(fl_width(row.c1.c_str())) + 2, y, 14, 52,
-              FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-    }
-    fl_color(theme::kTextMuted);
-    fl_font(theme::font_for(theme::kWeightRegular), theme::kFontSmall);
-    fl_draw(row.c2.c_str(), lx + 340, y, 174, 52, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-    y += 52;
-  }
-  fl_pop_clip();
-}
-
-int SecretsPage::handle(int event) {
-  // 左列行无子控件，命中检测在页面层完成（06 号画板），含滚动偏移。
-  if (event == FL_PUSH) {
-    Fl_Scroll* vp = body();
-    const int px = Fl::event_x() + vp->xposition();
-    const int py = Fl::event_y() + vp->yposition();
-    const int lx = theme::kSidebarWidth + theme::kContentPad;
-    if (px >= lx && px <= lx + 530 && py >= 190) {
-      const int row = (py - 190) / 52;
-      if (row < static_cast<int>(rows_.size())) {
-        on_row_click(row);
-        return 1;
-      }
-    }
-  }
-  return Fl_Group::handle(event);
 }
 
 void SecretsPage::on_add() { host()->navigate(Page::kAddSecret); }
