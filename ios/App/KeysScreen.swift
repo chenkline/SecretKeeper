@@ -42,8 +42,7 @@ struct KeysScreen: View {
                 .padding(.bottom, 10)
 
                 ForEach(state.masterKeys, id: \.masterKeyId) { item in
-                    MasterKeyCard(
-                        item,
+                    MasterKeyCard(item: item,
                         onExport: {
                             pendingExportKey = item.masterKeyId
                             showExportDialog = true

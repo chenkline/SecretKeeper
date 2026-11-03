@@ -28,7 +28,7 @@ struct FormScaffold: View {
         .navigationTitle(form.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .navigationAction) {
+            ToolbarItem(placement: .navigationBarLeading) {
                 Button { onBack() } label: {
                     Image(systemName: "chevron.left")
                 }
@@ -342,7 +342,7 @@ private struct ImportKeyForm: View {
             at: docs, includingPropertiesForKeys: nil))?
             .first(where: { $0.pathExtension == "smk" }) {
             fileName = url.lastPathComponent
-            bytes = try? Data(contentsOf: url).map(Array.init)
+            bytes = (try? Data(contentsOf: url)).map { [UInt8]($0) } ?? nil
         }
     }
 }
@@ -394,7 +394,7 @@ private struct ImportSecretForm: View {
             at: docs, includingPropertiesForKeys: nil))?
             .first(where: { $0.pathExtension == "ssc" }) {
             fileName = url.lastPathComponent
-            bytes = try? Data(contentsOf: url).map(Array.init)
+            bytes = (try? Data(contentsOf: url)).map { [UInt8]($0) } ?? nil
         }
     }
 }

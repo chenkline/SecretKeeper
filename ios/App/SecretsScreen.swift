@@ -61,7 +61,7 @@ struct SecretsScreen: View {
             } else {
                 List(filtered, id: \.secretId) { item in
                     Button { onOpenDetail(item.secretId) } label: {
-                        SecretRow(item)
+                        SecretRow(item: item)
                     }
                     .listRowBackground(SkColors.cardBg)
                     .listRowSeparator(.hidden)

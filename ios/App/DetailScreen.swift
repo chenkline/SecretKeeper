@@ -28,7 +28,7 @@ struct DetailScreen: View {
         .navigationTitle("信息详情")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .navigationAction) {
+            ToolbarItem(placement: .navigationBarLeading) {
                 Button { onBack() } label: {
                     Image(systemName: "chevron.left")
                 }
@@ -39,14 +39,10 @@ struct DetailScreen: View {
             if phase != .active { state.maskDetail() }
         }
         .sheet(isPresented: $showReveal) {
-            RevealSheet(state: state, secretId: secretId,
-                        keyName: state.detail?.masterKeyName ?? "",
-                        isDefault: state.detail.flatMap { key in
-                            state.masterKeys.first { $0.masterKeyId == key.masterKeyId }?.isDefault
-                        } ?? false) { showReveal = false }
+            RevealSheet(secretId: secretId) { showReveal = false }
         }
         .sheet(isPresented: $showDelete) {
-            DeleteSecretSheet(state: state, secretId: secretId) {
+            DeleteSecretSheet(secretId: secretId) {
                 showDelete = false
                 onBack()
             }
@@ -71,9 +67,10 @@ struct DetailScreen: View {
                                 .foregroundColor(d.masterKeyFound
                                     ? SkColors.primary : SkColors.warnText)
                         }
-                        DetailLine("主密钥 ID", shortId(d.masterKeyId)
-                            + (d.masterKeyFound ? "" : "?"))
-                        DetailLine("主密钥名称", d.masterKeyName) // 空名保持留白
+                        DetailLine(label: "主密钥 ID",
+                                   value: shortId(d.masterKeyId)
+                                       + (d.masterKeyFound ? "" : "?"))
+                        DetailLine(label: "主密钥名称", value: d.masterKeyName) // 空名保持留白
                     }
                 }
 
@@ -176,8 +173,6 @@ private struct RevealSheet: View {
     @EnvironmentObject var state: AppViewModel
     @Environment(\.dismiss) private var dismiss
     let secretId: String
-    let keyName: String
-    let isDefault: Bool
     let onDone: () -> Void
     @State private var pw = ""
 
@@ -185,7 +180,7 @@ private struct RevealSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    Text("「\(keyName.isEmpty ? "主密钥" : keyName)」")
+                    Text("「主密钥」")
                         .font(.system(size: 13)).foregroundColor(SkColors.textSub)
                     SecureField("输入主密钥密码", text: $pw)
                     if let msg = state.detailError {

@@ -83,7 +83,6 @@ struct UnlockScreen: View {
                     .padding(.vertical, 12)
                 }
 
-                let waiting = state.backoff.waiting && state.backoff.remainingSeconds > 0
                 Button {
                     let id = state.defaultKeyId.isEmpty
                         ? state.masterKeys.first?.masterKeyId ?? ""
@@ -102,9 +101,9 @@ struct UnlockScreen: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 46)
                 }
-                .disabled(waiting || password.isEmpty)
-                .background(waiting || password.isEmpty ? SkColors.pillBg : SkColors.primary)
-                .foregroundColor(waiting || password.isEmpty ? SkColors.textSub : .white)
+                .disabled(isWaiting || password.isEmpty)
+                .background(isWaiting || password.isEmpty ? SkColors.pillBg : SkColors.primary)
+                .foregroundColor(isWaiting || password.isEmpty ? SkColors.textSub : .white)
                 .cornerRadius(8)
                 .padding(.top, 12)
 
@@ -129,6 +128,10 @@ struct UnlockScreen: View {
             )
         }
         .background(SkColors.brandBg.ignoresSafeArea())
+    }
+
+    private var isWaiting: Bool {
+        state.backoff.waiting && state.backoff.remainingSeconds > 0
     }
 
     /// 主密钥选择器卡：钥匙 + 名称/ID 两行 + 「默认」徽章。
