@@ -915,9 +915,9 @@ CreateKeyPage::CreateKeyPage(MainWindow* host)
   layout_header("返回主密钥管理");
 
   // 03 号画板：整块内容在一张白卡上（240,117,928,639 r12）。
-  new widgets::Card(theme::kSidebarWidth + theme::kContentPad, 117, 928, 639);
+  new widgets::Card(theme::kSidebarWidth + theme::kContentPad, 117, 560, 639);
   const int ix = 264;
-  const int iw = 880;
+  const int iw = 512;
 
   auto* section = new Fl_Box(296, 149, 400, 24, "新主密钥");
   section->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
@@ -1059,9 +1059,9 @@ ImportKeyPage::ImportKeyPage(MainWindow* host)
   layout_header(nullptr);
 
   // 04 号画板：白卡（240,117,928,460 r12），无头部返回钮。
-  new widgets::Card(theme::kSidebarWidth + theme::kContentPad, 117, 928, 460);
+  new widgets::Card(theme::kSidebarWidth + theme::kContentPad, 117, 560, 460);
   const int ix = 264;
-  const int iw = 880;
+  const int iw = 512;
 
   // 文件块（04 号画板 #F3F5F6 141,96 r12）。
   widgets::Card* fcard = new widgets::Card(ix, 141, iw, 96, theme::kContentBg);
@@ -1202,9 +1202,9 @@ ExportKeyPage::ExportKeyPage(MainWindow* host)
   set_footer_reserve(0);  // 05 号画板无页脚行，body 视口延伸到窗口底
 
   // 05 号画板：白卡（240,117,928,829 r12），页面客户区高 905。
-  new widgets::Card(theme::kSidebarWidth + theme::kContentPad, 117, 928, 829);
+  new widgets::Card(theme::kSidebarWidth + theme::kContentPad, 117, 560, 829);
   const int ix = 264;
-  const int iw = 880;
+  const int iw = 512;
 
   // 密钥摘要块（05 号画板 #F8FAFA 141,94 r8）。
   widgets::Card* scard = new widgets::Card(ix, 141, iw, 94, theme::kSubtleBg);
@@ -1552,7 +1552,7 @@ SecretsPage::SecretsPage(MainWindow* host)
   missing_label_->labelcolor(theme::kTextMuted);
 
   // 页脚说明（06 号画板 board 804 → 客户区 760）。
-  Fl_Box* foot = new Fl_Box(theme::kSidebarWidth + theme::kContentPad, 760, 700, 19,
+  Fl_Box* foot = new Fl_Box(theme::kSidebarWidth + theme::kContentPad, 760, 512, 19,
                             "ID 后的黄色 ? 表示主密钥缺失；名称为空不代表缺失。");
   foot->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
   foot->labelsize(theme::kFontSmall);
@@ -1846,7 +1846,7 @@ AddSecretPage::AddSecretPage(MainWindow* host)
   // 07 号画板：白卡（240,117,928,576 r12）。
   new widgets::Card(theme::kSidebarWidth + theme::kContentPad, 117, 928, 576);
   const int ix = 264;
-  const int iw = 880;
+  const int iw = 512;
 
   auto* key_label = new Fl_Box(ix, 147, 400, 17, "用于加密的主密钥");
   key_label->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
@@ -2003,7 +2003,7 @@ ImportSecretPage::ImportSecretPage(MainWindow* host)
   // 08 号画板：白卡（240,117,928,623 r12）。
   new widgets::Card(theme::kSidebarWidth + theme::kContentPad, 117, 928, 623);
   const int ix = 264;
-  const int iw = 880;
+  const int iw = 512;
 
   // 三段步骤条（08 号画板 141,21）。
   step1_ = new widgets::Pill(ix, 141, 71, 21, "文件已选择", theme::kAccent,
@@ -2185,7 +2185,7 @@ SettingsPage::SettingsPage(MainWindow* host)
                theme::kSettingsH) {
   // 09 号画板：白卡（240,117,928,453 r12）。
   const int ix = theme::kSidebarWidth + theme::kContentPad;
-  const int iw = 880;
+  const int iw = 512;
   new widgets::Card(ix, 117, iw, 453);
 
   auto* title = new Fl_Box(ix + 24, 149, 300, 24, "锁定与隐私");
