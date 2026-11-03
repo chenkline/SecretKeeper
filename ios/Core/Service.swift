@@ -102,6 +102,13 @@ public struct BackoffStatus {
     public var waiting: Bool
     public var remainingSeconds: Int64
     public var consecutiveFailures: Int64
+
+    public init(waiting: Bool = false, remainingSeconds: Int64 = 0,
+                consecutiveFailures: Int64 = 0) {
+        self.waiting = waiting
+        self.remainingSeconds = remainingSeconds
+        self.consecutiveFailures = consecutiveFailures
+    }
 }
 
 // ===========================================================================

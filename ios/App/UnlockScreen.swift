@@ -91,7 +91,7 @@ struct UnlockScreen: View {
                     password.removeAll()
                 } label: {
                     HStack {
-                        if waiting {
+                        if isWaiting {
                             Image(systemName: "lock.fill")
                             Text("\(state.backoff.remainingSeconds) 秒后可解锁")
                         } else {

@@ -67,14 +67,14 @@ struct KeysScreen: View {
         }
         .background(SkColors.pageBg)
         .sheet(isPresented: $showExportDialog) {
-            ExportProtectionDialog(state: state) { name in
+            ExportProtectionDialog() { name in
                 exportTarget(name: name)
             }
         }
         .sheet(isPresented: Binding(get: { switchTargetId != nil },
                                     set: { if !$0 { switchTargetId = nil } })) {
             if let target = switchTargetId {
-                SwitchDefaultDialog(state: state, targetId: target) {
+                SwitchDefaultDialog(targetId: target) {
                     switchTargetId = nil
                 }
             }
@@ -82,7 +82,7 @@ struct KeysScreen: View {
         .sheet(isPresented: Binding(get: { deleteTargetId != nil },
                                     set: { if !$0 { deleteTargetId = nil } })) {
             if let target = deleteTargetId {
-                DeleteKeyDialog(state: state, targetId: target) {
+                DeleteKeyDialog(targetId: target) {
                     deleteTargetId = nil
                 }
             }
