@@ -407,7 +407,18 @@ jobs:
           if [ -d ios/ios.xcodeproj ]; then
             xcodebuild build -project ios/ios.xcodeproj -scheme ios \
               -destination "generic/platform=iOS" -configuration Release \
+              -derivedDataPath build/ios-dd \
               CODE_SIGNING_ALLOWED=NO
+            # 交付物：未签名 .app（安装需开发者签名/TestFlight，另册处理）
+            (cd build/ios-dd/Build/Products/Release-iphoneos && zip -qry \
+              "$GITHUB_WORKSPACE/SecretKeeper-ios-app.zip" ios.app)
           else
             echo "::notice::ios Xcode 工程尚未创建（UI 壳待后续阶段），跳过构建"
           fi
+      - name: 上传 iOS 交付物（未签名 .app 包）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SecretKeeper-ios-app
+          path: SecretKeeper-ios-app.zip
+          if-no-files-found: error
