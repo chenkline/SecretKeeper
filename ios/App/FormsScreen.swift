@@ -273,6 +273,7 @@ private struct ImportKeyForm: View {
     @State private var bytes: [UInt8]?
     @State private var protPw = ""
     @State private var newPw = ""
+    @State private var showImporter = false
 
     var body: some View {
         ScrollView {
@@ -281,12 +282,8 @@ private struct ImportKeyForm: View {
                     .font(.system(size: 13)).foregroundColor(SkColors.textSub)
                 FilePickCard(fileName: $fileName, bytes: $bytes, title: "导入主密钥")
                     .textSelection(.enabled)
-                    .overlay(
-                        // 轻量文件读取：从分享/文件 App 拖入在 v0.0.1 暂不支持，
-                        // 用文档目录路径输入兜底（TODO I2：fileImporter）。
-                        Group { EmptyView() }
-                    )
-                Text("已读入字节数：\(bytes?.count ?? 0)（从应用文档目录读取同 .smk 文件名）")
+                    .onTapGesture { showImporter = true }
+                Text("已读入字节数：\(bytes?.count ?? 0)")
                     .font(.system(size: 11)).foregroundColor(SkColors.textFaint)
 
                 Text("文件保护密码").font(.system(size: 13))
@@ -331,10 +328,17 @@ private struct ImportKeyForm: View {
             .padding(20)
         }
         .background(SkColors.pageBg)
+        .fileImporter(isPresented: $showImporter,
+                      allowedContentTypes: [.data]) { result in
+            if case .success(let url) = result {
+                fileName = url.lastPathComponent
+                bytes = (try? Data(contentsOf: url)).map { [UInt8]($0) }
+            }
+        }
         .onAppear { readFileFromDocs() }
     }
 
-    /// v0.0.1 文件读取兜底：从 App 文档目录找 .smk 文件（AirDrop/文件 App 放入）。
+    /// 文档目录兜底：AirDrop/文件 App 放入的 .smk 自动读取。
     private func readFileFromDocs() {
         let docs = FileManager.default.urls(for: .documentDirectory,
                                             in: .userDomainMask)[0]
@@ -353,6 +357,7 @@ private struct ImportSecretForm: View {
     @State private var fileName = ""
     @State private var bytes: [UInt8]?
     @State private var mkPw = ""
+    @State private var showImporter = false
 
     var body: some View {
         ScrollView {
@@ -360,7 +365,8 @@ private struct ImportSecretForm: View {
                 Text("导入导出的 .ssc 文件；数据密钥由主密钥封装。")
                     .font(.system(size: 13)).foregroundColor(SkColors.textSub)
                 FilePickCard(fileName: $fileName, bytes: $bytes, title: "导入机密信息")
-                Text("已读入字节数：\(bytes?.count ?? 0)（从应用文档目录读取同 .ssc 文件名）")
+                    .onTapGesture { showImporter = true }
+                Text("已读入字节数：\(bytes?.count ?? 0)")
                     .font(.system(size: 11)).foregroundColor(SkColors.textFaint)
 
                 Text("主密钥密码").font(.system(size: 13))
@@ -384,9 +390,17 @@ private struct ImportSecretForm: View {
             .padding(20)
         }
         .background(SkColors.pageBg)
+        .fileImporter(isPresented: $showImporter,
+                      allowedContentTypes: [.data]) { result in
+            if case .success(let url) = result {
+                fileName = url.lastPathComponent
+                bytes = (try? Data(contentsOf: url)).map { [UInt8]($0) }
+            }
+        }
         .onAppear { readFileFromDocs() }
     }
 
+    /// 文档目录兜底：AirDrop/文件 App 放入的 .ssc 自动读取。
     private func readFileFromDocs() {
         let docs = FileManager.default.urls(for: .documentDirectory,
                                             in: .userDomainMask)[0]
