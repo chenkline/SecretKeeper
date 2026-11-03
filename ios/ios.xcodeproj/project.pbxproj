@@ -236,7 +236,7 @@
 /* Begin XCLocalSwiftPackageReference */
 		AA0000000000000000000050 /* XCLocalSwiftPackageReference "ios" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = ..;
+			relativePath = .;
 		};
 /* End XCLocalSwiftPackageReference */
 
