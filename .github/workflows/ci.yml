@@ -324,12 +324,20 @@ jobs:
           name: conformance-macos
           path: conformance-macos.txt
           if-no-files-found: error
-      - name: 打包并上传 macOS 交付物（x86_64 .app）
+      - name: 组装 macOS .app bundle 并打包
+        if: always()
+        run: |
+          APP=build/macos/x64/Release/SecretKeeper.app
+          mkdir -p "$APP/Contents/MacOS"
+          cp build/macos/x64/Release/SecretKeeper "$APP/Contents/MacOS/"
+          printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' '<plist version="1.0"><dict>' '<key>CFBundleExecutable</key><string>SecretKeeper</string>' '<key>CFBundleIdentifier</key><string>com.secretkeeper.macos</string>' '<key>CFBundleName</key><string>SecretKeeper</string>' '<key>CFBundlePackageType</key><string>APPL</string>' '<key>CFBundleShortVersionString</key><string>0.0.1</string>' '<key>CFBundleVersion</key><string>1</string>' '</dict></plist>' > "$APP/Contents/Info.plist"
+          (cd build/macos/x64/Release && zip -qry SecretKeeper-macos-x64.zip SecretKeeper.app)
+      - name: 上传 macOS 交付物（x86_64 .app zip）
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: SecretKeeper-macos-x64
-          path: build/macos/x64/Release/SecretKeeper.app
+          path: build/macos/x64/Release/SecretKeeper-macos-x64.zip
           if-no-files-found: error
 
   # ---------- Android ----------
