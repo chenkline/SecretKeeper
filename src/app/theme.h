@@ -1,12 +1,11 @@
 #pragma once
 
-// SecretKeeper - 界面主题（视觉常量与绘制助手）
+// SecretKeeper - 界面主题（视觉常量与绘制助手）v2
 //
-// 取值全部来自 docs/ui/UI设计规范.md，21 张设计稿是唯一视觉真相源。
-// 桌面三端共用这一份，Windows / Linux / macOS 呈现完全一致。
-//
-// 为什么单独一层：界面代码里散落着魔法数字时，改一次配色要翻遍所有页面。
-// 这里集中之后，改主题只改本文件。
+// 取值全部来自 docs/ui/UI设计规范-v2.md（重设计规范），三端共用一份。
+// v2 要点：三层背景分层替代描边围栏、主色加深、字号/间距 token 化、
+// 全部可交互件具备 hover/focus/禁用状态。v1 常量名保留（页面层引用
+// 不必全改），值按 v2 更新；新增 token 一律用 v2 命名。
 
 #include <FL/Enumerations.H>
 #include <FL/Fl_Widget.H>
@@ -16,9 +15,9 @@
 namespace secretkeeper::ui::theme {
 
 // ---- 色彩（docs/ui/UI设计规范.md 第 1 节）----
-inline constexpr Fl_Color kSidebarBg = 0x1D2C3100;   // 侧栏底色
+inline constexpr Fl_Color kSidebarBg = 0x15262B00;   // 侧栏底色（v2 #15262B）
 inline constexpr Fl_Color kSidebarIcon = 0x96AFB300;  // 侧栏未选中图标
-inline constexpr Fl_Color kSidebarActiveBg = 0x24454A00;  // 侧栏选中项底色
+inline constexpr Fl_Color kSidebarActiveBg = 0x23444B00;  // 侧栏选中胶囊（v2）
 inline constexpr Fl_Color kActiveBg = 0x24454A00;  // 深色区上的浅色块（Logo 底、菜单选中）
 inline constexpr Fl_Color kSidebarActiveText = 0x68C3AD00;  // 侧栏选中项文字
 
@@ -36,20 +35,20 @@ inline constexpr Fl_Color kProgressTrack = 0x35505700;
 inline constexpr Fl_Color kSecondaryBg = 0xE8EDEE00;
 inline constexpr Fl_Color kSecondaryText = 0x9CA9AE00;
 
-inline constexpr Fl_Color kContentBg = 0xF3F5F600;  // 主内容区底色
+inline constexpr Fl_Color kContentBg = 0xF2F4F500;  // 内容区底（v2 #F2F4F5）
 inline constexpr Fl_Color kCardBg = 0xFFFFFF00;      // 卡片
 inline constexpr Fl_Color kFieldBg = 0xFFFFFF00;      // 输入框
 inline constexpr Fl_Color kSubtleBg = 0xF8FAFA00;    // 卡片内的浅底块
 
-inline constexpr Fl_Color kAccent = 0x14786D00;    // 主色（按钮 / 描边）
-inline constexpr Fl_Color kAccentSoft = 0xE8F4F000;  // 主色浅底（提示条）
-inline constexpr Fl_Color kAccentHover = 0x3D6B6D00;
+inline constexpr Fl_Color kAccent = 0x0E6E6200;    // 主色（v2 #0E6E62）
+inline constexpr Fl_Color kAccentSoft = 0xE3F1ED00;  // 主色浅底（v2）
+inline constexpr Fl_Color kAccentHover = 0x17897B00;  // 主色 hover（v2）
 
-inline constexpr Fl_Color kText = 0x1D2C3100;      // 主文字
-inline constexpr Fl_Color kTextMuted = 0x71808700;   // 次要文字
-inline constexpr Fl_Color kTextFaint = 0x9CA9AE00;    // 占位符 / 极弱文字
+inline constexpr Fl_Color kText = 0x1A262B00;      // 主文字（v2 #1A262B）
+inline constexpr Fl_Color kTextMuted = 0x5F707800;   // 次要文字（v2 #5F7078）
+inline constexpr Fl_Color kTextFaint = 0x9AA9AE00;    // 占位符 / 极弱文字（v2）
 
-inline constexpr Fl_Color kBorder = 0xDFE5E700;   // 常规描边
+inline constexpr Fl_Color kBorder = 0xE9EDEF00;   // 分隔线 hairline（v2）
 inline constexpr Fl_Color kBorderSubtle = 0xE8EDEE00;  // 卡片内分隔线
 
 inline constexpr Fl_Color kWarningBg = 0xFFF7E300;    // 黄色提示条底
@@ -62,20 +61,49 @@ inline constexpr Fl_Color kDangerText = 0xB2474700;
 
 inline constexpr Fl_Color kOnAccent = 0xFFFFFF00;  // 主色按钮上的文字
 
+// ---- v2 新增（UI设计规范-v2.md §2.1）----
+inline constexpr Fl_Color kSurfaceRaised = 0xF8FAFA00;  // 卡内嵌套区（表头/搜索框底）
+inline constexpr Fl_Color kSidebarHover = 0x1C333A00;   // 侧栏项 hover
+inline constexpr Fl_Color kSidebarAccentBar = 0x68C3AD00;  // 侧栏选中左缘 3px 竖条
+inline constexpr Fl_Color kInputFocus = 0x0E6E6200;      // 输入框聚焦描边（同主色）
+inline constexpr Fl_Color kInputBorder = 0xCBD5D900;     // 输入框常规描边
+inline constexpr Fl_Color kDanger = 0xB23B3B00;          // 危险动作（v2 收敛）
+inline constexpr Fl_Color kDangerSoft = 0xFBEFEE00;      // 错误条底
+inline constexpr Fl_Color kWarning = 0xA9791C00;         // 警示文字（v2）
+inline constexpr Fl_Color kWarningSoft = 0xFFF6E000;     // 警示条底
+inline constexpr Fl_Color kOk = 0x2E7D5B00;              // 成功/已验证
+inline constexpr Fl_Color kRowHover = 0xF8FAFA00;        // 列表行 hover
+inline constexpr Fl_Color kCardShadow = 0xE3E8EA00;      // 卡片底部 2px 模拟阴影
+inline constexpr Fl_Color kScrollbarThumb = 0xC4CFD300;  // 滚动条 thumb
+inline constexpr Fl_Color kPillBg = 0xE8EDEE00;         // 禁用控件底色
+inline constexpr Fl_Color kScrollbarThumbHover = 0xAEBDC200;
+inline constexpr Fl_Color kAccentBar = 0x0E6E6200;       // 列表选中左缘 3px 竖条
+
+// ---- v2 字号阶梯（§2.4）----
+inline constexpr int kFsCaption = 11;
+inline constexpr int kFsSmall = 12;
+inline constexpr int kFsBody = 13;      // v2 正文基准 13（v1 的 14 降半档）
+inline constexpr int kFsRow = 14;       // 列表行标题（Medium）
+inline constexpr int kFsCardTitle = 15; // 卡片标题（SemiBold）
+inline constexpr int kFsPageTitle = 22; // 页面标题（v1 24 → 22）
+inline constexpr int kFsDisplay = 28;   // 解锁页品牌语
+
 // ---- 圆角（第 2 节）----
-inline constexpr int kRadiusCard = 8;
+inline constexpr int kRadiusCard = 12;   // v2 卡片 12
 inline constexpr int kRadiusField = 8;
-inline constexpr int kRadiusButton = 6;
+inline constexpr int kRadiusButton = 8;  // v2 按钮 8
 inline constexpr int kRadiusPill = 100;
+inline constexpr int kRadiusBadge = 4;   // 徽章/小件
 
 // ---- 字号（第 7 节）----
-inline constexpr int kFontTitle = 24;    // 页面大标题
-inline constexpr int kFontHeading = 20;   // 区块标题
-inline constexpr int kFontSubheading = 14;  // 表单分组标题
-inline constexpr int kFontBody = 14;     // 正文
-inline constexpr int kFontLabel = 13;     // 字段标签
+inline constexpr int kFontTitle = 22;    // 页面大标题（v2 22）
+inline constexpr int kFontHeading = 15;   // 卡片标题（v2 kFsCardTitle）
+inline constexpr int kFontSubheading = 14;  // 表单分组标题（kFsRow）
+inline constexpr int kFontBody = 13;     // 正文（v2 基准 13）
+inline constexpr int kFontLabel = 12;     // 字段标签（v2 kFsSmall）
 inline constexpr int kFontSmall = 12;    // 说明 / 提示
-inline constexpr int kFontTiny = 11;     // 计数 / 角标
+inline constexpr int kFontTiny = 11;     // 计数 / 角标（kFsCaption）
+inline constexpr int kFontMono = 13;     // ID/哈希等宽（FL_COURIER）
 
 // ---- 字重（第 8 节）：FLTK 用字体族区分 400 与 700 ----
 inline constexpr int kWeightRegular = 0;

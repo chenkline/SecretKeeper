@@ -61,11 +61,9 @@ Card::Card(int x, int y, int w, int h, Fl_Color bg) : Card(x, y, w, h) {
 }
 
 void Card::draw() {
-  theme::fill_rounded(x(), y(), w(), h(), theme::kRadiusCard,
-                      custom_bg_ ? bg_ : theme::kCardBg);
-  if (!custom_bg_) {
-    theme::stroke_rounded(x(), y(), w(), h(), theme::kRadiusCard, theme::kBorder);
-  }
+  // v2（§2.5/§3.3）：白底无描边，底部 2px 模拟阴影。
+  theme::fill_rounded(x(), y(), w(), h(), theme::kRadiusCard, theme::kCardBg);
+  theme::fill_rounded(x() + 2, y() + h() - 2, w() - 4, 2, 2, theme::kCardShadow);
 }
 
 int Card::handle(int event) {
@@ -103,61 +101,81 @@ void Button::set_enabled(bool on) {
 }
 
 void Button::draw_background() {
+  const bool en = active() && enabled_;
+  const bool hov = hovered_ && en;
+
+  // v2（UI设计规范-v2.md §3.1）：三种按钮 + hover/禁用态。
   Fl_Color bg = theme::kCardBg;
-  Fl_Color border = theme::kBorder;
+  Fl_Color border = theme::kInputBorder;
+  Fl_Color fg = theme::kText;
+  bool draw_border = false;
 
   switch (kind_) {
     case ButtonKind::kPrimary:
-      bg = (active() && enabled_) ? kPrimaryHover : theme::kAccent;
-      border = bg;
+      bg = hov ? theme::kAccentHover : theme::kAccent;
+      fg = theme::kOnAccent;
+      break;
+    case ButtonKind::kSecondary:
+      bg = hov ? theme::kSurfaceRaised : theme::kCardBg;
+      draw_border = true;
       break;
     case ButtonKind::kDanger:
-      bg = theme::kDangerBg;
-      border = theme::kDangerBorder;
+      // v2 危险动作 = DangerQuiet：无底，文字危险色，hover 淡红底。
+      bg = hov ? theme::kDangerSoft : theme::kCardBg;
+      fg = theme::kDanger;
       break;
     case ButtonKind::kQuiet:
-      // 安静按钮（导入主密钥 / 删除主密钥等）：浅灰底。
-      bg = theme::kSecondaryBg;
-      border = theme::kSecondaryBg;
+      bg = hov ? theme::kAccentSoft : theme::kCardBg;
+      fg = theme::kAccent;
       break;
     case ButtonKind::kGhost:
-      // 侧栏锁定按钮：透明底 + 深描边。
       bg = theme::kSidebarBg;
-      border = theme::kSidebarBorder;
+      fg = 0xFFFFFF00;
       break;
     case ButtonKind::kNav:
-      // 侧栏导航项：未选中透明，选中 #24454A。
-      // 文字与图标由 IconButton::draw 左对齐绘制，这里只画底。
-      if (selected_) {
+      // 侧栏导航项：hover #1C333A，选中胶囊 #23444B + 左缘 3px 亮青竖条。
+      if (is_selected()) {
         theme::fill_rounded(x(), y(), w(), h(), theme::kRadiusButton,
                             theme::kSidebarActiveBg);
+        theme::fill_rounded(x(), y() + 6, 3, h() - 12, 1,
+                            theme::kSidebarAccentBar);
+        fg_color_ = 0xFFFFFF00;
+      } else {
+        if (hov) {
+          theme::fill_rounded(x(), y(), w(), h(), theme::kRadiusButton,
+                              theme::kSidebarHover);
+        }
+        fg_color_ = theme::kSidebarIcon;
       }
       return;
-    default:
-      bg = theme::kCardBg;
-      border = theme::kBorder;
-      break;
   }
 
-  if (!enabled_ && kind_ != ButtonKind::kGhost) {
-    // 禁用态统一降到浅灰底，忽略 kind 的配色。
-    bg = theme::kSubtleBg;
-    border = theme::kBorder;
+  if (!en && kind_ != ButtonKind::kGhost) {
+    bg = theme::kPillBg;
+    fg = theme::kTextFaint;
+    draw_border = false;
   }
 
   theme::fill_rounded(x(), y(), w(), h(), theme::kRadiusButton, bg);
-  if (kind_ != ButtonKind::kPrimary) {
+  if (draw_border) {
     theme::stroke_rounded(x(), y(), w(), h(), theme::kRadiusButton, border);
   }
+  fg_color_ = fg;
 }
 
 void Button::draw() {
   draw_background();
   draw_label_centered(label_, theme::kWeightMedium, theme::kFontBody,
-                      enabled_ ? theme::kText : theme::kTextFaint, x(), y(), w(), h());
+                      fg_color_, x(), y(), w(), h());
 }
 
 int Button::handle(int event) {
+  // v2：hover 跟踪。FLTK 不会自动重绘 hover 变化，手动 damage。
+  if (event == FL_ENTER || event == FL_MOVE) {
+    if (!hovered_) { hovered_ = true; redraw(); }
+  } else if (event == FL_LEAVE) {
+    if (hovered_) { hovered_ = false; redraw(); }
+  }
   if (!enabled_ && event == FL_PUSH) return 1;
   return Fl_Button::handle(event);
 }
@@ -288,11 +306,20 @@ void Field::set_text_inset(int left) {
 }
 
 void Field::draw() {
-  // 可见边框在原设计位置；控件矩形已左右缩进 12px 作为文字内边距。
-  theme::fill_rounded(x() - 12 - outer_dx_, y(), frame_w_, h(), theme::kRadiusField,
-                      theme::kFieldBg);
-  theme::stroke_rounded(x() - 12 - outer_dx_, y(), frame_w_, h(), theme::kRadiusField,
-                        theme::kBorder);
+  // v2（§3.2）：聚焦时主色 2px 描边 + 外圈 focus ring；常规 1px 输入描边。
+  const bool focused = Fl::focus() == this;
+  const int bx = x() - 12 - outer_dx_;
+  if (focused) {
+    theme::fill_rounded(bx - 3, y() - 3, frame_w_ + 6, h() + 6,
+                        theme::kRadiusField + 3, theme::kAccentSoft);
+    theme::fill_rounded(bx, y(), frame_w_, h(), theme::kRadiusField, theme::kFieldBg);
+    theme::stroke_rounded(bx, y(), frame_w_, h(), theme::kRadiusField,
+                          theme::kInputFocus, 2);
+  } else {
+    theme::fill_rounded(bx, y(), frame_w_, h(), theme::kRadiusField, theme::kFieldBg);
+    theme::stroke_rounded(bx, y(), frame_w_, h(), theme::kRadiusField,
+                          theme::kInputBorder);
+  }
 
   // 文本与光标交给 Fl_Input 自己画（box 已是 FL_NO_BOX，不会重画背景）。
   // 此前这里只画背景与占位符、从不画已输入文本，导致「输入有效但无回显」。
@@ -315,6 +342,8 @@ void Field::draw() {
 }
 
 int Field::handle(int event) {
+  // v2：聚焦态变化时整框重绘（focus ring 需要）。
+  if (event == FL_FOCUS || event == FL_UNFOCUS) redraw();
   const int rc = Fl_Input::handle(event);
   // Fl_Input_ 的最小更新路径假设「背景由 draw_box 每次维护」，与自绘外框
   // 不符：按键后只重画光标附近的一小条，其余文字区域被擦除底色盖住
@@ -452,7 +481,11 @@ void List::draw() {
     const ListRow& row = rows_[static_cast<std::size_t>(r)];
     const int ry = list_top + r * row_height();
     if (r == selected_) {
-      theme::fill_rounded(x() + 1, ry, w() - 2, row_height(), 0, theme::kAccentSoft);
+      // v2（§3.4）：选中 = 左缘 3px 主色竖条 + 整行 wash，无描边。
+      theme::fill_rounded(x(), ry, w(), row_height(), 0, theme::kAccentSoft);
+      theme::fill_rounded(x(), ry, 3, row_height(), 0, theme::kAccentBar);
+    } else if (r == hover_row_) {
+      theme::fill_rounded(x(), ry, w(), row_height(), 0, theme::kRowHover);
     }
     const std::string* cells[3] = {&row.c0, &row.c1, &row.c2};
     for (int c = 0; c < 3; ++c) {
@@ -469,10 +502,6 @@ void List::draw() {
         fl_draw("?", col_x_[c] + col_w_[c] - marker_slot + theme::kGapXs, ry, marker_slot,
                 row_height(), FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
       }
-    }
-    if (r + 1 < static_cast<int>(rows_.size())) {
-      fl_color(theme::kBorderSubtle);
-      fl_rect(x() + pad, ry + row_height() - 1, w() - pad * 2, 1);
     }
   }
   fl_pop_clip();
@@ -506,10 +535,7 @@ void IconButton::draw() {
   const int gap = theme::kGapSm;
   const int total = kIconSize + gap + text_w;
   const int start_x = x() + (w() - total) / 2;
-  Fl_Color fg = kind() == ButtonKind::kPrimary ? theme::kOnAccent : theme::kText;
-  if (kind() == ButtonKind::kGhost) fg = 0xFFFFFF00;
-  if (kind() == ButtonKind::kQuiet) fg = theme::kSecondaryText;
-  if (!is_enabled()) fg = theme::kTextFaint;
+  const Fl_Color fg = fg_color_;
   draw_icon(icon_, start_x, y() + (h() - kIconSize) / 2, fg);
   fl_color(fg);
   fl_font(theme::font_for(theme::kWeightMedium), font_size);

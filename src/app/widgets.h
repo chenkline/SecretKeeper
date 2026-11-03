@@ -64,15 +64,19 @@ class Button : public Fl_Button {
   void draw_background();
   // IconButton 在自己的 draw 里需要复用 Button 的配色判定。
   ButtonKind kind() const { return kind_; }
+  // draw_background 计算出的文字色（按型/hover/禁用）；draw 层直接使用。
+  Fl_Color fg_color() const { return fg_color_; }
   bool is_enabled() const { return enabled_; }
   bool is_selected() const { return selected_; }
   const std::string& label_text() const { return label_; }
 
- private:
+ protected:
   std::string label_;
   ButtonKind kind_;
   bool enabled_ = true;
   bool selected_ = false;
+  bool hovered_ = false;  // v2：hover 状态（FL_ENTER/LEAVE 驱动）
+  Fl_Color fg_color_ = FL_BLACK;  // draw_background 的文字色输出
 };
 
 // ---- 标签页 / 步骤胶囊 ----
@@ -184,13 +188,14 @@ class List : public Fl_Widget {
   int handle(int event) override;
 
  private:
-  int header_height() const { return 36; }
-  int row_height() const { return 44; }
+  int header_height() const { return 40; }
+  int row_height() const { return 56; }
   void layout_columns();
 
   std::vector<std::string> headers_;
   std::vector<ListRow> rows_;
   int selected_ = -1;
+  int hover_row_ = -1;  // v2：hover 行（FL_MOVE 驱动）
   int col_x_[3] = {0, 0, 0};
   int col_w_[3] = {0, 0, 0};
 };
