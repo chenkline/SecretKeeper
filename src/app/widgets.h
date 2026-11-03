@@ -170,6 +170,10 @@ struct ListRow {
   std::string c1;
   std::string c2;
   bool show_question_mark = false;
+  // v2.1：行首分类图标（Bitwarden 式圆底）。icon_warning 时画警示黄。
+  bool has_category_icon = false;
+  bool icon_warning = false;
+  int icon_kind = 1;  // widgets::Icon 枚举值（默认 kFile）
 };
 
 class List : public Fl_Widget {
@@ -189,7 +193,7 @@ class List : public Fl_Widget {
 
  private:
   int header_height() const { return 40; }
-  int row_height() const { return 56; }
+  int row_height() const { return 64; }
   void layout_columns();
 
   std::vector<std::string> headers_;

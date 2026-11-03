@@ -499,12 +499,29 @@ void List::draw() {
     } else if (r == hover_row_) {
       theme::fill_rounded(x(), ry, w(), row_height(), 0, theme::kRowHover);
     }
+
+    // v2.1（§7.2）：行首 40px 圆底分类图标（Bitwarden 式）。
+    if (row.has_category_icon) {
+      const int cx = x() + theme::kGapLg;
+      const int cy = ry + (row_height() - 40) / 2;
+      const Fl_Color bg = row.icon_warning ? theme::kWarningSoft
+                                           : theme::kCategoryIconBg;
+      const Fl_Color fg = row.icon_warning ? theme::kWarning
+                                           : theme::kCategoryIconFg;
+      fl_color(bg);
+      fl_pie(cx, cy, 40, 40, 0, 360);  // 40px 实心圆底
+      draw_icon(static_cast<Icon>(row.icon_kind), cx + 10, cy + 10, fg);
+    }
+
     const std::string* cells[3] = {&row.c0, &row.c1, &row.c2};
     for (int c = 0; c < 3; ++c) {
       const int marker_slot = (c == 1 && row.show_question_mark) ? theme::kGapLg : 0;
-      fl_color(theme::kText);
-      fl_font(theme::font_for(theme::kWeightRegular), theme::kFontBody);
-      fl_draw(cells[c]->c_str(), col_x_[c], ry, col_w_[c] - marker_slot, row_height(),
+      const int icon_slot = (c == 0 && row.has_category_icon) ? 48 : 0;
+      fl_color(c == 0 ? theme::kText : theme::kText);
+      fl_font(theme::font_for(c == 0 ? theme::kWeightMedium : theme::kWeightRegular),
+              c == 0 ? theme::kFsRow : theme::kFontSmall);
+      fl_draw(cells[c]->c_str(), col_x_[c] + icon_slot, ry,
+              col_w_[c] - marker_slot - icon_slot, row_height(),
               FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
       if (c == 1 && row.show_question_mark) {
         // 黄色问号紧跟 ID，属于 ID 列列值的一部分，
@@ -514,6 +531,18 @@ void List::draw() {
         fl_draw("?", col_x_[c] + col_w_[c] - marker_slot + theme::kGapXs, ry, marker_slot,
                 row_height(), FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
       }
+    }
+    // v2.1：hover 时右缘浮现复制/查看两个快捷图标提示。
+    if (r == hover_row_ && row.has_category_icon) {
+      draw_icon(Icon::kCopy, x() + w() - 64, ry + (row_height() - kIconSize) / 2,
+                theme::kTextSub);
+      draw_icon(Icon::kEye, x() + w() - 36, ry + (row_height() - kIconSize) / 2,
+                theme::kTextSub);
+    }
+    // v2.1：恢复行间 hairline 分隔（Bitwarden 列表样式）。
+    if (r + 1 < static_cast<int>(rows_.size())) {
+      fl_color(theme::kHairline);
+      fl_rect(x() + pad, ry + row_height() - 1, w() - pad * 2, 1);
     }
   }
   fl_pop_clip();

@@ -15,9 +15,9 @@
 namespace secretkeeper::ui::theme {
 
 // ---- 色彩（docs/ui/UI设计规范.md 第 1 节）----
-inline constexpr Fl_Color kSidebarBg = 0x15262B00;   // 侧栏底色（v2 #15262B）
+inline constexpr Fl_Color kSidebarBg = 0x16303A00;   // 侧栏底色（v2.1 深蓝青 #16303A）
 inline constexpr Fl_Color kSidebarIcon = 0x96AFB300;  // 侧栏未选中图标
-inline constexpr Fl_Color kSidebarActiveBg = 0x23444B00;  // 侧栏选中胶囊（v2）
+inline constexpr Fl_Color kSidebarActiveBg = 0x24455A00;  // 侧栏选中胶囊（v2.1 蓝青）
 inline constexpr Fl_Color kActiveBg = 0x24454A00;  // 深色区上的浅色块（Logo 底、菜单选中）
 inline constexpr Fl_Color kSidebarActiveText = 0x68C3AD00;  // 侧栏选中项文字
 
@@ -35,7 +35,7 @@ inline constexpr Fl_Color kProgressTrack = 0x35505700;
 inline constexpr Fl_Color kSecondaryBg = 0xE8EDEE00;
 inline constexpr Fl_Color kSecondaryText = 0x9CA9AE00;
 
-inline constexpr Fl_Color kContentBg = 0xF2F4F500;  // 内容区底（v2 #F2F4F5）
+inline constexpr Fl_Color kContentBg = 0xF5F7F900;  // 内容区底（v2.1 蓝灰 #F5F7F9）
 inline constexpr Fl_Color kCardBg = 0xFFFFFF00;      // 卡片
 inline constexpr Fl_Color kFieldBg = 0xFFFFFF00;      // 输入框
 inline constexpr Fl_Color kSubtleBg = 0xF8FAFA00;    // 卡片内的浅底块
@@ -74,6 +74,10 @@ inline constexpr Fl_Color kWarningSoft = 0xFFF6E000;     // 警示条底
 inline constexpr Fl_Color kOk = 0x2E7D5B00;              // 成功/已验证
 inline constexpr Fl_Color kRowHover = 0xF8FAFA00;        // 列表行 hover
 inline constexpr Fl_Color kCardShadow = 0xE3E8EA00;      // 卡片底部 2px 模拟阴影
+inline constexpr Fl_Color kCategoryIconBg = 0xE7EEF200;  // v2.1 行首分类图标圆底
+inline constexpr Fl_Color kCategoryIconFg = 0x3B6EA500;  // v2.1 分类图标色（Bitwarden 中蓝）
+inline constexpr Fl_Color kTextSub = kTextMuted;         // v2 别名（次要文字）
+inline constexpr Fl_Color kHairline = kBorder;           // v2 别名（分隔线）
 inline constexpr Fl_Color kScrollbarThumb = 0xC4CFD300;  // 滚动条 thumb
 inline constexpr Fl_Color kPillBg = 0xE8EDEE00;         // 禁用控件底色
 inline constexpr Fl_Color kScrollbarThumbHover = 0xAEBDC200;

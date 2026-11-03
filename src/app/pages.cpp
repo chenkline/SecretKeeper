@@ -707,16 +707,20 @@ void MasterKeysPage::draw() {
     const auto& item = keys[i];
     const bool is_selected = static_cast<int>(i) == selected_;
     const int ch = card_height(i);
-    theme::fill_rounded(cx, y, cw, ch, theme::kRadiusField,
+    // v2.1 Bitwarden 化：无描边卡片 + 底部阴影；选中左缘 3px 主色竖条；
+    // 行首 40px 圆底钥匙图标（浅蓝灰底 + 中蓝）。
+    theme::fill_rounded(cx, y, cw, ch, theme::kRadiusCard,
                         is_selected ? theme::kAccentSoft : theme::kCardBg);
-    theme::stroke_rounded(cx, y, cw, ch, theme::kRadiusField,
-                          is_selected ? theme::kAccent : theme::kBorder);
-    widgets::draw_icon(Icon::kKey, cx + 20, y + 21,
-                       is_selected ? theme::kAccent : theme::kTextMuted);
+    theme::fill_rounded(cx + 2, y + ch - 2, cw - 4, 2, 2, theme::kCardShadow);
+    if (is_selected) {
+      theme::fill_rounded(cx, y, 3, ch, 0, theme::kAccentBar);
+    }
+    theme::fill_rounded(cx + 20, y + 20, 40, 40, 20, theme::kCategoryIconBg);
+    widgets::draw_icon(Icon::kKey, cx + 30, y + 30, theme::kCategoryIconFg);
 
     fl_color(theme::kText);
     fl_font(theme::font_for(theme::kWeightBold), theme::kFontBody);
-    fl_draw(item.name.c_str(), cx + 52, y + 25, cw - 52 - 70, 22, FL_ALIGN_LEFT);
+    fl_draw(item.name.c_str(), cx + 76, y + 25, cw - 76 - 70, 22, FL_ALIGN_LEFT);
     theme::draw_pill(cx + cw - 20 - 38, y + 20, 38, 21, item.is_default ? "默认" : "备选",
                      item.is_default ? theme::kAccent : theme::kTextMuted,
                      is_selected ? theme::kAccentSoft : theme::kSubtleBg);
@@ -1582,6 +1586,10 @@ void SecretsPage::reload() {
     row.c1 = projected[0].c1;
     row.c2 = projected[0].c2;
     row.show_question_mark = projected[0].show_question_mark;
+    // v2.1：行首分类图标（Bitwarden 式）；缺失主密钥时警示黄。
+    row.has_category_icon = true;
+    row.icon_warning = !item.master_key_found;
+    row.icon_kind = item.master_key_found ? 1 : 13; // kFile / kWarning
     rows.push_back(row);
     ids_.push_back(item.secret_id);
     if (!item.master_key_found) ++missing;
