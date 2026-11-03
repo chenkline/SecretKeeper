@@ -171,6 +171,20 @@ dumpbin /dependents build/windows/x64/Release/SecretKeeper.exe
 
 释放 UI 界面可用 `-DSK_BUILD_APP=OFF`，仅构建前四个目标。
 
+## 交付物（CI Artifacts）
+
+每次 CI 全绿后自动产出五端可分发交付物（Actions 页面 → 对应 run → Artifacts）：
+
+| Artifact | 内容 | 说明 |
+|---|---|---|
+| `windows-ui-build` | SecretKeeper.exe | x86_64 Release，静态链接无第三方 DLL，单文件运行 |
+| `SecretKeeper-linux-x64` | SecretKeeper | x86_64 可执行，依赖系统 X11 库 |
+| `SecretKeeper-macos-x64` | SecretKeeper.app zip | x86_64（ARM 机器经 Rosetta 运行） |
+| `SecretKeeper-android-apk` | debug + release APK | 均可直接安装（v0.0.1 release 用 debug 签名） |
+| `SecretKeeper-ios-app` | ios.app zip | 未签名包，安装需开发者签名/TestFlight |
+
+桌面界面截图见 [docs/ui/screenshots-v2/](docs/ui/screenshots-v2/)（v2 Bitwarden 风格九页）。
+
 ## 文档
 
 全部文档位于 [docs/](docs/README.md)，建议从 [总体技术设计](docs/01-architecture/总体技术设计.md) 开始阅读。
