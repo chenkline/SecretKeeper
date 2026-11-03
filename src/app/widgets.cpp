@@ -476,6 +476,18 @@ void List::draw() {
   const int list_h = h() - header_height();
   fl_push_clip(x(), list_top, w(), list_h);
 
+  if (rows_.empty()) {
+    // v2（§3.8）空态：居中图标 + 引导文案（主行动由页头按钮承担）。
+    fl_color(theme::kTextFaint);
+    draw_icon(Icon::kFile, x() + w() / 2 - 24, list_top + list_h / 2 - 58,
+              theme::kTextFaint);
+    fl_font(theme::font_for(theme::kWeightRegular), theme::kFontBody);
+    fl_draw("暂无条目", x(), list_top + list_h / 2 - 26, w(), 22,
+            FL_ALIGN_CENTER);
+    fl_pop_clip();
+    return;
+  }
+
   const int rows_visible = std::max(0, list_h / row_height());
   for (int r = 0; r < rows_visible && r < static_cast<int>(rows_.size()); ++r) {
     const ListRow& row = rows_[static_cast<std::size_t>(r)];

@@ -452,6 +452,15 @@ void UnlockPage::draw() {
   fl_font(theme::font_for(theme::kWeightRegular), 10);
   fl_draw("本机加密", 225, 380, 56, 28, FL_ALIGN_CENTER);
 
+  // v2（§4/01）：品牌语大字——居中于品牌区中轴。
+  fl_color(0xFFFFFF00);
+  fl_font(theme::font_for(theme::kWeightBold), theme::kFsDisplay);
+  fl_draw("你的秘密，只在本机。", 48, 468, side_w - 48, 40, FL_ALIGN_CENTER);
+  fl_color(theme::kSidebarIcon);
+  fl_font(theme::font_for(theme::kWeightRegular), theme::kFontBody);
+  fl_draw("完全离线 · 无账户 · 无云同步", 48, 512, side_w - 48, 22,
+          FL_ALIGN_CENTER);
+
   // 版本号（01 号画板最终稿：只留 v0.0.1）。
   fl_color(theme::kSidebarIcon);
   fl_font(theme::font_for(theme::kWeightRegular), theme::kFontSmall);
