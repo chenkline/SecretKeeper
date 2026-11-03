@@ -407,13 +407,15 @@ jobs:
         if: steps.has_android.outputs.exists == 'true'
         run: |
           chmod +x android/gradlew
-          cd android && ./gradlew assembleDebug test --no-daemon
-      - name: 上传 Android 交付物（可安装 debug APK）
+          cd android && ./gradlew assembleDebug assembleRelease test --no-daemon
+      - name: 上传 Android 交付物（可安装 APK：debug + release 双包）
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: SecretKeeper-android-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
   # ---------- iOS ----------

@@ -18,7 +18,10 @@ android {
 
     buildTypes {
         release {
+            // v0.0.1：release 用 debug 签名以产出可直接安装的 APK；
+            // 正式发布签名（keystore）在 v1.0.0 发布流程中接入。
             isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
