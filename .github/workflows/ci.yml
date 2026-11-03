@@ -310,7 +310,7 @@ jobs:
         # 交付物要求 x86_64：在 ARM runner 上交叉构建（显式 SK_TARGET_ARCH
         # 保证 AES 加速源文件选到 aesni.c），测试经 Rosetta 2 运行。
         run: cmake -S . -B build/macos/x64 -G Ninja -DCMAKE_BUILD_TYPE=Release
-          -DCMAKE_OSX_ARCHITECTURES=x86_64 -DSK_TARGET_ARCH=x86_64
+          -DCMAKE_OSX_ARCHITECTURES=x86_64 -DSK_TARGET_ARCH=x64
       - name: 构建并测试
         run: |
           cmake --build build/macos/x64 --parallel
