@@ -279,6 +279,13 @@ jobs:
           name: conformance-linux
           path: conformance-linux.txt
           if-no-files-found: error
+      - name: 上传 Linux 交付物（x86_64 可执行）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SecretKeeper-linux-x64
+          path: build/linux/x64/Release/SecretKeeper
+          if-no-files-found: error
 
 
   # ---------- macOS ----------
@@ -300,19 +307,29 @@ jobs:
         # 与 Linux job 对齐使用 Ninja。macOS runner 上 CMake 默认落到 Makefile
         # 生成器，Apple Silicon 只有 3 核，FLTK 的三百多个源文件被串行编译，
         # 整个 job 要 16 分钟；换 Ninja 后与 Linux 一样两分钟内完成。
-        run: cmake -S . -B build/macos/arm64 -G Ninja -DCMAKE_BUILD_TYPE=Release
+        # 交付物要求 x86_64：在 ARM runner 上交叉构建（显式 SK_TARGET_ARCH
+        # 保证 AES 加速源文件选到 aesni.c），测试经 Rosetta 2 运行。
+        run: cmake -S . -B build/macos/x64 -G Ninja -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_OSX_ARCHITECTURES=x86_64 -DSK_TARGET_ARCH=x86_64
       - name: 构建并测试
         run: |
-          cmake --build build/macos/arm64 --parallel
-          ctest --test-dir build/macos/arm64 --output-on-failure
+          cmake --build build/macos/x64 --parallel
+          ctest --test-dir build/macos/x64 --output-on-failure
       - name: 生成跨平台一致性探针
-        run: ./build/macos/arm64/Release/sk_crypto_conformance | tee conformance-macos.txt
+        run: ./build/macos/x64/Release/sk_crypto_conformance | tee conformance-macos.txt
       - name: 上传一致性 transcript
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: conformance-macos
           path: conformance-macos.txt
+          if-no-files-found: error
+      - name: 打包并上传 macOS 交付物（x86_64 .app）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SecretKeeper-macos-x64
+          path: build/macos/x64/Release/SecretKeeper.app
           if-no-files-found: error
 
   # ---------- Android ----------
@@ -383,6 +400,13 @@ jobs:
         run: |
           chmod +x android/gradlew
           cd android && ./gradlew assembleDebug test --no-daemon
+      - name: 上传 Android 交付物（可安装 debug APK）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SecretKeeper-android-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
 
   # ---------- iOS ----------
   ios:
