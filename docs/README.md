@@ -26,7 +26,10 @@
 |---|---|
 | [index.html](ui/index.html) | 预览页，21 张画板，按操作先后顺序编号 |
 | [UI设计规范](ui/UI设计规范.md) | 色彩 / 字号 / 间距 / 圆角 / 布局 / 渲染约定 |
-| `svg/` | 21 张画板单体（01–21） |
+| [UI设计规范-v3](ui/UI设计规范-v3.md) | **当前实现依据**：Bitwarden 桌面风格重设计（64px 图标栏+主从布局）|
+| [Bitwarden 三屏设计稿](ui/design-v3/bitwarden-desktop.html) | v3 视觉真相源（解锁/主密钥/机密） |
+| [screenshots-v2/](ui/screenshots-v2/) | v3 实现九页实拍 PNG（--screenshot 生成） |
+| `svg/` | 21 张画板单体（01–21，v1 历史归档） |
 | `.figma-export/` | Figma REST API 原始数据，渲染源，需入库 |
 
 重新生成全部画板：
