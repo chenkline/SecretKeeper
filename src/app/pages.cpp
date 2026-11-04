@@ -247,24 +247,22 @@ PageBase::PageBase(MainWindow* host, const char* title, const char* subtitle,
   // 注意：new Fl_Box 时 current 组是 body_（Fl_Scroll 构造切组），会误挂
   // 进 body 并把 Fl_Scroll 的内容宽度撑出 14px（恰一个滚动条宽），导致
   // 常驻水平滚动条；这里显式移回页面级，并插到 body 之后（z 序盖住它）。
-  header_mask_ = new Fl_Box(theme::kSidebarWidth, 0, kWinW - theme::kSidebarWidth, 117);
+  header_mask_ = new Fl_Box(theme::kSidebarWidth, 0, kWinW - theme::kSidebarWidth, 60);
   header_mask_->box(FL_FLAT_BOX);
   header_mask_->color(theme::kContentBg);
   add(header_mask_);
   insert(*header_mask_, find(body_) + 1);
 
   // 页头（02/03 号画板）：内容区 x=208+32=240，标题 fs24、说明 fs13。
-  title_box_ = new Fl_Box(theme::kSidebarWidth + theme::kContentPad, 32, 656, 33, title);
+  title_box_ = new Fl_Box(theme::kSidebarWidth + theme::kContentPad, 14, 656, 30, title);
   title_box_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
   title_box_->labelfont(theme::font_for(theme::kWeightRegular));
-  title_box_->labelsize(24);
+  title_box_->labelsize(17);
   title_box_->labelcolor(theme::kText);
+  // v3：副标题取消（信息并入列表列头/详情），控件保留但永久隐藏。
   subtitle_box_ = new Fl_Box(theme::kSidebarWidth + theme::kContentPad, 72, 700, 21,
                              subtitle_.c_str());
-  subtitle_box_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  subtitle_box_->labelfont(theme::font_for(theme::kWeightRegular));
-  subtitle_box_->labelsize(theme::kFontLabel);
-  subtitle_box_->labelcolor(theme::kTextMuted);
+  subtitle_box_->hide();
   // title/subtitle 同样误入 body（随滚动跑出页头），移回页面级；
   // 追加到 children 尾 = 绘制在 mask 之上。
   add(title_box_);
@@ -328,7 +326,7 @@ UnlockPage::UnlockPage(MainWindow* host) : Fl_Group(0, 0, kWinW, theme::kUnlockH
   color(theme::kBrandBg);
 
   // ---- 表单滚动视口（01 号画板 x=456 起，品牌区固定不滚动）----
-  body_ = new Fl_Scroll(456, 0, kWinW - 456, theme::kUnlockH);
+  body_ = new Fl_Scroll(528, 0, kWinW - 528, theme::kUnlockH);
   body_->box(FL_NO_BOX);
   body_->color(theme::kFieldBg);
   body_->scrollbar_size(14);
@@ -337,7 +335,7 @@ UnlockPage::UnlockPage(MainWindow* host) : Fl_Group(0, 0, kWinW, theme::kUnlockH
   body_->begin();
 
   // ---- 解锁区（01 号画板最终稿 x=568 w=520；Fl_Scroll 子控件用绝对坐标）----
-  const int form_x = 568;
+  const int form_x = 604;
   const int form_w = 520;
 
   state_pill_ = new widgets::Pill(form_x, 64, 49, 21, "已锁定", theme::kTextMuted,
@@ -405,7 +403,9 @@ UnlockPage::UnlockPage(MainWindow* host) : Fl_Group(0, 0, kWinW, theme::kUnlockH
 
 void UnlockPage::resize_body(int win_w, int win_h) {
   if (body_ == nullptr) return;
-  body_->resize(456, 0, std::max(1, win_w - 456), std::max(1, win_h));
+  body_->resize(static_cast<int>(win_w * 0.44), 0,
+                std::max(1, win_w - static_cast<int>(win_w * 0.44)),
+                std::max(1, win_h));
 }
 
 void UnlockPage::draw() {
@@ -416,12 +416,12 @@ void UnlockPage::draw() {
   // 表单区右上角的锁图标随视口滚动，画进视口坐标。
   {
     Fl_Scroll* b = body_;
-    widgets::draw_icon(Icon::kLock, 1068 - 456 - b->xposition(), 64 - b->yposition(),
+    widgets::draw_icon(Icon::kLock, 1124 - 528 - b->xposition(), 64 - b->yposition(),
                        theme::kTextMuted);
   }
 
   // ---- 左侧品牌区（01 号画板 x=0..456，#172C31）----
-  const int side_w = 456;
+  const int side_w = static_cast<int>(w() * 0.44);
   fl_color(theme::kBrandBg);
   fl_rectf(0, 0, side_w, h());
 
@@ -438,19 +438,19 @@ void UnlockPage::draw() {
   // fl_arc 的角度单位是度，不是弧度。
   fl_line_style(FL_SOLID, 1);
   fl_color(theme::kBrandBorder);
-  fl_arc(188, 316, 122, 0, 360);
+  fl_arc(264, 316, 122, 0, 360);
   fl_color(theme::kAccentHover);
-  fl_arc(188, 317, 91, 0, 360);
+  fl_arc(264, 317, 91, 0, 360);
   fl_line_style(FL_SOLID, 0);
-  theme::fill_rounded(138, 260, 100, 114, 20, theme::kActiveBg);
-  theme::stroke_rounded(138, 260, 100, 114, 20, theme::kCoreStroke);
-  widgets::draw_icon(Icon::kCheck, 178, 306, theme::kBrandTeal);
+  theme::fill_rounded(214, 260, 100, 114, 20, theme::kActiveBg);
+  theme::stroke_rounded(214, 260, 100, 114, 20, theme::kCoreStroke);
+  widgets::draw_icon(Icon::kCheck, 254, 306, theme::kBrandTeal);
 
-  theme::fill_rounded(225, 380, 56, 28, 6, theme::kBrandBg);
-  theme::stroke_rounded(225, 380, 56, 28, 6, theme::kBrandBorder);
+  theme::fill_rounded(301, 380, 56, 28, 6, theme::kNavyDeep);
+  theme::stroke_rounded(301, 380, 56, 28, 6, theme::kBrandBorder);
   fl_color(theme::kBrandTeal);
   fl_font(theme::font_for(theme::kWeightRegular), 10);
-  fl_draw("本机加密", 225, 380, 56, 28, FL_ALIGN_CENTER);
+  fl_draw("本机加密", 301, 380, 56, 28, FL_ALIGN_CENTER);
 
   // v2（§4/01）：品牌语大字——居中于品牌区中轴。
   fl_color(0xFFFFFF00);
@@ -599,19 +599,19 @@ MasterKeysPage::MasterKeysPage(MainWindow* host)
   quota_notice_->set_shown(false);
 
   // 左列：列表标题 + 卡片（卡片在 draw() 绘制，handle() 命中检测）。
-  list_label_ = new Fl_Box(theme::kSidebarWidth + theme::kContentPad, 215, 384, 19,
+  list_label_ = new Fl_Box(theme::kSidebarWidth + theme::kContentPad, 88, 380, 19,
                            "本机主密钥　0 把");
   list_label_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
   list_label_->labelfont(theme::font_for(theme::kWeightRegular));
   list_label_->labelsize(theme::kFontSmall);
   list_label_->labelcolor(theme::kTextMuted);
-  card_box_ = new Fl_Box(theme::kSidebarWidth + theme::kContentPad, 240,
-                         theme::kListColumnWidth, 422, "");
+  card_box_ = new Fl_Box(theme::kSidebarWidth + theme::kContentPad, 112,
+                         theme::kListColumnWidth, 540, "");
   card_box_->box(FL_NO_BOX);
 
   // 右列详情卡片（02 号画板最终稿 x=648 y=209 w=520 h=553，pad 24）。
-  const int dx = 648;
-  const int dw = 520;
+  const int dx = 492;
+  const int dw = 676;
   const int ix = dx + 24;
   const int iw = dw - 48;
   new widgets::Card(dx, 209, dw, 553);
@@ -916,7 +916,7 @@ CreateKeyPage::CreateKeyPage(MainWindow* host)
 
   // 03 号画板：整块内容在一张白卡上（240,117,928,639 r12）。
   new widgets::Card(theme::kSidebarWidth + theme::kContentPad, 117, 560, 639);
-  const int ix = 264;
+  const int ix = 120;
   const int iw = 512;
 
   auto* section = new Fl_Box(296, 149, 400, 24, "新主密钥");
@@ -1060,7 +1060,7 @@ ImportKeyPage::ImportKeyPage(MainWindow* host)
 
   // 04 号画板：白卡（240,117,928,460 r12），无头部返回钮。
   new widgets::Card(theme::kSidebarWidth + theme::kContentPad, 117, 560, 460);
-  const int ix = 264;
+  const int ix = 120;
   const int iw = 512;
 
   // 文件块（04 号画板 #F3F5F6 141,96 r12）。
@@ -1203,7 +1203,7 @@ ExportKeyPage::ExportKeyPage(MainWindow* host)
 
   // 05 号画板：白卡（240,117,928,829 r12），页面客户区高 905。
   new widgets::Card(theme::kSidebarWidth + theme::kContentPad, 117, 560, 829);
-  const int ix = 264;
+  const int ix = 120;
   const int iw = 512;
 
   // 密钥摘要块（05 号画板 #F8FAFA 141,94 r8）。
@@ -1417,27 +1417,27 @@ SecretsPage::SecretsPage(MainWindow* host)
   // 左列卡片（06 号画板 240,117,530,571 r12），搜索框嵌在卡片顶部。
   const int lx = theme::kSidebarWidth + theme::kContentPad;
   const int lw = 530;
-  new widgets::Card(lx, 117, lw, 571);
-  search_ = new widgets::Field(lx + 16, 117, lw - 32, 36);
+  new widgets::Card(lx, 76, lw, 612);
+  search_ = new widgets::Field(lx + 16, 88, lw - 32, 36);
   search_->set_placeholder("搜索标题或主密钥 ID");
   search_->set_text_inset(32); // 左侧让位给放大镜
   search_->callback([](Fl_Widget*, void* d) {
     static_cast<SecretsPage*>(d)->reload();
   }, this);
-  search_icon_ = new widgets::IconBox(lx + 28, 125, widgets::Icon::kSearch,
+  search_icon_ = new widgets::IconBox(lx + 28, 96, widgets::Icon::kSearch,
                                       theme::kTextFaint);
 
   // 行列表（06 号画板 153 起，表头 36 + 行高 44）：真实子控件交给
   // Fl_Scroll 平移，滚动时由 FLTK 裁剪重绘——此前自绘行与滚动位移
   // 不同步，滚动后留下残影。
-  list_ = new widgets::List(lx, 153, lw, 36 + 44 * 2 + 24);
+  list_ = new widgets::List(lx, 136, lw, 40 + 64 * 2 + 24);
   list_->set_columns({"标题（可选）", "主密钥 ID", "主密钥名称"});
   list_->callback([](Fl_Widget*, void* d) {
     static_cast<SecretsPage*>(d)->on_row_select();
   }, this);
 
   // 右列详情卡片（06 号画板 790,117,378,621 r12）。
-  const int dx = 790;
+  const int dx = 492;
   const int dw = 378;
   const int ix = dx + 24;
   const int iw = dw - 48;
@@ -1845,7 +1845,7 @@ AddSecretPage::AddSecretPage(MainWindow* host)
 
   // 07 号画板：白卡（240,117,928,576 r12）。
   new widgets::Card(theme::kSidebarWidth + theme::kContentPad, 117, 928, 576);
-  const int ix = 264;
+  const int ix = 120;
   const int iw = 512;
 
   auto* key_label = new Fl_Box(ix, 147, 400, 17, "用于加密的主密钥");
@@ -2002,7 +2002,7 @@ ImportSecretPage::ImportSecretPage(MainWindow* host)
 
   // 08 号画板：白卡（240,117,928,623 r12）。
   new widgets::Card(theme::kSidebarWidth + theme::kContentPad, 117, 928, 623);
-  const int ix = 264;
+  const int ix = 120;
   const int iw = 512;
 
   // 三段步骤条（08 号画板 141,21）。

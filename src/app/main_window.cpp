@@ -34,21 +34,18 @@ constexpr double kKekRotateSeconds = 30.0;
 
 // 侧栏导航项（02 号画板最终稿）：三项，x=20 w=168 h=44，
 // 客户区 y=99 起，间距 52。文件导入/导出入口在各管理页内（用户定稿）。
-constexpr int kNavX = 20;
-constexpr int kNavW = 168;
+// v3：64px 图标导航栏（UI设计规范-v3.md §3.1）。
+constexpr int kNavX = 10;
+constexpr int kNavW = 44;
 constexpr int kNavH = 44;
-constexpr int kNavTop = 99;
+constexpr int kNavTop = 70;
 constexpr int kNavStep = 52;
 
 // 侧栏底部：锁定按钮距底 60（01/02/03 号画板一致）。
-constexpr int kLockFromBottom = 60;
-constexpr int kStatusFromBottom = 33;
+constexpr int kLockFromBottom = 16;
+constexpr int kStatusFromBottom = 44;
 
 // 容量卡（02 号画板最终稿）：x=20 y=279 w=168 h=108，仅机密信息一根进度条。
-constexpr int kQuotaCardX = 20;
-constexpr int kQuotaCardY = 279;
-constexpr int kQuotaCardW = 168;
-constexpr int kQuotaCardH = 108;
 
 // 内容页页脚：距底 53（02 号画板 786 = 839 − 53）。
 constexpr int kFooterFromBottom = 53;
@@ -164,41 +161,26 @@ void MainWindow::build_chrome() {
   for (int i = 0; i < kNavCount; ++i) {
     menu_targets_[i].window = this;
     menu_targets_[i].page = kNav[i].page;
+    // v3：图标 only（空 label，IconButton 自动居中画图标）。
     auto* btn = new widgets::IconButton(kNavX, kNavTop + i * kNavStep, kNavW, kNavH,
-                                        kNav[i].icon, kNav[i].label,
+                                        kNav[i].icon, "",
                                         widgets::ButtonKind::kNav);
     btn->callback(on_menu_cb, &menu_targets_[i]);
     menu_items_[i] = btn;
   }
 
-  // 容量卡文本（边框与进度条在 paint_sidebar_decor 里画）。
-  quota_version_ = new Fl_Box(kQuotaCardX + 12, kQuotaCardY + 12, 144, 14,
-                              "基础版 · 本地存储");
-  quota_version_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  quota_version_->labelsize(theme::kFontTiny);
-  quota_version_->labelcolor(theme::kSidebarIcon);
+  // v3：容量卡移除——配额信息并入 02/06 列表列头（list_label_/count_label_）。
 
-  quota_secrets_ = new Fl_Box(kQuotaCardX + 12, kQuotaCardY + 37, 144, 16, "机密信息 0 / 15");
-  quota_secrets_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  quota_secrets_->labelsize(theme::kFontSmall);
-  quota_secrets_->labelcolor(0xFFFFFF00);
-
-  quota_keys_ = new Fl_Box(kQuotaCardX + 12, kQuotaCardY + 80, 144, 16, "主密钥 0 / 2");
-  quota_keys_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-  quota_keys_->labelsize(theme::kFontSmall);
-  quota_keys_->labelcolor(0xFFFFFF00);
-
-  // 锁定按钮（02 号画板底部，kGhost 样式）。位置随页高变化，在 show_page 摆放。
-  lock_btn_ = new widgets::IconButton(kNavX, 0, kNavW, 40, widgets::Icon::kLock,
-                                      "立即锁定", widgets::ButtonKind::kGhost);
-  lock_btn_->labelsize(theme::kFontSmall);
+  // 锁定按钮（v3：图标 only，沉底）。位置随页高变化，在 show_page 摆放。
+  lock_btn_ = new widgets::IconButton(kNavX, 0, kNavW, 44, widgets::Icon::kLock,
+                                      "", widgets::ButtonKind::kNav);
   lock_btn_->callback([](Fl_Widget*, void* data) {
     static_cast<MainWindow*>(data)->lock_now();
   }, this);
 
-  // 瞬时状态消息（最终稿侧栏底部没有常驻离线行）：默认隐藏。
-  status_ = new Fl_Box(kNavX, 0, kNavW, 14, "");
-  status_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  // 瞬时状态消息：默认隐藏。
+  status_ = new Fl_Box(8, 0, 48, 14, "");
+  status_->align(FL_ALIGN_CENTER | FL_ALIGN_INSIDE);
   status_->labelsize(theme::kFontTiny);
   status_->labelcolor(theme::kTextFaint);
   status_->hide();
@@ -223,22 +205,7 @@ void MainWindow::on_menu_cb(Fl_Widget*, void* data) {
 }
 
 void MainWindow::refresh_chrome() {
-  const svc::QuotaStatus q = service_.quota();
-  const std::string secrets = "机密信息 " + std::to_string(q.secrets) + " / " +
-                              std::to_string(q.max_secrets);
-  const std::string keys = "主密钥 " + std::to_string(q.master_keys) + " / " +
-                           std::to_string(q.max_master_keys);
-  quota_secrets_->copy_label(secrets.c_str());
-  quota_keys_->copy_label(keys.c_str());
-  quota_secret_ratio_ = q.max_secrets == 0
-                            ? 0.0
-                            : static_cast<double>(q.secrets) / static_cast<double>(q.max_secrets);
-  quota_key_ratio_ = q.max_master_keys == 0
-                         ? 0.0
-                         : static_cast<double>(q.master_keys) /
-                               static_cast<double>(q.max_master_keys);
-  quota_secrets_->redraw();
-  quota_keys_->redraw();
+  // v3：配额显示移入各页列表列头（由页面 reload 自刷），chrome 不再维护。
 
   // 页脚胶囊：已解锁 / 已锁定。
   const bool unlocked = service_.is_unlocked();
@@ -247,28 +214,14 @@ void MainWindow::refresh_chrome() {
 }
 
 void MainWindow::paint_sidebar_decor() {
-  // 侧栏底色。
+  // v3：64px navy 图标导航栏底 + 顶部 logo 方块（容量卡已移除）。
   fl_color(theme::kSidebarBg);
   fl_rectf(0, 0, theme::kSidebarWidth, h());
 
-  // 品牌（02 号画板）：盾牌 30px + 密匣 fs22 白 + SecretKeeper fs10。
-  widgets::draw_icon(widgets::Icon::kKey, 20, 32, theme::kSidebarActiveText);
+  theme::fill_rounded(14, 14, 36, 36, 9, theme::kAccent);
   fl_color(0xFFFFFF00);
-  fl_font(theme::font_for(theme::kWeightRegular), 22);
-  fl_draw("密匣", 60, 28, 120, 27, FL_ALIGN_LEFT);
-  fl_color(theme::kSidebarIcon);
-  fl_font(theme::font_for(theme::kWeightRegular), 10);
-  fl_draw("SecretKeeper", 60, 55, 130, 13, FL_ALIGN_LEFT);
-
-  // 容量卡：描边框 + 机密信息进度条（02 号画板最终稿只有一根）。
-  theme::stroke_rounded(kQuotaCardX, kQuotaCardY, kQuotaCardW, kQuotaCardH, 8,
-                        theme::kSidebarBorder);
-  const int track_x = kQuotaCardX + 12;
-  theme::fill_rounded(track_x, kQuotaCardY + 65, 144, 3, 2, theme::kProgressTrack);
-  const int fill1 = static_cast<int>(144 * std::clamp(quota_secret_ratio_, 0.0, 1.0));
-  if (fill1 > 0) {
-    theme::fill_rounded(track_x, kQuotaCardY + 65, fill1, 3, 2, theme::kSidebarActiveText);
-  }
+  fl_font(theme::font_for(theme::kWeightBold), 18);
+  fl_draw("密", 14, 14, 36, 36, FL_ALIGN_CENTER);
 }
 
 void MainWindow::draw() {
@@ -417,16 +370,9 @@ void MainWindow::show_page(Page page) {
     menu_items_[i]->set_selected(menu_targets_[i].page == menu_page);
     menu_items_[i]->redraw();
   }
-  if (chrome) {
-    quota_version_->show();
-    quota_secrets_->show();
-    quota_keys_->show();
-  } else {
+  if (!chrome) {
     lock_btn_->hide();
     status_->hide();
-    quota_version_->hide();
-    quota_secrets_->hide();
-    quota_keys_->hide();
   }
   refresh_chrome();
 

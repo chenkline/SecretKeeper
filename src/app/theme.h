@@ -15,14 +15,14 @@
 namespace secretkeeper::ui::theme {
 
 // ---- 色彩（docs/ui/UI设计规范.md 第 1 节）----
-inline constexpr Fl_Color kSidebarBg = 0x16303A00;   // 侧栏底色（v2.1 深蓝青 #16303A）
-inline constexpr Fl_Color kSidebarIcon = 0x96AFB300;  // 侧栏未选中图标
-inline constexpr Fl_Color kSidebarActiveBg = 0x24455A00;  // 侧栏选中胶囊（v2.1 蓝青）
+inline constexpr Fl_Color kSidebarBg = 0x1A3B5D00;   // 导航栏 navy（v3 Bitwarden #1A3B5D）
+inline constexpr Fl_Color kSidebarIcon = 0x9FB6D000;  // 导航未选中图标（v3 #9FB6D0）
+inline constexpr Fl_Color kSidebarActiveBg = 0x152F4A00;  // 导航选中底（v3 #152F4A）
 inline constexpr Fl_Color kActiveBg = 0x24454A00;  // 深色区上的浅色块（Logo 底、菜单选中）
 inline constexpr Fl_Color kSidebarActiveText = 0x68C3AD00;  // 侧栏选中项文字
 
 // 深色区专用（解锁页品牌区 #172C31 比侧栏底色更深，含配套描边与亮青）。
-inline constexpr Fl_Color kBrandBg = 0x172C3100;
+inline constexpr Fl_Color kBrandBg = 0x1A3B5D00;  // 解锁品牌区 navy（v3）
 inline constexpr Fl_Color kBrandTeal = 0x74CFBA00;
 inline constexpr Fl_Color kBrandBorder = 0x35565B00;
 inline constexpr Fl_Color kCoreStroke = 0x477A7900;
@@ -40,9 +40,9 @@ inline constexpr Fl_Color kCardBg = 0xFFFFFF00;      // 卡片
 inline constexpr Fl_Color kFieldBg = 0xFFFFFF00;      // 输入框
 inline constexpr Fl_Color kSubtleBg = 0xF8FAFA00;    // 卡片内的浅底块
 
-inline constexpr Fl_Color kAccent = 0x0E6E6200;    // 主色（v2 #0E6E62）
+inline constexpr Fl_Color kAccent = 0x175DDC00;    // 主色 Bitwarden 蓝（v3 #175DDC）
 inline constexpr Fl_Color kAccentSoft = 0xE3F1ED00;  // 主色浅底（v2）
-inline constexpr Fl_Color kAccentHover = 0x17897B00;  // 主色 hover（v2）
+inline constexpr Fl_Color kAccentHover = 0x134EAF00;  // 主色 hover（v3 #134EAF）
 
 inline constexpr Fl_Color kText = 0x1A262B00;      // 主文字（v2 #1A262B）
 inline constexpr Fl_Color kTextMuted = 0x5F707800;   // 次要文字（v2 #5F7078）
@@ -63,9 +63,9 @@ inline constexpr Fl_Color kOnAccent = 0xFFFFFF00;  // 主色按钮上的文字
 
 // ---- v2 新增（UI设计规范-v2.md §2.1）----
 inline constexpr Fl_Color kSurfaceRaised = 0xF8FAFA00;  // 卡内嵌套区（表头/搜索框底）
-inline constexpr Fl_Color kSidebarHover = 0x1C333A00;   // 侧栏项 hover
-inline constexpr Fl_Color kSidebarAccentBar = 0x68C3AD00;  // 侧栏选中左缘 3px 竖条
-inline constexpr Fl_Color kInputFocus = 0x0E6E6200;      // 输入框聚焦描边（同主色）
+inline constexpr Fl_Color kSidebarHover = 0x1C3B5C00;   // 导航项 hover（v3）
+inline constexpr Fl_Color kSidebarAccentBar = 0x175DDC00;  // 导航/列表选中左缘 3px 竖条（v3 主蓝）
+inline constexpr Fl_Color kInputFocus = 0x175DDC00;      // 输入框聚焦描边（v3 主蓝）
 inline constexpr Fl_Color kInputBorder = 0xCBD5D900;     // 输入框常规描边
 inline constexpr Fl_Color kDanger = 0xB23B3B00;          // 危险动作（v2 收敛）
 inline constexpr Fl_Color kDangerSoft = 0xFBEFEE00;      // 错误条底
@@ -79,9 +79,10 @@ inline constexpr Fl_Color kCategoryIconFg = 0x3B6EA500;  // v2.1 分类图标色
 inline constexpr Fl_Color kTextSub = kTextMuted;         // v2 别名（次要文字）
 inline constexpr Fl_Color kHairline = kBorder;           // v2 别名（分隔线）
 inline constexpr Fl_Color kScrollbarThumb = 0xC4CFD300;  // 滚动条 thumb
+inline constexpr Fl_Color kNavyDeep = 0x12325200;       // 解锁品牌区渐变深端（v3）
 inline constexpr Fl_Color kPillBg = 0xE8EDEE00;         // 禁用控件底色
 inline constexpr Fl_Color kScrollbarThumbHover = 0xAEBDC200;
-inline constexpr Fl_Color kAccentBar = 0x0E6E6200;       // 列表选中左缘 3px 竖条
+inline constexpr Fl_Color kAccentBar = 0x175DDC00;       // 列表选中左缘 3px 竖条（v3 主蓝）
 
 // ---- v2 字号阶梯（§2.4）----
 inline constexpr int kFsCaption = 11;
@@ -128,7 +129,7 @@ inline constexpr int kGapXxl = 32;
 // 实现用系统标题栏，客户区高 = 画板高 − 36。窗口高度随页面切换。
 
 inline constexpr int kWinW = 1200;          // 全部桌面画板统一宽度
-inline constexpr int kSidebarWidth = 208;   // 侧栏宽（02-09 号画板公共）
+inline constexpr int kSidebarWidth = 64;    // 图标导航栏宽（v3 Bitwarden 式）
 inline constexpr int kContentPad = 32;      // 主内容区四周留白
 
 // 用户可调窗口的下限。size_range 的 min 以下拖不动；max 传 0（无上限）
