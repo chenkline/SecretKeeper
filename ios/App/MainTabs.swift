@@ -18,11 +18,6 @@ enum SkTab: String, CaseIterable {
 
 /// 主界面骨架：内容区 + 底部三 tab 导航。
 struct MainTabs: View {
-    init() {
-        // v3 Bitwarden 移动式：tab 栏白底、选中主蓝（色板已同步）。
-        UITabBar.appearance().unselectedItemTintColor = UIColor(
-            red: 0x6C/255, green: 0x75/255, blue: 0x7D/255, alpha: 1)
-    }
 
     @EnvironmentObject var state: AppViewModel
     @Binding var tab: SkTab
@@ -44,6 +39,10 @@ struct MainTabs: View {
                 .tabItem { Label(SkTab.settings.rawValue, systemImage: SkTab.settings.icon) }
                 .tag(SkTab.settings)
         }
-        .onAppear { state.refreshLists() }
+        .onAppear {
+            state.refreshLists()
+            UITabBar.appearance().unselectedItemTintColor = UIColor(
+                red: 0x6C/255, green: 0x75/255, blue: 0x7D/255, alpha: 1)
+        }
     }
 }
