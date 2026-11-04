@@ -67,6 +67,23 @@ fun SecretsScreen(
         }
         Spacer(Modifier.height(14.dp))
 
+        // v3 Bitwarden 移动式：通栏搜索紧贴标题，行内快捷按钮移入行卡。
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            placeholder = {
+                Text("搜索标题或主密钥 ID", color = SkColors.TextFaint, fontSize = 14.sp)
+            },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = SkColors.Primary,
+                unfocusedBorderColor = SkColors.Border,
+            ),
+            shape = RoundedCornerShape(8.dp),
+        )
+        Spacer(Modifier.height(12.dp))
+
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = state.quotaText,
@@ -92,22 +109,6 @@ fun SecretsScreen(
                 Text("新增")
             }
         }
-        Spacer(Modifier.height(12.dp))
-
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            placeholder = {
-                Text("搜索标题或主密钥 ID", color = SkColors.TextFaint, fontSize = 14.sp)
-            },
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = SkColors.Primary,
-                unfocusedBorderColor = SkColors.Border,
-            ),
-            shape = RoundedCornerShape(8.dp),
-        )
         Spacer(Modifier.height(10.dp))
 
         // 表头（画板 14 的列头：标题（可选）/主密钥 ID/主密钥名称）
