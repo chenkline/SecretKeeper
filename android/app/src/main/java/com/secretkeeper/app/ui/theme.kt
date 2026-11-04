@@ -11,14 +11,14 @@ import androidx.compose.ui.unit.dp
  * 色值取自 docs/ui/UI设计规范.md §1（设计稿实测），与桌面端 theme.h 同源。
  */
 object SkColors {
-    val BrandBg = Color(0xFF172C31) // 品牌深青底（画板 10 上半区）
+    val BrandBg = Color(0xFF1A3B5D) // 品牌 navy 底（v3 Bitwarden）
     val BrandBgDeep = Color(0xFF1D2C31) // 标题深青
-    val Primary = Color(0xFF14786D) // 主青（按钮/选中态）
-    val PrimarySoft = Color(0xFF68C3AD) // 亮青（图标/徽章）
-    val PrimaryWash = Color(0xFFE8F4F0) // 选中行淡青底
-    val PageBg = Color(0xFFF3F5F6) // 页面浅灰底
+    val Primary = Color(0xFF175DDC) // 主蓝（v3 Bitwarden #175DDC）
+    val PrimarySoft = Color(0xFF3B6EA5) // 中蓝（v3 行首圆底图标）
+    val PrimaryWash = Color(0xFFEEF2F7) // 选中行淡蓝灰底（v3）
+    val PageBg = Color(0xFFF5F7F9) // 页面蓝灰底（v3）
     val CardBg = Color(0xFFFFFFFF)
-    val TextMain = Color(0xFF1D2C31)
+    val TextMain = Color(0xFF212529)
     val TextSub = Color(0xFF718087) // 次要文本
     val TextFaint = Color(0xFF96AFB3) // 占位文本
     val Border = Color(0xFFDFE5E7)
@@ -28,6 +28,9 @@ object SkColors {
     val DangerText = Color(0xFFB24747)
     val DangerSoftBg = Color(0xFFF8E4E4) // 删除按钮淡红底
     val PillBg = Color(0xFFE8EDEE)
+    val CategoryIconBg = Color(0xFFEEF2F7) // v3 行首圆底分类图标
+    val CategoryIconFg = Color(0xFF3B6EA5) // v3 圆底图标中蓝
+    val Navy = Color(0xFF1A3B5D) // v3 底导航 navy
 }
 
 private val LightScheme = lightColorScheme(

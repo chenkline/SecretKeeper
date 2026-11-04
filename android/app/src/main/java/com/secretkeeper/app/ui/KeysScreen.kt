@@ -3,6 +3,7 @@ package com.secretkeeper.app.ui
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -191,13 +192,21 @@ private fun MasterKeyCard(
             .padding(16.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            androidx.compose.material3.Icon(
-                SkIcons.Key,
-                contentDescription = null,
-                tint = SkColors.Primary,
-                modifier = Modifier.size(18.dp),
-            )
-            Spacer(Modifier.width(8.dp))
+            // v3 Bitwarden：行首 40dp 圆底钥匙图标。
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(SkColors.CategoryIconBg, RoundedCornerShape(20.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                androidx.compose.material3.Icon(
+                    SkIcons.Key,
+                    contentDescription = null,
+                    tint = SkColors.CategoryIconFg,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            Spacer(Modifier.width(10.dp))
             Text(
                 text = item.name.ifEmpty { shortId(item.masterKeyId) },
                 color = SkColors.TextMain,

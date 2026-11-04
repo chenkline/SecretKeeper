@@ -1,6 +1,8 @@
 package com.secretkeeper.app.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -150,8 +152,24 @@ private fun SecretRow(item: SecretListItem, onClick: () -> Unit = {}) {
             .background(SkColors.CardBg, RoundedCornerShape(8.dp))
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
-
+        // v3 Bitwarden 移动风格：行首 40dp 圆底分类图标（缺失主密钥=警示黄）。
         Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(
+                        if (item.masterKeyFound) SkColors.CategoryIconBg
+                        else SkColors.WarnBg,
+                        RoundedCornerShape(20.dp),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = if (item.masterKeyFound) "📄" else "⚠",
+                    fontSize = 16.sp,
+                )
+            }
+            Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 // 空标题与空名称保持留白（需求 3.1），不显示占位符
                 Text(
