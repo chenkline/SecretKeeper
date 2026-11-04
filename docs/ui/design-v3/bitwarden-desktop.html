@@ -1,0 +1,200 @@
+<div id="sk-v3-mockups" style="background:#e9ecef;padding:24px;display:flex;flex-direction:column;gap:32px;font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;">
+<style>
+#sk-v3-mockups { --sk-navy:#1a3b5d; --sk-navy-deep:#152f4a; --sk-blue:#175ddc; --sk-blue-hover:#134eaf; --sk-bg:#f5f7f9; --sk-card:#fff; --sk-text:#212529; --sk-sub:#6c757d; --sk-faint:#adb5bd; --sk-line:#e9ecef; --sk-wash:#eef2f7; --sk-danger:#c0392b; }
+#sk-v3-mockups .win { border-radius:10px; overflow:hidden; box-shadow:0 8px 30px rgba(26,59,93,.18); background:var(--sk-card); }
+#sk-v3-mockups .titlebar { height:36px; background:#dee2e6; display:flex; align-items:center; padding:0 12px; gap:6px; }
+#sk-v3-mockups .titlebar .dot { width:12px; height:12px; border-radius:50%; background:#ced4da; }
+#sk-v3-mockups .titlebar .t { margin-left:8px; font-size:12px; color:#495057; flex:1; }
+#sk-v3-mockups .cap { font-size:13px; color:#495057; margin-bottom:8px; }
+#sk-v3-mockups .shell { display:flex; height:640px; }
+#sk-v3-mockups .rail { width:64px; background:var(--sk-navy); display:flex; flex-direction:column; align-items:center; padding:14px 0; gap:6px; flex-shrink:0; }
+#sk-v3-mockups .rail .logo { width:36px; height:36px; border-radius:9px; background:var(--sk-blue); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:18px; margin-bottom:14px; }
+#sk-v3-mockups .rail .it { width:44px; height:44px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#9fb6d0; }
+#sk-v3-mockups .rail .it.active { background:var(--sk-navy-deep); color:#fff; box-shadow:inset 3px 0 0 var(--sk-blue); }
+#sk-v3-mockups .rail .sp { flex:1; }
+#sk-v3-mockups .main { flex:1; display:flex; flex-direction:column; background:var(--sk-bg); min-width:0; }
+#sk-v3-mockups .topbar { height:60px; display:flex; align-items:center; gap:12px; padding:0 20px; background:var(--sk-card); border-bottom:1px solid var(--sk-line); }
+#sk-v3-mockups .topbar h2 { font-size:17px; font-weight:600; margin:0; color:var(--sk-text); flex-shrink:0; }
+#sk-v3-mockups .search { flex:1; height:36px; border-radius:8px; border:1px solid var(--sk-line); background:var(--sk-bg); display:flex; align-items:center; padding:0 12px; color:var(--sk-faint); font-size:13px; gap:8px; max-width:430px; }
+#sk-v3-mockups .act { height:36px; padding:0 16px; border-radius:8px; display:flex; align-items:center; font-size:13px; font-weight:500; }
+#sk-v3-mockups .act.pri { background:var(--sk-blue); color:#fff; }
+#sk-v3-mockups .act.sec { border:1px solid var(--sk-line); color:var(--sk-text); background:var(--sk-card); }
+#sk-v3-mockups .cols { flex:1; display:flex; min-height:0; }
+#sk-v3-mockups .listcol { width:380px; border-right:1px solid var(--sk-line); background:var(--sk-card); overflow:hidden; flex-shrink:0; }
+#sk-v3-mockups .listcol .lh { padding:12px 16px 8px; font-size:12px; color:var(--sk-sub); }
+#sk-v3-mockups .row { display:flex; align-items:center; gap:12px; padding:11px 16px; border-bottom:1px solid var(--sk-line); }
+#sk-v3-mockups .row.sel { background:var(--sk-wash); box-shadow:inset 3px 0 0 var(--sk-blue); }
+#sk-v3-mockups .row .av { width:40px; height:40px; border-radius:50%; background:var(--sk-wash); display:flex; align-items:center; justify-content:center; color:var(--sk-blue); flex-shrink:0; }
+#sk-v3-mockups .row .av.warn { background:#fdf3d8; color:#a9791c; }
+#sk-v3-mockups .row .tx { flex:1; min-width:0; }
+#sk-v3-mockups .row .tx .a { font-size:14px; font-weight:500; color:var(--sk-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#sk-v3-mockups .row .tx .b { font-size:12px; color:var(--sk-sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#sk-v3-mockups .row .q { color:#a9791c; font-weight:700; }
+#sk-v3-mockups .detail { flex:1; overflow:hidden; padding:20px 24px; }
+#sk-v3-mockups .detail h3 { font-size:16px; font-weight:600; margin:0 0 18px; color:var(--sk-text); display:flex; align-items:center; gap:10px; }
+#sk-v3-mockups .kv { display:flex; padding:8px 0; border-bottom:1px solid var(--sk-line); font-size:13px; }
+#sk-v3-mockups .kv .k { width:120px; color:var(--sk-sub); flex-shrink:0; }
+#sk-v3-mockups .kv .v { color:var(--sk-text); font-family:ui-monospace,Consolas,monospace; }
+#sk-v3-mockups .kv .v.plain { font-family:inherit; }
+#sk-v3-mockups .badge { font-size:11px; padding:3px 8px; border-radius:4px; background:var(--sk-wash); color:var(--sk-blue); font-weight:500; }
+#sk-v3-mockups .btns { display:flex; gap:10px; margin-top:20px; }
+#sk-v3-mockups .btns .b1 { height:38px; padding:0 18px; border-radius:8px; background:var(--sk-blue); color:#fff; display:flex; align-items:center; font-size:13px; font-weight:500; gap:8px; }
+#sk-v3-mockups .btns .b2 { height:38px; padding:0 18px; border-radius:8px; border:1px solid var(--sk-line); color:var(--sk-danger); display:flex; align-items:center; font-size:13px; background:var(--sk-card); }
+#sk-v3-mockups .unlock { display:flex; height:640px; }
+#sk-v3-mockups .ubrand { width:44%; background:linear-gradient(160deg,var(--sk-navy) 0%,#123252 100%); color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; }
+#sk-v3-mockups .ubrand .sh { width:76px; height:76px; border-radius:20px; background:rgba(255,255,255,.08); display:flex; align-items:center; justify-content:center; }
+#sk-v3-mockups .ubrand .h { font-size:28px; font-weight:700; }
+#sk-v3-mockups .ubrand .s { font-size:13px; opacity:.75; }
+#sk-v3-mockups .uform { flex:1; display:flex; align-items:center; justify-content:center; background:var(--sk-card); }
+#sk-v3-mockups .ucard { width:400px; }
+#sk-v3-mockups .ucard label { display:block; font-size:13px; color:var(--sk-text); margin:18px 0 6px; font-weight:500; }
+#sk-v3-mockups .ucard .inp { height:42px; border-radius:8px; border:1px solid var(--sk-line); display:flex; align-items:center; padding:0 12px; color:var(--sk-faint); font-size:14px; background:var(--sk-card); }
+#sk-v3-mockups .ucard .inp.focus { border:2px solid var(--sk-blue); }
+#sk-v3-mockups .ucard .go { margin-top:26px; height:44px; border-radius:8px; background:var(--sk-blue); color:#fff; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:600; gap:8px; }
+#sk-v3-mockups .ucard .warn { margin-top:20px; font-size:12px; color:#a9791c; background:#fdf3d8; padding:10px 12px; border-radius:8px; }
+#sk-v3-mockups .ucard .foot { margin-top:26px; font-size:12px; color:var(--sk-faint); text-align:center; }
+#sk-v3-mockups svg { display:block; }
+</style>
+
+<div class="cap">① 解锁 — 全屏双区：左品牌 / 右表单（画板 01）</div>
+<div class="win">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="t">密匣 SecretKeeper</span></div>
+  <div class="unlock">
+    <div class="ubrand">
+      <div class="sh"><i data-lucide="shield-check" style="width:40px;height:40px;color:#74c0e8" aria-hidden="true"></i></div>
+      <div class="h">你的秘密，只在本机。</div>
+      <div class="s">完全离线 · 无账户 · 无云同步</div>
+    </div>
+    <div class="uform">
+      <div class="ucard">
+        <div style="font-size:20px;font-weight:600;color:var(--sk-text)">解锁密匣</div>
+        <label>主密钥</label>
+        <div class="inp" style="color:var(--sk-text)"><i data-lucide="key-round" style="width:16px;height:16px;margin-right:8px" aria-hidden="true"></i>main <span style="flex:1"></span><span class="badge">默认</span></div>
+        <label>主密钥密码</label>
+        <div class="inp focus">••••••••••<span style="flex:1"></span><i data-lucide="eye-off" style="width:16px;height:16px" aria-hidden="true"></i></div>
+        <div class="warn">⚠ 密码错误，请在 8 秒后重试</div>
+        <div class="go"><i data-lucide="lock-open" style="width:16px;height:16px" aria-hidden="true"></i>解锁</div>
+        <div class="foot">密码丢失无法解密，没有在线找回方式。<br>完全离线 · 无账户 · 无云同步 · v0.0.1</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="cap">② 主密钥管理 — 64px 图标导航 + 列表/详情主从布局（画板 02）</div>
+<div class="win">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="t">密匣 SecretKeeper</span></div>
+  <div class="shell">
+    <div class="rail">
+      <div class="logo">密</div>
+      <div class="it"><i data-lucide="shield" style="width:20px;height:20px" aria-hidden="true"></i></div>
+      <div class="it active"><i data-lucide="key-round" style="width:20px;height:20px" aria-hidden="true"></i></div>
+      <div class="it"><i data-lucide="settings" style="width:20px;height:20px" aria-hidden="true"></i></div>
+      <div class="sp"></div>
+      <div class="it"><i data-lucide="lock" style="width:20px;height:20px" aria-hidden="true"></i></div>
+    </div>
+    <div class="main">
+      <div class="topbar">
+        <h2>主密钥管理</h2>
+        <div class="search"><i data-lucide="search" style="width:15px;height:15px" aria-hidden="true"></i>搜索主密钥…</div>
+        <div class="act pri"><i data-lucide="plus" style="width:15px;height:15px" aria-hidden="true"></i>生成主密钥</div>
+        <div class="act sec"><i data-lucide="download" style="width:15px;height:15px" aria-hidden="true"></i>导入</div>
+      </div>
+      <div class="cols">
+        <div class="listcol">
+          <div class="lh">本机主密钥 · 1 / 2 把</div>
+          <div class="row sel">
+            <div class="av"><i data-lucide="key-round" style="width:18px;height:18px" aria-hidden="true"></i></div>
+            <div class="tx"><div class="a">main</div><div class="b">RSA-2048 · 关联 0 条 · 2026-10-03</div></div>
+            <span class="badge">默认</span>
+          </div>
+          <div class="row">
+            <div class="av"><i data-lucide="plus" style="width:18px;height:18px" aria-hidden="true"></i></div>
+            <div class="tx"><div class="a" style="color:var(--sk-sub)">还有 1 把可创建</div><div class="b">容量上限 2 把（基础版）</div></div>
+          </div>
+        </div>
+        <div class="detail">
+          <h3>主密钥详情 <span class="badge">默认</span></h3>
+          <div class="kv"><div class="k">主密钥 ID</div><div class="v">5463de226dff5201cf07c98799d12aa</div></div>
+          <div class="kv"><div class="k">名称</div><div class="v plain">main</div></div>
+          <div class="kv"><div class="k">算法</div><div class="v plain">RSA-2048（OAEP-SHA256）</div></div>
+          <div class="kv"><div class="k">保存位置</div><div class="v plain">本机加密存储</div></div>
+          <div class="kv"><div class="k">关联信息</div><div class="v plain">0 条</div></div>
+          <div style="font-size:12px;color:var(--sk-sub);margin-top:16px">随机生成的主密钥，由主密钥密码派生的 KEK 加密后保存在本地。</div>
+          <div class="btns">
+            <div class="b1"><i data-lucide="upload" style="width:15px;height:15px" aria-hidden="true"></i>导出主密钥</div>
+            <div class="b2"><i data-lucide="trash-2" style="width:15px;height:15px" aria-hidden="true"></i>删除</div>
+            <div class="b2" style="color:var(--sk-text)"><i data-lucide="star" style="width:15px;height:15px" aria-hidden="true"></i>设为默认</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="cap">③ 机密信息管理 — 同构主从布局 + 行内快捷图标 hover（画板 06）</div>
+<div class="win">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="t">密匣 SecretKeeper</span></div>
+  <div class="shell">
+    <div class="rail">
+      <div class="logo">密</div>
+      <div class="it active"><i data-lucide="shield" style="width:20px;height:20px" aria-hidden="true"></i></div>
+      <div class="it"><i data-lucide="key-round" style="width:20px;height:20px" aria-hidden="true"></i></div>
+      <div class="it"><i data-lucide="settings" style="width:20px;height:20px" aria-hidden="true"></i></div>
+      <div class="sp"></div>
+      <div class="it"><i data-lucide="lock" style="width:20px;height:20px" aria-hidden="true"></i></div>
+    </div>
+    <div class="main">
+      <div class="topbar">
+        <h2>机密信息</h2>
+        <div class="search"><i data-lucide="search" style="width:15px;height:15px" aria-hidden="true"></i>搜索标题或主密钥 ID…</div>
+        <div class="act sec"><i data-lucide="download" style="width:15px;height:15px" aria-hidden="true"></i>导入</div>
+        <div class="act pri"><i data-lucide="plus" style="width:15px;height:15px" aria-hidden="true"></i>新增</div>
+      </div>
+      <div class="cols">
+        <div class="listcol">
+          <div class="lh">0 / 15 条 · 基础版</div>
+          <div class="row sel">
+            <div class="av"><i data-lucide="file-text" style="width:18px;height:18px" aria-hidden="true"></i></div>
+            <div class="tx"><div class="a">工作备用门禁</div><div class="b">MK-7A2F · 个人主密钥</div></div>
+            <i data-lucide="copy" style="width:15px;height:15px;color:#adb5bd" aria-hidden="true"></i>
+            <i data-lucide="eye" style="width:15px;height:15px;color:#adb5bd" aria-hidden="true"></i>
+          </div>
+          <div class="row">
+            <div class="av"><i data-lucide="file-text" style="width:18px;height:18px" aria-hidden="true"></i></div>
+            <div class="tx"><div class="a">旅行应急信息</div><div class="b">MK-7A2F · 个人主密钥</div></div>
+            <i data-lucide="copy" style="width:15px;height:15px;color:#adb5bd" aria-hidden="true"></i>
+            <i data-lucide="eye" style="width:15px;height:15px;color:#adb5bd" aria-hidden="true"></i>
+          </div>
+          <div class="row">
+            <div class="av warn"><i data-lucide="file-warning" style="width:18px;height:18px" aria-hidden="true"></i></div>
+            <div class="tx"><div class="a">旧设备恢复记录</div><div class="b"><span class="q">MK-4088?</span> · 主密钥缺失</div></div>
+            <i data-lucide="copy" style="width:15px;height:15px;color:#adb5bd" aria-hidden="true"></i>
+            <i data-lucide="eye" style="width:15px;height:15px;color:#adb5bd" aria-hidden="true"></i>
+          </div>
+          <div class="row">
+            <div class="av"><i data-lucide="file-text" style="width:18px;height:18px" aria-hidden="true"></i></div>
+            <div class="tx"><div class="a">紧急联络备忘</div><div class="b">MK-9C10 · 本地可用</div></div>
+            <i data-lucide="copy" style="width:15px;height:15px;color:#adb5bd" aria-hidden="true"></i>
+            <i data-lucide="eye" style="width:15px;height:15px;color:#adb5bd" aria-hidden="true"></i>
+          </div>
+        </div>
+        <div class="detail">
+          <h3>工作备用门禁 <span class="badge">MK-7A2F</span></h3>
+          <div class="kv"><div class="k">主密钥 ID</div><div class="v">mk7a2f…（16 字节）</div></div>
+          <div class="kv"><div class="k">主密钥名称</div><div class="v plain">个人主密钥</div></div>
+          <div class="kv"><div class="k">标题</div><div class="v plain">工作备用门禁</div></div>
+          <div class="kv"><div class="k">机密信息</div><div class="v plain">默认掩码，查看后显示</div></div>
+          <div style="font-size:12px;color:var(--sk-sub);margin-top:16px;background:var(--sk-wash);padding:10px 12px;border-radius:8px">默认掩码，查看后才显示。切换界面或进入后台，立即隐藏明文。</div>
+          <div class="btns">
+            <div class="b1"><i data-lucide="copy" style="width:15px;height:15px" aria-hidden="true"></i>复制</div>
+            <div class="b1" style="background:var(--sk-card);color:var(--sk-text);border:1px solid var(--sk-line)"><i data-lucide="download" style="width:15px;height:15px" aria-hidden="true"></i>导出</div>
+            <div class="b2"><i data-lucide="trash-2" style="width:15px;height:15px" aria-hidden="true"></i>删除</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>lucide.createIcons({ attrs: { width: 16, height: 16 } });</script>
+</div>
