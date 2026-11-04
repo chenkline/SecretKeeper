@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// 底部导航三页（画板 11/14/20 的底部栏）。
 enum SkTab: String, CaseIterable {
@@ -17,6 +18,12 @@ enum SkTab: String, CaseIterable {
 
 /// 主界面骨架：内容区 + 底部三 tab 导航。
 struct MainTabs: View {
+    init() {
+        // v3 Bitwarden 移动式：tab 栏白底、选中主蓝（色板已同步）。
+        UITabBar.appearance().unselectedItemTintColor = UIColor(
+            red: 0x6C/255, green: 0x75/255, blue: 0x7D/255, alpha: 1)
+    }
+
     @EnvironmentObject var state: AppViewModel
     @Binding var tab: SkTab
     let onOpenForm: (SkForm) -> Void
