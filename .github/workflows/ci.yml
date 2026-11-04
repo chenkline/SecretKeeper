@@ -97,12 +97,13 @@ jobs:
           pwsh -NoProfile -File windows/scripts/build.ps1 -Conformance -Architecture x64
           build\windows\x64\Release\crypto_conformance.exe > conformance-windows.txt
           type conformance-windows.txt
-      - name: 缓存一致性 transcript（内部传递，不进 Artifacts）
+      - name: 传递一致性 transcript（job output，不进 Artifacts）
         if: always()
-        uses: actions/cache/save@v4
-        with:
-          key: conformance-windows-${{ github.run_id }}
-          path: conformance-windows.txt
+        shell: pwsh
+        run: |
+          "transcript<<TRANS_EOL" | Add-Content $env:GITHUB_OUTPUT
+          Get-Content conformance-windows.txt | ForEach-Object { $_ | Add-Content $env:GITHUB_OUTPUT }
+          "TRANS_EOL" | Add-Content $env:GITHUB_OUTPUT
       - name: 上传测试日志
         if: always()
         uses: actions/upload-artifact@v4
@@ -271,12 +272,12 @@ jobs:
           ctest --test-dir build/linux/x64 --output-on-failure
       - name: 生成跨平台一致性探针
         run: ./build/linux/x64/Release/sk_crypto_conformance | tee conformance-linux.txt
-      - name: 缓存一致性 transcript（内部传递，不进 Artifacts）
+      - name: 传递一致性 transcript（job output，不进 Artifacts）
         if: always()
-        uses: actions/cache/save@v4
-        with:
-          key: conformance-linux-${{ github.run_id }}
-          path: conformance-linux.txt
+        run: |
+          echo "transcript<<TRANS_EOL" >> "$GITHUB_OUTPUT"
+          cat conformance-linux.txt >> "$GITHUB_OUTPUT"
+          echo "TRANS_EOL"" >> "$GITHUB_OUTPUT"
       - name: 上传 Linux 交付物（x86_64 可执行）
         if: always()
         uses: actions/upload-artifact@v4
@@ -315,12 +316,12 @@ jobs:
           ctest --test-dir build/macos/x64 --output-on-failure
       - name: 生成跨平台一致性探针
         run: ./build/macos/x64/Release/sk_crypto_conformance | tee conformance-macos.txt
-      - name: 缓存一致性 transcript（内部传递，不进 Artifacts）
+      - name: 传递一致性 transcript（job output，不进 Artifacts）
         if: always()
-        uses: actions/cache/save@v4
-        with:
-          key: conformance-macos-${{ github.run_id }}
-          path: conformance-macos.txt
+        run: |
+          echo "transcript<<TRANS_EOL" >> "$GITHUB_OUTPUT"
+          cat conformance-macos.txt >> "$GITHUB_OUTPUT"
+          echo "TRANS_EOL"" >> "$GITHUB_OUTPUT"
       - name: 组装 macOS .app bundle 并打包
         if: always()
         run: |
@@ -352,21 +353,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: 还原 Windows transcript
-        uses: actions/cache/restore@v4
-        with:
-          key: conformance-windows-${{ github.run_id }}
-          path: transcripts
-      - name: 还原 Linux transcript
-        uses: actions/cache/restore@v4
-        with:
-          key: conformance-linux-${{ github.run_id }}
-          path: transcripts
-      - name: 还原 macOS transcript
-        uses: actions/cache/restore@v4
-        with:
-          key: conformance-macos-${{ github.run_id }}
-          path: transcripts
+      - name: 从 needs.outputs 还原三份 transcript
+        run: |
+          mkdir -p transcripts
+          printf '%s
+' "${{ needs.windows.outputs.transcript }}" > transcripts/conformance-windows.txt
+          printf '%s
+' "${{ needs.linux.outputs.transcript }}" > transcripts/conformance-linux.txt
+          printf '%s
+' "${{ needs.macos.outputs.transcript }}" > transcripts/conformance-macos.txt
       - name: 比对
         run: >
           python scripts/compare-conformance.py
