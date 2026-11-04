@@ -277,7 +277,7 @@ jobs:
         run: |
           echo "transcript<<TRANS_EOL" >> "$GITHUB_OUTPUT"
           cat conformance-linux.txt >> "$GITHUB_OUTPUT"
-          echo "TRANS_EOL"" >> "$GITHUB_OUTPUT"
+          echo "TRANS_EOL" >> "$GITHUB_OUTPUT"
       - name: 上传 Linux 交付物（x86_64 可执行）
         if: always()
         uses: actions/upload-artifact@v4
@@ -321,7 +321,7 @@ jobs:
         run: |
           echo "transcript<<TRANS_EOL" >> "$GITHUB_OUTPUT"
           cat conformance-macos.txt >> "$GITHUB_OUTPUT"
-          echo "TRANS_EOL"" >> "$GITHUB_OUTPUT"
+          echo "TRANS_EOL" >> "$GITHUB_OUTPUT"
       - name: 组装 macOS .app bundle 并打包
         if: always()
         run: |
@@ -356,12 +356,9 @@ jobs:
       - name: 从 needs.outputs 还原三份 transcript
         run: |
           mkdir -p transcripts
-          printf '%s
-' "${{ needs.windows.outputs.transcript }}" > transcripts/conformance-windows.txt
-          printf '%s
-' "${{ needs.linux.outputs.transcript }}" > transcripts/conformance-linux.txt
-          printf '%s
-' "${{ needs.macos.outputs.transcript }}" > transcripts/conformance-macos.txt
+          printf '%s\n' "${{ needs.windows.outputs.transcript }}" > transcripts/conformance-windows.txt
+          printf '%s\n' "${{ needs.linux.outputs.transcript }}" > transcripts/conformance-linux.txt
+          printf '%s\n' "${{ needs.macos.outputs.transcript }}" > transcripts/conformance-macos.txt
       - name: 比对
         run: >
           python scripts/compare-conformance.py
