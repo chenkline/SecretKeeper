@@ -97,13 +97,12 @@ jobs:
           pwsh -NoProfile -File windows/scripts/build.ps1 -Conformance -Architecture x64
           build\windows\x64\Release\crypto_conformance.exe > conformance-windows.txt
           type conformance-windows.txt
-      - name: 上传一致性 transcript
+      - name: 缓存一致性 transcript（内部传递，不进 Artifacts）
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/cache/save@v4
         with:
-          name: conformance-windows
+          key: conformance-windows-${{ github.run_id }}
           path: conformance-windows.txt
-          if-no-files-found: error
       - name: 上传测试日志
         if: always()
         uses: actions/upload-artifact@v4
@@ -235,7 +234,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: windows-ui-build
+          name: SecretKeeper-windows-x64
           path: build/windows/x64/Release/SecretKeeper.exe
           if-no-files-found: warn
 
@@ -272,13 +271,12 @@ jobs:
           ctest --test-dir build/linux/x64 --output-on-failure
       - name: 生成跨平台一致性探针
         run: ./build/linux/x64/Release/sk_crypto_conformance | tee conformance-linux.txt
-      - name: 上传一致性 transcript
+      - name: 缓存一致性 transcript（内部传递，不进 Artifacts）
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/cache/save@v4
         with:
-          name: conformance-linux
+          key: conformance-linux-${{ github.run_id }}
           path: conformance-linux.txt
-          if-no-files-found: error
       - name: 上传 Linux 交付物（x86_64 可执行）
         if: always()
         uses: actions/upload-artifact@v4
@@ -317,13 +315,12 @@ jobs:
           ctest --test-dir build/macos/x64 --output-on-failure
       - name: 生成跨平台一致性探针
         run: ./build/macos/x64/Release/sk_crypto_conformance | tee conformance-macos.txt
-      - name: 上传一致性 transcript
+      - name: 缓存一致性 transcript（内部传递，不进 Artifacts）
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/cache/save@v4
         with:
-          name: conformance-macos
+          key: conformance-macos-${{ github.run_id }}
           path: conformance-macos.txt
-          if-no-files-found: error
       - name: 组装 macOS .app bundle 并打包
         if: always()
         run: |
@@ -355,16 +352,27 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: 下载各平台 transcript
-        uses: actions/download-artifact@v4
+      - name: 还原 Windows transcript
+        uses: actions/cache/restore@v4
         with:
+          key: conformance-windows-${{ github.run_id }}
+          path: transcripts
+      - name: 还原 Linux transcript
+        uses: actions/cache/restore@v4
+        with:
+          key: conformance-linux-${{ github.run_id }}
+          path: transcripts
+      - name: 还原 macOS transcript
+        uses: actions/cache/restore@v4
+        with:
+          key: conformance-macos-${{ github.run_id }}
           path: transcripts
       - name: 比对
         run: >
           python scripts/compare-conformance.py
-          transcripts/conformance-windows/conformance-windows.txt
-          transcripts/conformance-linux/conformance-linux.txt
-          transcripts/conformance-macos/conformance-macos.txt
+          transcripts/conformance-windows.txt
+          transcripts/conformance-linux.txt
+          transcripts/conformance-macos.txt
 
   android:
     name: Android (Kotlin/Compose)
