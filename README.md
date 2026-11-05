@@ -181,7 +181,7 @@ dumpbin /dependents build/windows/x64/Release/SecretKeeper.exe
 | `SecretKeeper-linux-x64` | SecretKeeper | x86_64 可执行，依赖系统 X11 库 |
 | `SecretKeeper-macos-x64` | SecretKeeper.app zip | x86_64（ARM 机器经 Rosetta 运行） |
 | `SecretKeeper-android-apk` | debug + release APK | 均可直接安装（v0.0.1 release 用 debug 签名） |
-| `SecretKeeper-ios-app` | ios.app zip | 未签名包，安装需开发者签名/TestFlight |
+| `SecretKeeper-ios-unsigned-ipa` | 未签名 ipa | 用 Sideloadly/AltStore（免费 Apple ID）本机侧载，7 天有效期 |
 
 桌面界面截图见 [docs/ui/screenshots-v2/](docs/ui/screenshots-v2/)（v2 Bitwarden 风格九页）。
 
