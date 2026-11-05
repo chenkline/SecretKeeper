@@ -108,13 +108,14 @@ fun KeysScreen(
 
         state.masterKeys.forEach { item ->
             MasterKeyCard(
-                item,
+                item = item,
                 onExport = {
                     state.pendingExportKey = item.masterKeyId
                     exportTarget = item
                 },
                 onSwitchDefault = { switchTargetId = item.masterKeyId },
                 onDelete = { deleteTargetId = item.masterKeyId },
+                onExportFirst = { state.pendingExportKey = item.masterKeyId },
             )
             Spacer(Modifier.height(12.dp))
         }
@@ -151,6 +152,14 @@ fun KeysScreen(
             DeleteKeyDialog(
                 state = state,
                 targetId = deleteTargetId!!,
+                onExportFirst = {
+                    // 需求 2.6：① 立即导出——关闭删除框，弹出导出保护密码流程；
+                    // 导出完成后用户重开删除流程并选「② 已经导出」。
+                    exportTarget = state.masterKeys.firstOrNull {
+                        it.masterKeyId == deleteTargetId
+                    }
+                    deleteTargetId = null
+                },
                 onConfirm = { pw ->
                     if (state.deleteMasterKey(deleteTargetId!!, pw)) {
                         deleteTargetId = null
@@ -184,6 +193,7 @@ private fun MasterKeyCard(
     onExport: () -> Unit,
     onSwitchDefault: () -> Unit = {},
     onDelete: () -> Unit = {},
+    onExportFirst: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -370,10 +380,12 @@ private fun SwitchDefaultDialog(
 private fun DeleteKeyDialog(
     state: AppViewModel,
     targetId: String,
+    onExportFirst: () -> Unit = {},
     onConfirm: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var pw by remember { mutableStateOf("") }
+    var backupAck by remember { mutableStateOf(false) }
     val target = state.masterKeys.firstOrNull { it.masterKeyId == targetId }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
@@ -382,9 +394,28 @@ private fun DeleteKeyDialog(
             androidx.compose.foundation.layout.Column {
                 androidx.compose.material3.Text(
                     "删除「${target?.name ?: shortId(targetId)}」。其加密的机密信息会保留" +
-                        "（显示黄色问号），删除前建议先导出备份。",
+                        "（显示黄色问号）。删除前必须先导出备份。",
                     fontSize = 13.sp, color = SkColors.TextSub,
                 )
+                Spacer(Modifier.height(10.dp))
+                // 需求 2.6：备份双选项——未选择则不允许删除。
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.TextButton(
+                        onClick = {
+                            // 立即导出：触发导出流程后留在对话框继续验证密码
+                            onExportFirst()
+                        },
+                    ) { androidx.compose.material3.Text("① 立即导出备份") }
+                    androidx.compose.material3.TextButton(
+                        onClick = { backupAck = true },
+                    ) { androidx.compose.material3.Text("② 已经导出") }
+                }
+                if (!backupAck) {
+                    androidx.compose.material3.Text(
+                        "请先完成备份（①或②），才能删除。",
+                        fontSize = 12.sp, color = SkColors.WarnText,
+                    )
+                }
                 Spacer(Modifier.height(10.dp))
                 FormLabel("该主密钥的密码")
                 SkPasswordField(pw, { pw = it }, "输入主密钥密码")
@@ -397,7 +428,7 @@ private fun DeleteKeyDialog(
         confirmButton = {
             androidx.compose.material3.TextButton(
                 onClick = { onConfirm(pw) },
-                enabled = pw.isNotEmpty(),
+                enabled = pw.isNotEmpty() && backupAck,
             ) { androidx.compose.material3.Text("删除", color = SkColors.DangerText) }
         },
         dismissButton = {
