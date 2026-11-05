@@ -443,16 +443,19 @@ jobs:
               -destination "generic/platform=iOS" -configuration Release \
               -derivedDataPath build/ios-dd \
               CODE_SIGNING_ALLOWED=NO
-            # 交付物：未签名 .app（安装需开发者签名/TestFlight，另册处理）
-            (cd build/ios-dd/Build/Products/Release-iphoneos && zip -qry \
-              "$GITHUB_WORKSPACE/SecretKeeper-ios-app.zip" ios.app)
+            # 方案 C（无签名侧载）：标准 ipa 结构（Payload/ios.app），
+            # Sideloadly / AltStore 免费侧载（7 天有效期）；
+            # 正式分发（Ad Hoc/TestFlight）签名流水线另册接入。
+            (cd build/ios-dd/Build/Products/Release-iphoneos && mkdir -p Payload \
+              && cp -R ios.app Payload/ && zip -qry \
+              "$GITHUB_WORKSPACE/SecretKeeper-ios-unsigned.ipa" Payload)
           else
             echo "::notice::ios Xcode 工程尚未创建（UI 壳待后续阶段），跳过构建"
           fi
-      - name: 上传 iOS 交付物（未签名 .app 包）
+      - name: 上传 iOS 交付物（未签名 ipa，Sideloadly/AltStore 侧载）
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: SecretKeeper-ios-app
-          path: SecretKeeper-ios-app.zip
+          name: SecretKeeper-ios-unsigned-ipa
+          path: SecretKeeper-ios-unsigned.ipa
           if-no-files-found: error
