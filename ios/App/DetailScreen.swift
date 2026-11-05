@@ -132,6 +132,10 @@ struct DetailScreen: View {
                 HStack(spacing: 10) {
                     Button {
                         UIPasteboard.general.string = d.plaintext
+                        // 需求 4.3：30 秒后清除剪贴板。
+                        Timer.scheduledTimer(withTimeInterval: 30, repeats: false) { _ in
+                            UIPasteboard.general.string = nil
+                        }
                     } label: {
                         Label("复制", systemImage: "doc.on.doc")
                             .frame(maxWidth: .infinity)
