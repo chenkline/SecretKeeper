@@ -115,7 +115,13 @@ class AppViewModel(dataDir: File) {
 
     fun notifyActivity() {
         service.notifyActivity()
+        lastActivityMs = System.currentTimeMillis()
     }
+
+    /** 需求 4.1：距上次交互的空闲毫秒数（供闲置锁定计时）。 */
+    fun idleMs(): Long = System.currentTimeMillis() - lastActivityMs
+
+    private var lastActivityMs = System.currentTimeMillis()
 
     // ------------------------------------------------ 详情页（画板 15/16）
 

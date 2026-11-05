@@ -83,6 +83,17 @@ class MainActivity : ComponentActivity() {
                         state.rotateKekTick()
                     }
                 }
+
+                // 需求 4.1：闲置 5 分钟自动锁定（任何交互由 notifyActivity 重置）。
+                LaunchedEffect(state.unlocked) {
+                    val idleLimitMs = 5 * 60 * 1000L
+                    while (state.unlocked) {
+                        kotlinx.coroutines.delay(30_000L)  // 30 秒检查周期
+                        if (state.idleMs() >= idleLimitMs) {
+                            state.lock()
+                        }
+                    }
+                }
             }
         }
     }

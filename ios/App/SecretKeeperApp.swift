@@ -25,12 +25,21 @@ struct SecretKeeperApp: App {
 
 struct RootView: View {
     @EnvironmentObject var state: AppViewModel
+    @Environment(\.scenePhase) private var scenePhase
     @State private var tab: SkTab = .secrets
     @State private var form: SkForm?
     @State private var detailId: String?
+    @State private var lastActivity = Date()
+
+    // 需求 4.1：闲置 5 分钟自动锁定（与 v1.5 桌面默认一致）。
+    private let idleLimit: TimeInterval = 5 * 60
 
     var body: some View {
         if state.unlocked {
+            // 需求 4.1：回到前台时若已闲置超限则锁定（后台到达即视为超限起点）。
+            if Date().timeIntervalSince(lastActivity) >= idleLimit {
+                state.lock()
+            }
             if let id = detailId {
                 DetailScreen(secretId: id, onBack: { detailId = nil })
             } else if let f = form {
@@ -44,6 +53,14 @@ struct RootView: View {
             }
         } else {
             UnlockScreen()
+        }
+        .onChange(of: scenePhase) { phase in
+            // 前台交互重置闲置计时；进入后台 5 分钟无交互即锁定。
+            if phase == .active {
+                lastActivity = Date()
+            } else if phase == .background {
+                lastActivity = Date().addingTimeInterval(-idleLimit)
+            }
         }
     }
 }
