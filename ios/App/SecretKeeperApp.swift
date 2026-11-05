@@ -35,24 +35,26 @@ struct RootView: View {
     private let idleLimit: TimeInterval = 5 * 60
 
     var body: some View {
-        if state.unlocked {
-            // 需求 4.1：回到前台时若已闲置超限则锁定（后台到达即视为超限起点）。
-            if Date().timeIntervalSince(lastActivity) >= idleLimit {
-                state.lock()
-            }
-            if let id = detailId {
-                DetailScreen(secretId: id, onBack: { detailId = nil })
-            } else if let f = form {
-                FormScaffold(form: f, onBack: { form = nil })
+        Group {
+            if state.unlocked {
+                // 需求 4.1：回到前台时若已闲置超限则锁定（后台到达即视为超限起点）。
+                if Date().timeIntervalSince(lastActivity) >= idleLimit {
+                    state.lock()
+                }
+                if let id = detailId {
+                    DetailScreen(secretId: id, onBack: { detailId = nil })
+                } else if let f = form {
+                    FormScaffold(form: f, onBack: { form = nil })
+                } else {
+                    MainTabs(tab: $tab, onOpenForm: { form = $0 },
+                             onOpenDetail: { id in
+                                 state.loadDetail(id)
+                                 detailId = id
+                             })
+                }
             } else {
-                MainTabs(tab: $tab, onOpenForm: { form = $0 },
-                         onOpenDetail: { id in
-                             state.loadDetail(id)
-                             detailId = id
-                         })
+                UnlockScreen()
             }
-        } else {
-            UnlockScreen()
         }
         .onChange(of: scenePhase) { phase in
             // 前台交互重置闲置计时；进入后台 5 分钟无交互即锁定。
@@ -60,6 +62,10 @@ struct RootView: View {
                 lastActivity = Date()
             } else if phase == .background {
                 lastActivity = Date().addingTimeInterval(-idleLimit)
+                if state.unlocked {
+                    // 进入后台即视为已达闲置超限（下次回前台先锁定）。
+                    lastActivity = Date().addingTimeInterval(-idleLimit)
+                }
             }
         }
     }
