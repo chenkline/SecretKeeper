@@ -125,7 +125,7 @@ fun KeysScreen(
                 state = state,
                 onConfirm = {
                     exportLauncher.launch("masterkey-" +
-                        (state.pendingExportKey ?: "key").takeLast(8) + ".smk")
+                        (state.pendingExportKey ?: "key").takeLast(8) + ".smkexp")
                 },
                 onDismiss = {
                     exportTarget = null

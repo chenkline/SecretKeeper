@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.secretkeeper.app.ui.AppViewModel
@@ -49,7 +50,7 @@ class MainActivity : ComponentActivity() {
                 androidx.compose.runtime.LaunchedEffect(state.requestSecretExport) {
                     if (state.requestSecretExport != null) {
                         secretExportLauncher.launch("secret-" +
-                            state.requestSecretExport!!.takeLast(8) + ".ssc")
+                            state.requestSecretExport!!.takeLast(8) + ".sscexp")
                     }
                 }
                 if (state.unlocked && detailId != null) {
@@ -73,6 +74,14 @@ class MainActivity : ComponentActivity() {
                     )
                 } else {
                     UnlockScreen(state)
+                }
+
+                // 需求 2.7：30 秒 KEK 轮换定时器（解锁期间生效）。
+                LaunchedEffect(state.unlocked) {
+                    while (state.unlocked) {
+                        kotlinx.coroutines.delay(30_000L)
+                        state.rotateKekTick()
+                    }
                 }
             }
         }

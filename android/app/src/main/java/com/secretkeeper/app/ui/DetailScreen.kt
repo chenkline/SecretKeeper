@@ -193,7 +193,14 @@ fun DetailScreen(
 
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Button(
-                        onClick = { clipboard.setText(AnnotatedString(d.plaintext)) },
+                        onClick = {
+                            clipboard.setText(AnnotatedString(d.plaintext))
+                            // 需求 4.3：30 秒后清除剪贴板。
+                            android.os.Handler(android.os.Looper.getMainLooper())
+                                .postDelayed({
+                                    clipboard.setText(AnnotatedString(""))
+                                }, 30_000L)
+                        },
                         enabled = !d.plaintextMasked,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(8.dp),
